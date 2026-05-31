@@ -257,6 +257,257 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [results, setResults] = useState<AnalysisResult | null>(null);
+
+  const loadDemoData = (speciesName: 'Bovine' | 'Equine') => {
+    const profile = SPECIES_PROFILES[speciesName] || SPECIES_PROFILES['Bovine'];
+    const isBovine = speciesName === 'Bovine';
+    
+    const demoSpermatList: SpermData[] = [
+      {
+        id: "SPM-001",
+        path: Array.from({ length: 40 }, (_, i) => ({
+          x: 120 + Math.sin(i * 0.4) * (isBovine ? 18 : 25) + i * 1.5,
+          y: 110 + Math.cos(i * 0.4) * (isBovine ? 15 : 20) + i * 1.2,
+          z: Math.sin(i * 0.2) * 4,
+          t: i * 0.016
+        })),
+        vcl: isBovine ? 142.5 : 124.6,
+        vsl: isBovine ? 84.1 : 68.2,
+        vap: isBovine ? 98.4 : 82.5,
+        lin: isBovine ? 0.59 : 0.55,
+        str: isBovine ? 0.85 : 0.83,
+        wob: isBovine ? 0.69 : 0.66,
+        alh: isBovine ? 4.25 : 3.85,
+        bcf: isBovine ? 28.4 : 26.1,
+        mad: isBovine ? 12.8 : 14.5,
+        morphometry: {
+          area: isBovine ? 32.5 : 28.4,
+          perimeter: isBovine ? 24.1 : 21.2,
+          length: isBovine ? 8.4 : 7.6,
+          width: isBovine ? 4.2 : 3.9,
+          circularity: isBovine ? 0.82 : 0.80,
+          elongation: 1.25
+        },
+        morphology: {
+          head: 'normal',
+          vacuoles: 'absent',
+          acrosome: 'normal',
+          midpiece: 'normal',
+          tail: 'normal',
+          droplet: 'none'
+        },
+        vitality: 'live',
+        classification: 'progressive',
+        isHyperactivated: isBovine ? true : false,
+        sdf: {
+          fragmented: false,
+          haloSized: 14.2,
+          dfi: 8.5
+        }
+      },
+      {
+        id: "SPM-002",
+        path: Array.from({ length: 40 }, (_, i) => ({
+          x: 250 + Math.sin(i * 0.8) * 4,
+          y: 160 + i * 0.4,
+          z: Math.cos(i * 0.4) * 2,
+          t: i * 0.016
+        })),
+        vcl: isBovine ? 46.2 : 38.4,
+        vsl: isBovine ? 15.5 : 12.1,
+        vap: isBovine ? 22.8 : 18.5,
+        lin: isBovine ? 0.34 : 0.31,
+        str: isBovine ? 0.68 : 0.65,
+        wob: isBovine ? 0.49 : 0.48,
+        alh: isBovine ? 1.85 : 1.55,
+        bcf: isBovine ? 11.2 : 9.8,
+        mad: isBovine ? 35.4 : 38.2,
+        morphometry: {
+          area: isBovine ? 36.4 : 31.2,
+          perimeter: isBovine ? 26.5 : 23.4,
+          length: isBovine ? 9.2 : 8.1,
+          width: isBovine ? 4.6 : 4.1,
+          circularity: isBovine ? 0.74 : 0.72,
+          elongation: 1.38
+        },
+        morphology: {
+          head: 'pyriform',
+          vacuoles: 'absent',
+          acrosome: 'abnormal',
+          midpiece: 'bent',
+          tail: 'normal',
+          droplet: 'none'
+        },
+        vitality: 'live',
+        classification: 'non-progressive',
+        isHyperactivated: false,
+        sdf: {
+          fragmented: false,
+          haloSized: 11.5,
+          dfi: 12.4
+        }
+      },
+      {
+        id: "SPM-003",
+        path: Array.from({ length: 40 }, (_, i) => ({
+          x: 180 + Math.sin(i * 0.2) * 2,
+          y: 220 + Math.sin(i * 0.1) * 2,
+          z: 0,
+          t: i * 0.016
+        })),
+        vcl: 5.2,
+        vsl: 0.8,
+        vap: 1.5,
+        lin: 0.15,
+        str: 0.53,
+        wob: 0.28,
+        alh: 0.25,
+        bcf: 1.1,
+        mad: 2.5,
+        morphometry: {
+          area: isBovine ? 31.8 : 27.5,
+          perimeter: isBovine ? 22.4 : 19.8,
+          length: isBovine ? 8.1 : 7.2,
+          width: isBovine ? 4.0 : 3.6,
+          circularity: isBovine ? 0.86 : 0.84,
+          elongation: 1.15
+        },
+        morphology: {
+          head: 'amorphous',
+          vacuoles: 'present',
+          acrosome: 'abnormal',
+          midpiece: 'asymmetric',
+          tail: 'coiled',
+          droplet: 'proximal'
+        },
+        vitality: 'dead',
+        classification: 'immotile',
+        isHyperactivated: false,
+        sdf: {
+          fragmented: true,
+          haloSized: 3.2,
+          dfi: 84.5
+        }
+      }
+    ];
+
+    const demoSummary = {
+      totalCount: 84,
+      concentration: isBovine ? 562.5 : 124.8,
+      leukocytes: 0.15,
+      vitality: {
+        live: isBovine ? 84.5 : 78.2,
+        dead: isBovine ? 15.5 : 21.8,
+        total: 100
+      },
+      motility: {
+        progressive: isBovine ? 58.4 : 52.6,
+        nonProgressive: isBovine ? 18.2 : 16.4,
+        immotile: isBovine ? 23.4 : 31.0,
+        total: isBovine ? 76.6 : 69.0
+      },
+      kinematics: {
+        avgVcl: isBovine ? 128.4 : 110.5,
+        avgVsl: isBovine ? 74.2 : 62.4,
+        avgVap: isBovine ? 88.5 : 74.2,
+        avgLin: isBovine ? 0.58 : 0.56,
+        avgStr: isBovine ? 0.84 : 0.84,
+        avgWob: isBovine ? 0.69 : 0.67,
+        avgAlh: isBovine ? 3.95 : 3.45,
+        avgBcf: isBovine ? 26.4 : 24.2,
+        hyperactivation: {
+          count: isBovine ? 8 : 4,
+          percentage: isBovine ? 9.5 : 4.8
+        }
+      },
+      morphology: {
+        normal: isBovine ? 76.5 : 54.2,
+        abnormal: isBovine ? 23.5 : 45.8,
+        avgArea: isBovine ? 32.8 : 28.5,
+        tzi: isBovine ? 1.15 : 1.34,
+        mai: isBovine ? 1.10 : 1.22,
+        headDefects: {
+          large: 2.1,
+          small: 1.4,
+          amorphous: 3.8,
+          pyriform: 2.8,
+          tapered: 2.2,
+          round: 1.0
+        },
+        midpieceDefects: {
+          thick: isBovine ? 1.8 : 3.2,
+          bent: isBovine ? 3.2 : 5.8,
+          asymmetric: isBovine ? 1.5 : 2.4
+        },
+        tailDefects: {
+          short: 1.2,
+          coiled: isBovine ? 2.1 : 4.5,
+          bent: isBovine ? 2.5 : 4.8,
+          multiple: 0.6
+        },
+        acrosomeDefects: isBovine ? 2.1 : 4.2,
+        cytoplasmicDroplets: isBovine ? 1.4 : 3.1
+      },
+      sdf: {
+        dfi: isBovine ? 11.4 : 18.2,
+        fragmentedCount: isBovine ? 10 : 15,
+        totalCount: 84
+      },
+      interpretation: {
+        status: isBovine ? 'normal' as const : 'borderline' as const,
+        comments: isBovine 
+          ? [
+              "Patient concentration and total motility exceed criteria for bovine cryostorage reference limits (>70M/ml / >50%).",
+              "Superb acrosome structure and extremely low DNA Fragmentation Index (11.4%).",
+              "Low level of cytological and morphological defects detected overall."
+            ]
+          : [
+               "Equine concentration falls within normal fertile limits, but progressive mobility is borderline compared to premium stallion registries.",
+               "Slightly elevated midpiece and tail defects (bent midpieces and coiled tails) noted upon visual magnification.",
+               "DNA Fragmentation remains acceptable for AI procedures, but cooling and transportation should be conducted with care."
+            ],
+        recommendations: isBovine
+          ? [
+              "Approved for dilution and straw cryopreservation. Suggested dose target: 20 Million active sperm.",
+              "Excellent choice for immediate artificial insemination procedures."
+            ]
+          : [
+              "Formulate dose with nutrient-rich protective extender immediately following ejaculation.",
+              "Retest specimen quality after 24 hours of refrigerated storage (4°C) to verify cooling stability."
+            ]
+      }
+    };
+
+    setResults({
+      timestamp: new Date().toISOString(),
+      patientId: isBovine ? "BOV-9872" : "EQU-3421",
+      species: speciesName,
+      settings: {
+        fps: 60,
+        micronsPerPixel: 0.65,
+        profile
+      },
+      summary: demoSummary,
+      spermatozoa: demoSpermatList
+    });
+
+    setClinicianName('Dr. Sarah Jenkins, DVM');
+    setFacilityName('Central Semen Pathology Lab');
+    setCollectionMethod('Artificial Vagina');
+    setSampleVolume(isBovine ? '6.0' : '55.0');
+    setSamplePh(isBovine ? '6.8' : '7.4');
+    setSampleAppearance(isBovine ? 'Creamy Opaque' : 'Translucent Gray-White');
+    setClinicianRemarks(isBovine 
+      ? 'Excellent specimen quality. Retains high linearity parameters and low risk profile. Qualified for pedigree distribution.'
+      : 'Ejaculate volume is within standard stallion ranges. Recommend immediate extension to limit thermal shocks.'
+    );
+
+    setSelectedSperm(demoSpermatList[0]);
+    setAiAnalysis(isBovine 
+      ? 'Comprehensive Bovine (Bull) semen analysis displays robust concentration peaks exceeding 560 M/mL. Combined with progressive motility of 58.4%, the sample is deemed biologically premium and fit for high-throughput pedigree seeding lines.'
+      : 'Equine (Stallion) evaluation reveals progressive parameters bordering on critical thresholds. While overall concentration is strong, progressive motility measures of 52.6% warrant careful monitoring of transport temperatures.'
+    );
+  };
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -3499,6 +3750,38 @@ Digital Signature Verified - ATSA AI Engine v2.0
                             {/* Document Frame styling */}
                             <div className="rounded-[24px] shadow-2xl overflow-hidden border border-black/10">
                               
+                              {/* Tour Mode Banner (Visible in UI, Hidden in Print/PDF as it sits outside the selector) */}
+                              {(results?.patientId === "BOV-9872" || results?.patientId === "EQU-3421") && (
+                                <div className="bg-slate-900 border-b border-white/10 px-4 py-3 flex items-center justify-between gap-3 text-xs font-medium text-white select-none">
+                                  <div className="flex items-center gap-2">
+                                    <span className="flex h-2 w-2 relative">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
+                                    <span className="text-[10px] tracking-wide text-slate-300 font-sans">
+                                      🔬 <strong className="text-white">Active Demo Specimen</strong> ({results.species}) Loaded
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      onClick={() => loadDemoData(results.species === 'Bovine' ? 'Equine' : 'Bovine')}
+                                      className="px-2 py-1 bg-white/5 hover:bg-white/10 rounded text-[9px] font-bold uppercase transition-colors cursor-pointer font-sans"
+                                    >
+                                      Switch Sample
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setResults(null);
+                                        setClinicianRemarks('');
+                                      }}
+                                      className="px-2 py-1 bg-red-500/15 hover:bg-red-500/30 text-red-500 rounded text-[9px] font-bold uppercase transition-colors cursor-pointer font-sans"
+                                    >
+                                      Clear Data
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                              
                               {/* Clinical White Paper Report Document (Pure Printable Style) */}
                               <div id="analysis-report" className="p-8 bg-white text-black relative select-text text-left">
                                 
@@ -4084,11 +4367,33 @@ Digital Signature Verified - ATSA AI Engine v2.0
                     )}
                   </>
                 ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center p-6">
-                    <Activity className="w-12 h-12 text-white/5 mb-4" />
-                    <p className="text-xs text-white/40 leading-relaxed">
-                      Start the CASA engine to begin real-time kinematic analysis and motility profiling.
-                    </p>
+                  <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-6">
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                      <Microscope className="w-10 h-10 text-emerald-400" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-black uppercase tracking-wider text-white">No Active Analysis Data</h3>
+                      <p className="text-[10px] text-white/40 leading-relaxed max-w-[240px] mx-auto">
+                        To view your {activeTab} analytics, start the live CASA tracker, upload a semen macro recording, or load one of our high-integrity sample datasets below:
+                      </p>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2 w-full max-w-[240px]">
+                      <button 
+                        onClick={() => loadDemoData('Bovine')}
+                        className="py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] uppercase rounded-xl transition-all shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        Load Bull Specimen
+                      </button>
+                      <button 
+                        onClick={() => loadDemoData('Equine')}
+                        className="py-2.5 px-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] uppercase rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Activity className="w-3.5 h-3.5 text-purple-400" />
+                        Load Stallion Specimen
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
