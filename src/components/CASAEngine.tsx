@@ -232,6 +232,14 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     targetConcentration: 20,
     useMotileSperm: true
   });
+  const [calculatorSubTab, setCalculatorSubTab] = useState<'dilution' | 'multifield'>('dilution');
+  const [extenderType, setExtenderType] = useState<'commercial' | 'egg_yolk' | 'milk_glycerol'>('commercial');
+  const [strawSize, setStrawSize] = useState<0.25 | 0.5>(0.5);
+  const [qcFields, setQcFields] = useState([
+    { id: 1, active: true, name: 'Field A (Front Left)', concentration: 120, progressive: 55 },
+    { id: 2, active: true, name: 'Field B (Front Right)', concentration: 115, progressive: 52 },
+    { id: 3, active: true, name: 'Field C (Deep Centric)', concentration: 122, progressive: 58 }
+  ]);
   const [reportSections, setReportSections] = useState({
     kinematics: true,
     morphology: true,
@@ -508,6 +516,17 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       : 'Equine (Stallion) evaluation reveals progressive parameters bordering on critical thresholds. While overall concentration is strong, progressive motility measures of 52.6% warrant careful monitoring of transport temperatures.'
     );
   };
+
+  // Sync QC fields with loaded specimen results for visual continuity
+  useEffect(() => {
+    if (results) {
+      setQcFields([
+        { id: 1, active: true, name: 'Field A (Front Left)', concentration: Math.round(results.summary.concentration * 10) / 10, progressive: Math.round(results.summary.motility.progressive * 10) / 10 },
+        { id: 2, active: true, name: 'Field B (Front Right)', concentration: Math.max(1, Math.round(results.summary.concentration * 0.94 * 10) / 10), progressive: Math.max(0, Math.round(results.summary.motility.progressive * 0.91 * 10) / 10) },
+        { id: 3, active: true, name: 'Field C (Deep Centric)', concentration: Math.round(results.summary.concentration * 1.05 * 10) / 10, progressive: Math.min(100, Math.round(results.summary.motility.progressive * 1.03 * 10) / 10) }
+      ]);
+    }
+  }, [results]);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -2270,108 +2289,469 @@ Digital Signature Verified - ATSA AI Engine v2.0
                 {activeTab === 'calculator' && (
                   <div className="space-y-6">
                     <section>
-                      <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-4">Dose & Dilution Calculator</h3>
-                      
-                      <div className="space-y-4">
-                        <div className="bg-black/40 p-4 rounded-2xl border border-white/5 space-y-4">
-                          <div>
-                            <label className="text-[10px] text-white/40 uppercase font-bold block mb-2">Ejaculate Volume (ml)</label>
-                            <input 
-                              type="number" 
-                              value={calculator.ejaculateVolume}
-                              onChange={(e) => setCalculator({...calculator, ejaculateVolume: parseFloat(e.target.value) || 0})}
-                              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-white font-mono text-sm focus:outline-none focus:border-emerald-500/50 transition-all"
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="text-[10px] text-white/40 uppercase font-bold block mb-2">Target Concentration (M/dose)</label>
-                            <input 
-                              type="number" 
-                              value={calculator.targetConcentration}
-                              onChange={(e) => setCalculator({...calculator, targetConcentration: parseFloat(e.target.value) || 0})}
-                              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-white font-mono text-sm focus:outline-none focus:border-emerald-500/50 transition-all"
-                            />
-                          </div>
+                      <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-4">Laboratory Utilities</h3>
 
-                          <div className="flex items-center justify-between py-2">
-                            <span className="text-[10px] text-white/40 uppercase font-bold">Use Progressive Motility</span>
-                            <button 
-                              onClick={() => setCalculator({...calculator, useMotileSperm: !calculator.useMotileSperm})}
-                              className={cn(
-                                "w-10 h-5 rounded-full transition-all relative",
-                                calculator.useMotileSperm ? "bg-emerald-500" : "bg-white/10"
-                              )}
-                            >
-                              <div className={cn(
-                                "absolute top-1 w-3 h-3 rounded-full bg-white transition-all",
-                                calculator.useMotileSperm ? "left-6" : "left-1"
-                              )} />
-                            </button>
-                          </div>
-                        </div>
+                      {/* Tab Sub-Selector */}
+                      <div className="flex bg-black/45 p-1 rounded-xl border border-white/5 mb-6">
+                        <button
+                          type="button"
+                          onClick={() => setCalculatorSubTab('dilution')}
+                          className={cn(
+                            "flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                            calculatorSubTab === 'dilution' ? "bg-emerald-500 text-white shadow" : "text-white/40 hover:text-white"
+                          )}
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          Dose & Dilution Extender
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCalculatorSubTab('multifield')}
+                          className={cn(
+                            "flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                            calculatorSubTab === 'multifield' ? "bg-emerald-500 text-white shadow" : "text-white/40 hover:text-white"
+                          )}
+                        >
+                          <LayoutGrid className="w-3.5 h-3.5" />
+                          Multi-Field Microscope QC
+                        </button>
+                      </div>
 
-                        {results ? (
-                          <div className="space-y-3">
-                            <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl">
-                              <div className="flex justify-between items-center mb-4">
-                                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Calculation Results</span>
-                                <Zap className="w-3 h-3 text-emerald-400" />
+                      {calculatorSubTab === 'dilution' ? (
+                        <div className="space-y-4 text-left">
+                          <div className="bg-black/40 p-4 rounded-2xl border border-white/5 space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[10px] text-white/40 uppercase font-bold block mb-2">Ejaculate Volume (ml)</label>
+                                <input 
+                                  type="number" 
+                                  step="0.1"
+                                  value={calculator.ejaculateVolume}
+                                  onChange={(e) => setCalculator({...calculator, ejaculateVolume: parseFloat(e.target.value) || 0})}
+                                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-white font-mono text-sm focus:outline-none focus:border-emerald-500/50 transition-all"
+                                />
                               </div>
                               
-                              <div className="space-y-3">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-white/40 font-bold uppercase">Total Sperm</span>
-                                  <span className="text-sm font-mono text-white">{(results.summary.concentration * calculator.ejaculateVolume).toFixed(0)} M</span>
-                                </div>
-                                
-                                {calculator.useMotileSperm && (
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-[10px] text-white/40 font-bold uppercase">Total Motile Sperm</span>
-                                    <span className="text-sm font-mono text-white">
-                                      {(results.summary.concentration * calculator.ejaculateVolume * (results.summary.motility.progressive / 100)).toFixed(0)} M
-                                    </span>
-                                  </div>
-                                )}
+                              <div>
+                                <label className="text-[10px] text-white/40 uppercase font-bold block mb-2">Target Conc (M/dose)</label>
+                                <input 
+                                  type="number" 
+                                  value={calculator.targetConcentration}
+                                  onChange={(e) => setCalculator({...calculator, targetConcentration: parseFloat(e.target.value) || 0})}
+                                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-white font-mono text-sm focus:outline-none focus:border-emerald-500/50 transition-all"
+                                />
+                              </div>
+                            </div>
 
-                                <div className="h-px bg-white/5 my-2" />
-
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-emerald-400 font-bold uppercase">Possible Doses</span>
-                                  <span className="text-xl font-mono text-white font-bold">
-                                    {Math.floor(
-                                      (results.summary.concentration * calculator.ejaculateVolume * (calculator.useMotileSperm ? results.summary.motility.progressive / 100 : 1)) / 
-                                      calculator.targetConcentration
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[10px] text-white/40 uppercase font-bold block mb-2">Extender Formula Choice</label>
+                                <select 
+                                  value={extenderType}
+                                  onChange={(e: any) => setExtenderType(e.target.value)}
+                                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500/50 transition-all"
+                                >
+                                  <option value="commercial">Commercial Synthetic Cryo (2-step)</option>
+                                  <option value="egg_yolk">Traditional Egg-Yolk Citrate</option>
+                                  <option value="milk_glycerol">Skimmed Milk Glycerol Buffer</option>
+                                </select>
+                              </div>
+                              
+                              <div>
+                                <label className="text-[10px] text-white/40 uppercase font-bold block mb-2">Cryo-Straw Packaging</label>
+                                <div className="grid grid-cols-2 gap-1.5 p-0.5 bg-black/20 rounded-xl border border-white/10">
+                                  <button
+                                    type="button"
+                                    onClick={() => setStrawSize(0.25)}
+                                    className={cn(
+                                      "py-1 text-[9px] font-bold uppercase rounded-lg transition-all cursor-pointer",
+                                      strawSize === 0.25 ? "bg-white/10 text-white" : "text-white/40 hover:text-white"
                                     )}
-                                  </span>
-                                </div>
-
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-white/40 font-bold uppercase">Extender Volume</span>
-                                  <span className="text-sm font-mono text-white">
-                                    {Math.max(0, (
-                                      (Math.floor(
-                                        (results.summary.concentration * calculator.ejaculateVolume * (calculator.useMotileSperm ? results.summary.motility.progressive / 100 : 1)) / 
-                                        calculator.targetConcentration
-                                      ) * 0.5) - calculator.ejaculateVolume
-                                    )).toFixed(1)} ml
-                                  </span>
+                                  >
+                                    0.25 ml Mini
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setStrawSize(0.5)}
+                                    className={cn(
+                                      "py-1 text-[9px] font-bold uppercase rounded-lg transition-all cursor-pointer",
+                                      strawSize === 0.5 ? "bg-white/10 text-white" : "text-white/40 hover:text-white"
+                                    )}
+                                  >
+                                    0.50 ml Med
+                                  </button>
                                 </div>
                               </div>
                             </div>
-                            <p className="text-[8px] text-white/20 italic text-center">
-                              * Calculation assumes standard 0.5ml straws. Adjust extender volume based on your specific lab protocol.
-                            </p>
+
+                            <div className="flex items-center justify-between py-1">
+                              <div className="flex flex-col">
+                                <span className="text-[10px] text-white/80 font-bold block">Only Account for Progressive Motile Sperm</span>
+                                <span className="text-[8px] text-white/30">Discount dead or immotile sperm from fertilizing quotas</span>
+                              </div>
+                              <button 
+                                type="button"
+                                onClick={() => setCalculator({...calculator, useMotileSperm: !calculator.useMotileSperm})}
+                                className={cn(
+                                  "w-10 h-5 rounded-full transition-all relative cursor-pointer",
+                                  calculator.useMotileSperm ? "bg-emerald-500" : "bg-white/10"
+                                )}
+                              >
+                                <div className={cn(
+                                  "absolute top-1 w-3 h-3 rounded-full bg-white transition-all",
+                                  calculator.useMotileSperm ? "left-6" : "left-1"
+                                )} />
+                              </button>
+                            </div>
                           </div>
-                        ) : (
-                          <div className="bg-black/40 p-6 rounded-2xl border border-white/5 text-center">
-                            <Activity className="w-8 h-8 text-white/10 mx-auto mb-3" />
-                            <p className="text-[10px] text-white/40 leading-relaxed">
-                              Run an analysis first to use the calculator with real-time concentration and motility data.
-                            </p>
+
+                          {results ? (
+                            <div className="space-y-4">
+                              {/* Summary calculations block */}
+                              {(() => {
+                                const spermSource = results.summary.concentration;
+                                const totalSperm = spermSource * calculator.ejaculateVolume;
+                                const motileFactor = calculator.useMotileSperm ? (results.summary.motility.progressive / 100) : 1;
+                                const totalViableSperm = totalSperm * motileFactor;
+                                const targetDoses = Math.floor(totalViableSperm / calculator.targetConcentration);
+                                const totalFinalVolume = targetDoses * strawSize;
+                                const neededExtenderVolume = Math.max(0, totalFinalVolume - calculator.ejaculateVolume);
+                                const dilutionRatio = calculator.ejaculateVolume > 0 ? (neededExtenderVolume / calculator.ejaculateVolume) : 0;
+                                const fractionA = neededExtenderVolume / 2;
+                                const fractionB = neededExtenderVolume / 2;
+                                
+                                const colorCode = results?.species === 'Bovine' ? 'Emerald Green' : 'Amethyst Purple';
+
+                                return (
+                                  <div className="space-y-4">
+                                    <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl space-y-3">
+                                      <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Calculated Production Recipe</span>
+                                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-2 gap-3 text-left">
+                                        <div className="bg-black/20 p-2.5 rounded-xl border border-white/5">
+                                          <div className="text-[8px] text-white/40 uppercase font-black">Ejaculate Totals</div>
+                                          <div className="text-sm font-mono text-white mt-1">{(totalSperm).toFixed(0)} M <span className="text-[9px] text-white/30 font-sans">sps</span></div>
+                                          <div className="text-[8px] text-emerald-400/80">{(totalViableSperm).toFixed(0)} M Viable</div>
+                                        </div>
+                                        
+                                        <div className="bg-black/20 p-2.5 rounded-xl border border-white/5">
+                                          <div className="text-[8px] text-white/40 uppercase font-black">Total Straw Yield</div>
+                                          <div className="text-sm font-mono text-white mt-1 font-bold">{targetDoses} <span className="text-[8px] text-white/30 font-sans">Straws</span></div>
+                                          <div className="text-[8px] text-white/40">{strawSize} ml sizing</div>
+                                        </div>
+                                      </div>
+
+                                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 space-y-2">
+                                        <div className="flex justify-between text-xs">
+                                          <span className="text-[10px] text-white/40 uppercase font-bold">Total Extender Needed:</span>
+                                          <span className="font-mono text-emerald-400 font-bold">{neededExtenderVolume.toFixed(2)} ml</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs">
+                                          <span className="text-[10px] text-white/40 uppercase font-bold text-[9px]">Semen to Extender Ratio:</span>
+                                          <span className="font-mono text-white text-[10px]">1 : {dilutionRatio.toFixed(2)}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Action Protocol Steps */}
+                                    <div className="bg-black/40 p-4 rounded-2xl border border-white/5 space-y-4 text-left">
+                                      <h4 className="text-[10px] font-black uppercase text-white/60 tracking-wider flex items-center gap-1.5">
+                                        <Sliders className="w-3 h-3 text-amber-500" />
+                                        Cryo Dilution Protocol Timeline
+                                      </h4>
+
+                                      <div className="space-y-4 border-l border-white/10 ml-2.5 pl-4 relative">
+                                        {/* Step 1 */}
+                                        <div className="relative">
+                                          <div className="absolute -left-[21px] top-1 w-2 h-2 rounded-full bg-emerald-500 border border-slate-900" />
+                                          <div className="text-[9px] font-bold text-white uppercase tracking-wider">Step 1: Fraction A (Cooling Phase)</div>
+                                          <p className="text-[10px] text-white/40 mt-1 leading-relaxed">
+                                            Mix <strong className="text-white font-mono">{fractionA.toFixed(2)} ml</strong> of temperate {extenderType === 'commercial' ? "Fraction A synthetic buffer" : extenderType === 'egg_yolk' ? "custom egg-yolk-citrate" : "skim milk buffer"} into the {calculator.ejaculateVolume}ml ejaculate. Introduce slowly down container wall at room temp.
+                                          </p>
+                                        </div>
+
+                                        {/* Step 2 */}
+                                        <div className="relative">
+                                          <div className="absolute -left-[21px] top-1 w-2 h-2 rounded-full bg-amber-500 border border-slate-900" />
+                                          <div className="text-[9px] font-bold text-white uppercase tracking-wider">Step 2: Equilibrating</div>
+                                          <p className="text-[10px] text-white/40 mt-1 leading-relaxed">
+                                            Transfer specimen into standard cooling cabinet. Program temperature gradient. Cool from 22°C to 4°C slowly over 2.5 hours to avoid cold shock.
+                                          </p>
+                                        </div>
+
+                                        {/* Step 3 */}
+                                        <div className="relative">
+                                          <div className="absolute -left-[21px] top-1 w-2 h-2 rounded-full bg-blue-500 border border-slate-900" />
+                                          <div className="text-[9px] font-bold text-white uppercase tracking-wider">Step 3: Fraction B & Glycerolizing</div>
+                                          <p className="text-[10px] text-white/40 mt-1 leading-relaxed">
+                                            Slowly incorporate <strong className="text-white font-mono">{fractionB.toFixed(2)} ml</strong> of chilled glycerolized {extenderType === 'commercial' ? "Fraction B buffer" : "Glycerol-milk extender"} at 4°C. Add in 3 equal parts over a 30-minute interval to ease osmotic loading.
+                                          </p>
+                                        </div>
+
+                                        {/* Step 4 */}
+                                        <div className="relative">
+                                          <div className="absolute -left-[21px] top-1 w-2 h-2 rounded-full bg-purple-500 border border-slate-900" />
+                                          <div className="text-[9px] font-bold text-white uppercase tracking-wider">Step 4: Pack & Straw Storage</div>
+                                          <p className="text-[10px] text-white/40 mt-1 leading-relaxed">
+                                            Pipette and fill <strong className="text-white font-mono">{targetDoses}</strong> individual {strawSize}ml straws. Seal ultrasound/heat. Apply identification label colored <strong className="text-white">{colorCode}</strong> to represent {results.species} pedigree records. Suspend in liquid nitrogen vapor (-120°C) for 10 minutes prior to immersion.
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          ) : (
+                            <div className="bg-black/40 p-6 rounded-2xl border border-white/5 text-center space-y-4">
+                              <Activity className="w-8 h-8 text-white/10 mx-auto" />
+                              <p className="text-[10px] text-white/40 leading-relaxed max-w-[200px] mx-auto">
+                                To populate the extender cryo protocol with active specimen calculations, load or run an analysis:
+                              </p>
+                              <div className="flex flex-col gap-2 max-w-[180px] mx-auto">
+                                <button 
+                                  type="button"
+                                  onClick={() => loadDemoData('Bovine')}
+                                  className="py-1.5 px-3 bg-emerald-500 hover:bg-emerald-600 text-white text-[9px] font-black uppercase rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+                                >
+                                  <ShieldCheck className="w-3 h-3" />
+                                  Load Bull Specimen
+                                </button>
+                                <button 
+                                  type="button"
+                                  onClick={() => loadDemoData('Equine')}
+                                  className="py-1.5 px-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[9px] font-black uppercase rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+                                >
+                                  <Activity className="w-3 h-3 text-purple-400" />
+                                  Load Stallion Specimen
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-4 text-left">
+                          {/* Microscope QC Tab */}
+                          <div className="bg-black/40 p-4 rounded-2xl border border-white/5 space-y-4 animate-fadeIn">
+                            <div className="flex justify-between items-start gap-4">
+                              <div className="space-y-0.5">
+                                <h4 className="text-[10px] font-black uppercase text-white tracking-wider flex items-center gap-1.5">
+                                  <Microscope className="w-3.5 h-3.5 text-emerald-400" />
+                                  Multi-Field Homogeneity Assayer
+                                </h4>
+                                <p className="text-[8px] text-white/30">Assess slide loading quality across distinct fields using WHO-compliant CV coefficients</p>
+                              </div>
+                              <span className="text-[8px] font-black py-0.5 px-1.5 rounded-md bg-white/5 border border-white/10 text-white/45 uppercase tracking-widest block whitespace-nowrap">CV Limit: 15%</span>
+                            </div>
+
+                            {/* Grid list of fields */}
+                            <div className="space-y-2.5">
+                              {qcFields.map((field, idx) => (
+                                <div key={field.id} className={cn(
+                                  "p-3 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/20",
+                                  field.active ? "border-white/10" : "border-white/5 opacity-40"
+                                )}>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const copy = [...qcFields];
+                                        copy[idx].active = !copy[idx].active;
+                                        setQcFields(copy);
+                                      }}
+                                      className={cn(
+                                        "w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer",
+                                        field.active ? "bg-emerald-500 border-emerald-600 text-white" : "border-white/20 hover:border-white/40"
+                                      )}
+                                    >
+                                      {field.active && <Check className="w-2.5 h-2.5" />}
+                                    </button>
+                                    <div>
+                                      <p className="text-[9px] font-bold text-white/80">{field.name}</p>
+                                      <p className="text-[7px] text-white/30 uppercase tracking-widest font-mono">Index-0{field.id}</p>
+                                    </div>
+                                  </div>
+
+                                  {field.active && (
+                                    <div className="flex items-center gap-3">
+                                      {/* Concentration adjustment */}
+                                      <div className="space-y-1">
+                                        <span className="text-[7px] text-white/40 uppercase font-black block">Concentration (M/ml)</span>
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const copy = [...qcFields];
+                                              copy[idx].concentration = Math.max(0, Math.round((copy[idx].concentration - 2) * 10) / 10);
+                                              setQcFields(copy);
+                                            }}
+                                            className="w-4 h-4 bg-white/5 rounded text-[10px] hover:bg-white/10 flex items-center justify-center text-white cursor-pointer select-none"
+                                          >
+                                            -
+                                          </button>
+                                          <input
+                                            type="number"
+                                            value={field.concentration}
+                                            onChange={(e) => {
+                                              const val = parseFloat(e.target.value) || 0;
+                                              const copy = [...qcFields];
+                                              copy[idx].concentration = val;
+                                              setQcFields(copy);
+                                            }}
+                                            className="w-16 bg-black/40 border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-center font-mono focus:outline-none focus:border-emerald-500 text-white"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const copy = [...qcFields];
+                                              copy[idx].concentration = Math.round((copy[idx].concentration + 2) * 10) / 10;
+                                              setQcFields(copy);
+                                            }}
+                                            className="w-4 h-4 bg-white/5 rounded text-[10px] hover:bg-white/10 flex items-center justify-center text-white cursor-pointer select-none"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      {/* Progressive adjustment */}
+                                      <div className="space-y-1">
+                                        <span className="text-[7px] text-white/40 uppercase font-black block">Progressive %</span>
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const copy = [...qcFields];
+                                              copy[idx].progressive = Math.max(0, Math.round((copy[idx].progressive - 1) * 10) / 10);
+                                              setQcFields(copy);
+                                            }}
+                                            className="w-4 h-4 bg-white/5 rounded text-[10px] hover:bg-white/10 flex items-center justify-center text-white cursor-pointer select-none"
+                                          >
+                                            -
+                                          </button>
+                                          <input
+                                            type="number"
+                                            value={field.progressive}
+                                            onChange={(e) => {
+                                              const val = parseFloat(e.target.value) || 0;
+                                              const copy = [...qcFields];
+                                              copy[idx].progressive = Math.min(100, val);
+                                              setQcFields(copy);
+                                            }}
+                                            className="w-14 bg-black/40 border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-center font-mono focus:outline-none focus:border-emerald-500 text-white"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const copy = [...qcFields];
+                                              copy[idx].progressive = Math.min(100, Math.round((copy[idx].progressive + 1) * 10) / 10);
+                                              setQcFields(copy);
+                                            }}
+                                            className="w-4 h-4 bg-white/5 rounded text-[10px] hover:bg-white/10 flex items-center justify-center text-white cursor-pointer select-none"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* QC Evaluation Card */}
+                            {(() => {
+                              const activeFields = qcFields.filter(f => f.active);
+                              const totalActive = activeFields.length;
+                              
+                              const meanConcentration = totalActive > 0 
+                                ? activeFields.reduce((sum, f) => sum + f.concentration, 0) / totalActive 
+                                : 0;
+                                
+                              const meanProgressive = totalActive > 0 
+                                ? activeFields.reduce((sum, f) => sum + f.progressive, 0) / totalActive 
+                                : 0;
+
+                              // Std Dev of concentration
+                              const varianceConcen = totalActive > 1
+                                ? activeFields.reduce((sum, f) => sum + Math.pow(f.concentration - meanConcentration, 2), 0) / (totalActive - 1)
+                                : 0;
+                              const sdConcentration = Math.sqrt(varianceConcen);
+                              const cvConcentration = meanConcentration > 0 ? (sdConcentration / meanConcentration) * 100 : 0;
+
+                              // Std Dev of progressive motility
+                              const varianceProg = totalActive > 1
+                                ? activeFields.reduce((sum, f) => sum + Math.pow(f.progressive - meanProgressive, 2), 0) / (totalActive - 1)
+                                : 0;
+                              const sdProgressive = Math.sqrt(varianceProg);
+                              const cvProgressive = meanProgressive > 0 ? (sdProgressive / meanProgressive) * 100 : 0;
+
+                              // Maximum of the CV values is our QC metric
+                              const maxCV = Math.max(cvConcentration, cvProgressive);
+
+                              return totalActive > 0 ? (
+                                <div className={cn(
+                                  "p-4 rounded-xl border transition-all space-y-3",
+                                  maxCV <= 10 
+                                    ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-300"
+                                    : maxCV <= 15
+                                      ? "bg-amber-500/5 border-amber-500/20 text-amber-300"
+                                      : "bg-red-500/5 border-red-500/20 text-red-300 animate-pulse border-dashed"
+                                )}>
+                                  <div className="flex items-center justify-between text-xs">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className={cn(
+                                        "w-2 h-2 rounded-full",
+                                        maxCV <= 10 ? "bg-emerald-500" : maxCV <= 15 ? "bg-amber-500" : "bg-red-500 animate-ping"
+                                      )} />
+                                      <span className="font-bold uppercase text-[9px] tracking-wider text-white">Uniformity Status:</span>
+                                      <span className={cn(
+                                        "text-[9px] px-1.5 py-0.5 rounded font-black uppercase text-slate-900",
+                                        maxCV <= 10 ? "bg-emerald-400" : maxCV <= 15 ? "bg-amber-400" : "bg-red-400"
+                                      )}>
+                                        {maxCV <= 10 ? "Optimal Uniformity" : maxCV <= 15 ? "Acceptable Variance" : "Non-Compliant"}
+                                      </span>
+                                    </div>
+                                    <span className="font-mono font-bold text-white text-[10px] whitespace-nowrap">Max CV: {maxCV.toFixed(1)}%</span>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-3 text-xs pt-1 border-t border-white/5">
+                                    <div className="bg-black/10 p-2.5 rounded-lg space-y-0.5">
+                                      <div className="text-[7px] text-white/40 uppercase block">Mean Concentration</div>
+                                      <div className="text-xs font-mono font-bold text-white">{meanConcentration.toFixed(1)} <span className="text-[8px] text-white/30 font-sans">M/ml</span></div>
+                                      <div className="text-[7px] text-white/40 font-mono">CV: {cvConcentration.toFixed(1)}% <span className="text-white/25">(SD: {sdConcentration.toFixed(1)})</span></div>
+                                    </div>
+                                    
+                                    <div className="bg-black/10 p-2.5 rounded-lg space-y-0.5">
+                                      <div className="text-[7px] text-white/40 uppercase block">Mean Progressive</div>
+                                      <div className="text-xs font-mono font-bold text-white">{meanProgressive.toFixed(1)}%</div>
+                                      <div className="text-[7px] text-white/40 font-mono">CV: {cvProgressive.toFixed(1)}% <span className="text-white/25">(SD: {sdProgressive.toFixed(1)})</span></div>
+                                    </div>
+                                  </div>
+
+                                  {/* Clinical advice box */}
+                                  <div className="text-[9px] text-white/45 leading-relaxed pt-1">
+                                    {maxCV <= 10 && (
+                                      <span>✅ <strong>Excellent Homogeneity</strong>: Microscope fields correspond with negligible coefficient drift. Certified with WHO guidelines section 2.4. Specimen is ready for automated clinical profiling.</span>
+                                    )}
+                                    {maxCV > 10 && maxCV <= 15 && (
+                                      <span>⚠️ <strong>Acceptable Multi-Field Variance</strong>: Low level drift identified. Valid for baseline work, but suggest checking that coverslips are balanced and free of shear forces.</span>
+                                    )}
+                                    {maxCV > 15 && (
+                                      <span className="text-red-400/90 font-bold">❌ <strong>CRITICAL STRAW/SLIDE MISALIGNMENT</strong>: Field variance exceeds the 15% WHO maximum threshold. This is likely caused by an uneven counting chamber load, fluid air pockets, or sperm sedimentation. <strong>Clinical Action</strong>: Clean the counting slide/chamber, reload a fresh aliquot, and restart tracking.</span>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-[9px] text-white/30 text-center italic py-4 bg-black/20 rounded-xl">At least one microscopic field must be active for QC evaluation</p>
+                              );
+                            })()}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </section>
                   </div>
                 )}
