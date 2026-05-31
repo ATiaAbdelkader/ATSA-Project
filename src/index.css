@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;950&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Cairo", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  :root {
+    --background: #ffffff;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --primary: #10b981;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #0f172a;
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+    --accent: #f1f5f9;
+    --accent-foreground: #0f172a;
+    --destructive: #ef4444;
+    --destructive-foreground: #f8fafc;
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #10b981;
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: #050505;
+    --foreground: #f8fafc;
+    --card: #0f0f0f;
+    --card-foreground: #f8fafc;
+    --popover: #0f0f0f;
+    --popover-foreground: #f8fafc;
+    --primary: #10b981;
+    --primary-foreground: #050505;
+    --secondary: #1a1a1a;
+    --secondary-foreground: #f8fafc;
+    --muted: #1a1a1a;
+    --muted-foreground: #94a3b8;
+    --accent: #1a1a1a;
+    --accent-foreground: #f8fafc;
+    --destructive: #ef4444;
+    --destructive-foreground: #f8fafc;
+    --border: rgba(255, 255, 255, 0.1);
+    --input: rgba(255, 255, 255, 0.1);
+    --ring: #10b981;
+  }
+
+  body {
+    @apply bg-[var(--background)] text-[var(--foreground)] antialiased transition-colors duration-300;
+  }
+}
+
+/* Custom scrollbar for that dark theme look */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Field Mode - High Contrast for outdoor use */
+.field-mode {
+  --bg-primary: #000000;
+  --accent-primary: #fbbf24; /* Amber 400 */
+}
+
+.field-mode .bg-\[\#0a0a0a\],
+.field-mode .bg-\[\#0f0f0f\],
+.field-mode .bg-\[\#1a1a1a\] {
+  background-color: #000000 !important;
+}
+
+.field-mode .border-white\/10 {
+  border-color: rgba(251, 191, 36, 0.3) !important;
+}
+
+.field-mode .text-white\/40,
+.field-mode .text-white\/60 {
+  color: rgba(251, 191, 36, 0.7) !important;
+}
+
+.field-mode .text-emerald-500 {
+  color: #fbbf24 !important;
+}
+
+.field-mode .bg-emerald-500 {
+  background-color: #fbbf24 !important;
+}
+
+.field-mode .shadow-emerald-500\/20 {
+  box-shadow: 0 10px 15px -3px rgba(251, 191, 36, 0.4) !important;
+}
+
+.field-mode .font-mono {
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+.scanline {
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, transparent, rgba(16, 185, 129, 0.5), transparent);
+  position: absolute;
+  animation: scanline 4s linear infinite;
+  z-index: 10;
+}
+

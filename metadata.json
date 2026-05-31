@@ -1,0 +1,9 @@
+{
+  "name": "ATSA AI - Animal-Assisted Key Semen Analysis",
+  "description": "Instant semen diagnostics from your phone — up to 95% accuracy, no lab required. Powered by ATSA's high-speed neural network for counting 500,000 cells in 3 seconds.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

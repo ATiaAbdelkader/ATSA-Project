@@ -1,0 +1,131 @@
+{
+  "entities": {
+    "Analysis": {
+      "title": "Analysis",
+      "description": "A single semen analysis result",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string", "description": "The ID of the patient/animal" },
+        "species": { "type": "string", "description": "The species of the animal" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the analysis was performed" },
+        "concentration": { "type": "number", "description": "Sperm concentration in M/ml" },
+        "motility": {
+          "type": "object",
+          "properties": {
+            "total": { "type": "number" },
+            "progressive": { "type": "number" }
+          }
+        },
+        "morphology": {
+          "type": "object",
+          "properties": {
+            "normal": { "type": "number" }
+          }
+        },
+        "vitality": {
+          "type": "object",
+          "properties": {
+            "live": { "type": "number" }
+          }
+        },
+        "sdf": {
+          "type": "object",
+          "properties": {
+            "dfi": { "type": "number" }
+          }
+        },
+        "interpretation": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string", "enum": ["normal", "borderline", "abnormal"] },
+            "comments": { "type": "array", "items": { "type": "string" } },
+            "recommendations": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "uid": { "type": "string", "description": "The UID of the user who performed the analysis" }
+      },
+      "required": ["patientId", "timestamp", "uid"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "An animal profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the animal" },
+        "name": { "type": "string", "description": "Name of the animal" },
+        "species": { "type": "string", "description": "Species of the animal" },
+        "breed": { "type": "string", "description": "Breed of the animal" },
+        "owner": { "type": "string", "description": "Owner name or ID" },
+        "uid": { "type": "string", "description": "The UID of the user who owns this patient record" }
+      },
+      "required": ["id", "species", "uid"]
+    },
+    "Sample": {
+      "title": "Sample",
+      "description": "A registered semen sample",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "species": { "type": "string" },
+        "collectionTime": { "type": "string", "format": "date-time" },
+        "abstinenceDays": { "type": "string" },
+        "notes": { "type": "string" },
+        "uid": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["patientId", "uid", "timestamp"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System alerts and notifications",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "warning", "error", "success"] },
+        "read": { "type": "boolean" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "uid": { "type": "string" },
+        "link": { "type": "string", "description": "Optional link to a specific record" }
+      },
+      "required": ["title", "message", "type", "read", "timestamp", "uid"]
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Laboratory reagents and supplies",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string", "enum": ["reagent", "disposable", "equipment", "other"] },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "minThreshold": { "type": "number" },
+        "expiryDate": { "type": "string", "format": "date" },
+        "uid": { "type": "string" }
+      },
+      "required": ["name", "category", "quantity", "unit", "uid"]
+    }
+  },
+  "firestore": {
+    "/analyses/{analysisId}": {
+      "schema": "Analysis",
+      "description": "Collection of all semen analyses"
+    },
+    "/patients/{patientId}": {
+      "schema": "Patient",
+      "description": "Collection of animal profiles"
+    },
+    "/samples/{sampleId}": {
+      "schema": "Sample",
+      "description": "Collection of registered samples"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Collection of user notifications"
+    },
+    "/inventory/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "Collection of laboratory inventory items"
+    }
+  }
+}

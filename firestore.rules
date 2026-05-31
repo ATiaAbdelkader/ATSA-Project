@@ -1,0 +1,140 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /analyses/{analysisId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - species: string
+    //   - timestamp: string (required, ISO 8601)
+    //   - concentration: number
+    //   - motility: map
+    //   - morphology: map
+    //   - vitality: map
+    //   - sdf: map
+    //   - interpretation: map
+    //   - uid: string (required, immutable)
+    //
+    // Collection: /patients/{patientId}
+    // Fields:
+    //   - id: string (required)
+    //   - name: string
+    //   - species: string (required)
+    //   - breed: string
+    //   - owner: string
+    //   - uid: string (required, immutable)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "atia.abdelkader@gmail.com" ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Domain Validators
+    function isValidAnalysis(data) {
+      return data.patientId is string && data.patientId.size() > 0 &&
+             isValidDateString(data.timestamp) &&
+             data.uid is string && data.uid == request.auth.uid;
+    }
+
+    function isValidPatient(data) {
+      return data.id is string && data.id.size() > 0 &&
+             data.species is string && data.species.size() > 0 &&
+             data.uid is string && data.uid == request.auth.uid;
+    }
+
+    function isValidSample(data) {
+      return data.patientId is string && data.patientId.size() > 0 &&
+             data.uid is string && data.uid == request.auth.uid;
+    }
+
+    // Rules
+    // Notification validation
+    function isValidNotification(data) {
+      return hasOnlyAllowedFields(['title', 'message', 'type', 'read', 'timestamp', 'uid', 'link']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.message is string && data.message.size() > 0 && data.message.size() < 500 &&
+             data.type in ['info', 'warning', 'error', 'success'] &&
+             data.read is bool &&
+             data.uid == request.auth.uid;
+    }
+
+    // Inventory validation
+    function isValidInventoryItem(data) {
+      return hasOnlyAllowedFields(['name', 'category', 'quantity', 'unit', 'minThreshold', 'expiryDate', 'uid']) &&
+             data.name is string && data.name.size() > 0 &&
+             data.category in ['reagent', 'disposable', 'equipment', 'other'] &&
+             data.quantity is number &&
+             data.unit is string &&
+             data.uid == request.auth.uid;
+    }
+
+    match /analyses/{analysisId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidAnalysis(request.resource.data) && (request.resource.data.uid == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && isValidAnalysis(request.resource.data) && (resource.data.uid == request.auth.uid || isAdmin()) && request.resource.data.uid == resource.data.uid;
+      allow delete: if isAdmin();
+    }
+
+    match /patients/{patientId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidPatient(request.resource.data) && (request.resource.data.uid == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && isValidPatient(request.resource.data) && (resource.data.uid == request.auth.uid || isAdmin()) && request.resource.data.uid == resource.data.uid;
+      allow delete: if isAdmin();
+    }
+
+    match /samples/{sampleId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidSample(request.resource.data) && (request.resource.data.uid == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && isValidSample(request.resource.data) && (resource.data.uid == request.auth.uid || isAdmin()) && request.resource.data.uid == resource.data.uid;
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidNotification(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && 
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    match /inventory/{itemId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidInventoryItem(request.resource.data);
+      allow update: if isAuthenticated() && isValidInventoryItem(request.resource.data) && (resource.data.uid == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isAdmin();
+    }
+  }
+}
