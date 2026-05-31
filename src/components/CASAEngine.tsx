@@ -30,7 +30,12 @@ import {
   Sliders,
   Wind,
   Contrast as ContrastIcon,
-  Sun as SunIcon
+  Sun as SunIcon,
+  Printer,
+  Copy,
+  FileSpreadsheet,
+  FileText,
+  Tag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -234,6 +239,20 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     sdf: true,
     ai: true
   });
+
+  // Custom metadata and notes for Report section
+  const [clinicianName, setClinicianName] = useState('Dr. Sarah Jenkins, DVM');
+  const [facilityName, setFacilityName] = useState('Central Semen Pathology Lab');
+  const [collectionMethod, setCollectionMethod] = useState<'Artificial Vagina' | 'Electroejaculation' | 'Epididymal Recovery' | 'Manual Stimulation'>('Artificial Vagina');
+  const [sampleVolume, setSampleVolume] = useState('4.5');
+  const [samplePh, setSamplePh] = useState('7.4');
+  const [sampleAppearance, setSampleAppearance] = useState('Opalescent Milky');
+  const [clinicianRemarks, setClinicianRemarks] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
+  const [labelPrinted, setLabelPrinted] = useState(false);
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [labelStorageLoc, setLabelStorageLoc] = useState('Dewar A / Canister 3 / Straw #12');
+  const [labelWarning, setLabelWarning] = useState('Biohazard - Research Only');
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -753,6 +772,180 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     } catch (err) {
       console.error("PDF Export failed:", err);
     }
+  };
+
+  const copyReportToClipboard = () => {
+    if (!results) return;
+    
+    const interpretationText = results.summary.interpretation
+      ? `\nSTATUS: ${results.summary.interpretation.status.toUpperCase()}\n` +
+        `Comments:\n${results.summary.interpretation.comments.map(c => `- ${c}`).join('\n')}\n` +
+        `Recommendations:\n${results.summary.interpretation.recommendations.map(r => `- ${r}`).join('\n')}`
+      : aiAnalysis ? `\nAI Analysis:\n${aiAnalysis}` : '';
+
+    const text = `==================================================
+ATSA COMPUTER-ASSISTED SEMEN ANALYSIS (CASA) REPORT
+==================================================
+Report Date: ${new Date(results.timestamp).toLocaleString()}
+Facility:    ${facilityName}
+Operator:    ${clinicianName}
+
+PATIENT INFORMATION
+--------------------------------------------------
+Patient ID:  ${results.patientId}
+Species:     ${results.species}
+
+COLLECTION & PHYSICAL CHARACTERISTICS
+--------------------------------------------------
+Method:      ${collectionMethod}
+Vol (mL):    ${sampleVolume} | pH: ${samplePh}
+Appearance:  ${sampleAppearance}
+
+KEY PERFORMANCE INDICATORS
+--------------------------------------------------
+Concentration:  ${results.summary.concentration.toFixed(1)} M/mL
+Total Motility: ${results.summary.motility.total.toFixed(1)}%
+Progressive:    ${results.summary.motility.progressive.toFixed(1)}%
+Vitality (Live):${results.summary.vitality.live.toFixed(1)}%
+DFI (SDF):      ${results.summary.sdf.dfi.toFixed(1)}%
+TZI Index:      ${results.summary.morphology.tzi.toFixed(2)}
+MAI Index:      ${results.summary.morphology.mai.toFixed(2)}
+
+CLINICIAN REMARKS
+--------------------------------------------------
+${clinicianRemarks ? clinicianRemarks : 'No custom remarks recorded.'}
+
+${interpretationText}
+==================================================
+Digital Signature Verified - ATSA AI Engine v2.0
+==================================================`;
+
+    navigator.clipboard.writeText(text);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const exportToCSV = () => {
+    if (!results) return;
+    
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Parameter,Value,Reference Range,Units\r\n";
+    
+    // Add General
+    csvContent += `Patient ID,${results.patientId},-,-\r\n`;
+    csvContent += `Species,${results.species},-,-\r\n`;
+    csvContent += `Report Date,${new Date(results.timestamp).toLocaleDateString()},-,-\r\n`;
+    csvContent += `Operator,${clinicianName.replace(/,/g, '')},-,-\r\n`;
+    csvContent += `Facility,${facilityName.replace(/,/g, '')},-,-\r\n`;
+    csvContent += `Collection Method,${collectionMethod},-,-\r\n`;
+    csvContent += `Sample Volume,${sampleVolume},-,mL\r\n`;
+    csvContent += `Sample pH,${samplePh},-,pH\r\n`;
+    csvContent += `Sample Appearance,${sampleAppearance.replace(/,/g, '')},-,-\r\n`;
+    csvContent += `Clinician Remarks,${(clinicianRemarks || "None").replace(/[\r\n,]+/g, ' ')},-,-\r\n`;
+
+    // Add Kinematics
+    csvContent += `Concentration,${results.summary.concentration.toFixed(2)},> ${results.settings.profile.minConcentration},M/mL\r\n`;
+    csvContent += `Total Motility,${results.summary.motility.total.toFixed(2)},> ${results.settings.profile.minTotalMotility},%\r\n`;
+    csvContent += `Progressive Motility,${results.summary.motility.progressive.toFixed(2)},> ${results.settings.profile.minProgressiveMotility},%\r\n`;
+    csvContent += `Non-Progressive Motility,${results.summary.motility.nonProgressive.toFixed(2)},-,%\r\n`;
+    csvContent += `Immotile Sperm,${results.summary.motility.immotile.toFixed(2)},-,%\r\n`;
+    csvContent += `Average VCL,${results.summary.kinematics.avgVcl.toFixed(2)},-,um/s\r\n`;
+    csvContent += `Average VSL,${results.summary.kinematics.avgVsl.toFixed(2)},-,um/s\r\n`;
+    csvContent += `Average VAP,${results.summary.kinematics.avgVap.toFixed(2)},-,um/s\r\n`;
+    csvContent += `Average LIN,${(results.summary.kinematics.avgLin * 100).toFixed(2)},-,%\r\n`;
+    csvContent += `Average STR,${(results.summary.kinematics.avgStr * 100).toFixed(2)},-,%\r\n`;
+    csvContent += `Average ALH,${results.summary.kinematics.avgAlh.toFixed(2)},-,um\r\n`;
+    csvContent += `Average BCF,${results.summary.kinematics.avgBcf.toFixed(2)},-,Hz\r\n`;
+
+    // Add Morphology
+    csvContent += `Normal Morphology,${results.summary.morphology.normal.toFixed(2)},> ${results.settings.profile.minNormalMorphology},%\r\n`;
+    csvContent += `TZI Index,${results.summary.morphology.tzi.toFixed(2)},< 1.6,-\r\n`;
+    csvContent += `MAI Index,${results.summary.morphology.mai.toFixed(2)},< 1.5,-\r\n`;
+    csvContent += `Acrosome Defects,${results.summary.morphology.acrosomeDefects.toFixed(2)},-,%\r\n`;
+    csvContent += `Cytoplasmic Droplets,${results.summary.morphology.cytoplasmicDroplets.toFixed(2)},-,%\r\n`;
+
+    // Defects details
+    Object.entries(results.summary.morphology.headDefects).forEach(([k, v]) => {
+      csvContent += `Head defect: ${k},${(v as number).toFixed(2)},-,%\r\n`;
+    });
+    Object.entries(results.summary.morphology.midpieceDefects).forEach(([k, v]) => {
+      csvContent += `Midpiece defect: ${k},${(v as number).toFixed(2)},-,%\r\n`;
+    });
+    Object.entries(results.summary.morphology.tailDefects).forEach(([k, v]) => {
+      csvContent += `Tail defect: ${k},${(v as number).toFixed(2)},-,%\r\n`;
+    });
+
+    // DNA / SDF & Vitality
+    csvContent += `DNA Fragmentation Index (SDF),${results.summary.sdf.dfi.toFixed(2)},< 30,%\r\n`;
+    csvContent += `Vitality Live,${results.summary.vitality.live.toFixed(2)},> ${results.settings.profile.minVitality},%\r\n`;
+    csvContent += `Leukocytes,${results.summary.leukocytes.toFixed(2)},< ${results.settings.profile.maxLeukocytes},M/mL\r\n`;
+
+    const csvDataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent.replace("data:text/csv;charset=utf-8,", ""));
+    const link = document.createElement("a");
+    link.setAttribute("href", csvDataStr);
+    link.setAttribute("download", `ATSA-Data-${results.patientId}-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const printReport = () => {
+    const reportElem = document.getElementById('analysis-report');
+    if (!reportElem) return;
+
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    if (!printWindow) {
+      alert("Please allow popups to print clinical reports.");
+      return;
+    }
+
+    const stylesheets = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+      .map(node => node.outerHTML)
+      .join('\n');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>ATSA Clinical Report - ${results?.patientId}</title>
+          ${stylesheets}
+          <style>
+            body {
+              background: #ffffff !important;
+              color: #000000 !important;
+              font-family: 'Cairo', 'Inter', sans-serif !important;
+              padding: 20px;
+            }
+            #analysis-report {
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              width: 100% !important;
+              background: #ffffff !important;
+              color: #000000 !important;
+            }
+            @media print {
+              body { padding: 0; }
+              .no-print { display: none !important; }
+            }
+          </style>
+        </head>
+        <body>
+          <div id="analysis-report" class="bg-white text-black p-8">
+            ${reportElem.innerHTML}
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.close();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const handleAiChat = async (e: React.FormEvent) => {
@@ -3085,301 +3278,808 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
                         </div>
                       </div>
                     )}
+
                     {activeTab === 'report' && (
                       <div className="space-y-6">
-                        {/* Report Configuration */}
-                        <div className={cn(
-                          "p-4 rounded-2xl border space-y-4",
-                          theme === 'dark' ? "bg-white/5 border-white/10" : "bg-black/5 border-black/10"
-                        )}>
-                          <div className="flex items-center justify-between">
-                            <h3 className={cn(
-                              "text-[10px] font-bold uppercase tracking-widest",
-                              theme === 'dark' ? "text-white/40" : "text-black/40"
-                            )}>Report Configuration</h3>
-                            <p className={cn(
-                              "text-[8px] uppercase font-black",
-                              theme === 'dark' ? "text-white/20" : "text-black/20"
-                            )}>Select sections to include</p>
-                          </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {(Object.keys(reportSections) as Array<keyof typeof reportSections>).map((section) => (
-                              <button
-                                key={section}
-                                onClick={() => setReportSections(prev => ({ ...prev, [section]: !prev[section] }))}
+                        {/* Split Panel Layout for Configuration on Left & Report Sheet on Right */}
+                        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                          
+                          {/* LEFT PANEL: LAB & CLINICAL SETTINGS (5/12 Columns) */}
+                          <div className="xl:col-span-5 space-y-4">
+                            
+                            {/* Section 1: Laboratory Information */}
+                            <div className={cn(
+                              "p-5 rounded-2xl border space-y-4",
+                              theme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-50 border-black/10"
+                            )}>
+                              <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                                <Microscope className="w-4 h-4 text-emerald-500" />
+                                <h3 className={cn(
+                                  "text-xs font-bold uppercase tracking-wider",
+                                  theme === 'dark' ? "text-white" : "text-slate-900"
+                                )}>Lab & Facility Details</h3>
+                              </div>
+                              
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Laboratory Operator / Veterinarian</label>
+                                  <input 
+                                    type="text" 
+                                    value={clinicianName}
+                                    onChange={(e) => setClinicianName(e.target.value)}
+                                    className={cn(
+                                      "w-full px-3 py-2 rounded-xl text-xs font-bold border focus:outline-none transition-colors",
+                                      theme === 'dark' ? "bg-black/40 border-white/10 text-white focus:border-emerald-500/50" : "bg-white border-black/10 text-slate-950 focus:border-emerald-500/50"
+                                    )}
+                                    placeholder="Enter operator name..."
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Clinic / Facility Name</label>
+                                  <input 
+                                    type="text" 
+                                    value={facilityName}
+                                    onChange={(e) => setFacilityName(e.target.value)}
+                                    className={cn(
+                                      "w-full px-3 py-2 rounded-xl text-xs font-bold border focus:outline-none transition-colors",
+                                      theme === 'dark' ? "bg-black/40 border-white/10 text-white focus:border-emerald-500/50" : "bg-white border-black/10 text-slate-950 focus:border-emerald-500/55"
+                                    )}
+                                    placeholder="Enter facility name..."
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Section 2: Semen Collection Details */}
+                            <div className={cn(
+                              "p-5 rounded-2xl border space-y-4",
+                              theme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-50 border-black/10"
+                            )}>
+                              <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                                <Activity className="w-4 h-4 text-emerald-500" />
+                                <h3 className={cn(
+                                  "text-xs font-bold uppercase tracking-wider",
+                                  theme === 'dark' ? "text-white" : "text-slate-900"
+                                )}>Collection details & Physicals</h3>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="col-span-2">
+                                  <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Collection Method</label>
+                                  <select
+                                    value={collectionMethod}
+                                    onChange={(e) => setCollectionMethod(e.target.value as any)}
+                                    className={cn(
+                                      "w-full px-3 py-2 rounded-xl text-xs font-bold border focus:outline-none transition-colors",
+                                      theme === 'dark' ? "bg-black/40 border-white/10 text-white focus:border-emerald-500" : "bg-white border-black/10 text-slate-950 focus:border-emerald-500"
+                                    )}
+                                  >
+                                    <option value="Artificial Vagina">Artificial Vagina (AV)</option>
+                                    <option value="Electroejaculation">Electroejaculation (EE)</option>
+                                    <option value="Manual Stimulation">Manual Stimulation</option>
+                                    <option value="Epididymal Recovery">Epididymal Recovery</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Ejaculate Vol (mL)</label>
+                                  <input 
+                                    type="text" 
+                                    value={sampleVolume}
+                                    onChange={(e) => setSampleVolume(e.target.value)}
+                                    className={cn(
+                                      "w-full px-3 py-2 rounded-xl text-xs font-mono font-bold border focus:outline-none transition-colors",
+                                      theme === 'dark' ? "bg-black/40 border-white/10 text-white focus:border-emerald-500/50" : "bg-white border-black/10 text-slate-950 focus:border-emerald-500/50"
+                                    )}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Sample pH</label>
+                                  <input 
+                                    type="text" 
+                                    value={samplePh}
+                                    onChange={(e) => setSamplePh(e.target.value)}
+                                    className={cn(
+                                      "w-full px-3 py-2 rounded-xl text-xs font-mono font-bold border focus:outline-none transition-colors",
+                                      theme === 'dark' ? "bg-black/40 border-white/10 text-white focus:border-emerald-500/50" : "bg-white border-black/10 text-slate-950 focus:border-emerald-500/50"
+                                    )}
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Appearance / Color</label>
+                                  <input 
+                                    type="text" 
+                                    value={sampleAppearance}
+                                    onChange={(e) => setSampleAppearance(e.target.value)}
+                                    className={cn(
+                                      "w-full px-3 py-2 rounded-xl text-xs font-bold border focus:outline-none transition-colors",
+                                      theme === 'dark' ? "bg-black/40 border-white/10 text-white focus:border-emerald-500/50" : "bg-white border-black/10 text-slate-950 focus:border-emerald-500/50"
+                                    )}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Section 3: Diagnostic notes & override */}
+                            <div className={cn(
+                              "p-5 rounded-2xl border space-y-4",
+                              theme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-50 border-black/10"
+                            )}>
+                              <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="w-4 h-4 text-emerald-500" />
+                                  <h3 className={cn(
+                                    "text-xs font-bold uppercase tracking-wider",
+                                    theme === 'dark' ? "text-white" : "text-slate-900"
+                                  )}>Clinician Remarks</h3>
+                                </div>
+                                <span className="text-[8px] font-mono font-bold text-slate-400">{clinicianRemarks.length} chars</span>
+                              </div>
+
+                              <textarea 
+                                value={clinicianRemarks}
+                                onChange={(e) => setClinicianRemarks(e.target.value)}
+                                rows={3}
                                 className={cn(
-                                  "flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase transition-all border",
-                                  reportSections[section] 
-                                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
-                                    : (theme === 'dark' ? "bg-white/5 border-white/5 text-white/40" : "bg-black/5 border-black/5 text-black/40")
+                                  "w-full p-3 rounded-xl text-xs font-medium border focus:outline-none transition-colors leading-relaxed",
+                                  theme === 'dark' ? "bg-black/40 border-white/10 text-white focus:border-emerald-500" : "bg-white border-black/10 text-slate-950 focus:border-emerald-500"
+                                )}
+                                placeholder="Type custom clinician notes, override diagnostics, or test notes to render on output sheet..."
+                              />
+
+                              {/* Standard remarks quick buttons */}
+                              <div>
+                                <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-2">Inject Standard Presets:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {[
+                                    'Excellent motility & DFI parameters. Highly viable specimen for immediate breeding/AI.',
+                                    'Slight motility deficit. Recommend cooling caution prior to cryopreservation.',
+                                    'Morphological defects detected above normal limits (Pyriform & Coiled defects). Retesting requested.',
+                                    'DFI fragmentation index within normal physiological limits.'
+                                  ].map((pText, i) => (
+                                    <button
+                                      key={i}
+                                      onClick={() => setClinicianRemarks(pText)}
+                                      className={cn(
+                                        "px-2 py-1 rounded-lg text-[8px] font-semibold text-left max-w-full truncate border leading-none transition-colors",
+                                        theme === 'dark'
+                                          ? "bg-white/5 border-white/5 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/20"
+                                          : "bg-slate-100 border-black/5 text-emerald-800 hover:bg-emerald-500/10 hover:border-emerald-500/20"
+                                      )}
+                                    >
+                                      {pText}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Section 4: Display toggles */}
+                            <div className={cn(
+                              "p-5 rounded-2xl border space-y-4",
+                              theme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-50 border-black/10"
+                            )}>
+                              <div className="flex items-center justify-between">
+                                <h3 className={cn(
+                                  "text-[10px] font-bold uppercase tracking-widest",
+                                  theme === 'dark' ? "text-white/40" : "text-black/40"
+                                )}>Report Visibility</h3>
+                                <p className={cn(
+                                  "text-[8px] uppercase font-black",
+                                  theme === 'dark' ? "text-white/20" : "text-black/20"
+                                )}>Hide empty categories</p>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {(Object.keys(reportSections) as Array<keyof typeof reportSections>).map((section) => (
+                                  <button
+                                    key={section}
+                                    onClick={() => setReportSections(prev => ({ ...prev, [section]: !prev[section] }))}
+                                    className={cn(
+                                      "flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase transition-all border",
+                                      reportSections[section] 
+                                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
+                                        : (theme === 'dark' ? "bg-white/5 border-white/5 text-white/40" : "bg-black/5 border-black/5 text-black/40")
+                                    )}
+                                  >
+                                    <div className={cn(
+                                      "w-3.5 h-3.5 rounded-md border flex items-center justify-center shrink-0",
+                                      reportSections[section] ? "bg-emerald-500 border-emerald-500" : (theme === 'dark' ? "border-white/20" : "border-black/20")
+                                    )}>
+                                      {reportSections[section] && <Check className="w-2 h-2 text-black" />}
+                                    </div>
+                                    <span className="truncate">{section}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* RIGHT PANEL: PRINT REPORT SHEET PREVIEW (7/12 Columns) */}
+                          <div className="xl:col-span-7 space-y-4">
+                            
+                            {/* Document Frame styling */}
+                            <div className="rounded-[24px] shadow-2xl overflow-hidden border border-black/10">
+                              
+                              {/* Clinical White Paper Report Document (Pure Printable Style) */}
+                              <div id="analysis-report" className="p-8 bg-white text-black relative select-text text-left">
+                                
+                                {/* Aesthetic Watermark Background */}
+                                <div className="absolute inset-0 opacity-[0.02] pointer-events-none flex items-center justify-center overflow-hidden">
+                                  <Zap className="w-[500px] h-[500px] text-emerald-500 stroke-[5]" />
+                                </div>
+
+                                {/* Report Header Banner */}
+                                <div className="flex justify-between items-start mb-6 pb-6 border-b-2 border-black/10 relative z-10 font-sans">
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                      <div className="p-1 bg-black rounded-lg">
+                                        <Zap className="w-5 h-5 text-emerald-400 fill-current" />
+                                      </div>
+                                      <h2 className="text-xl font-black tracking-tighter uppercase italic leading-none font-sans">ATSA AI</h2>
+                                    </div>
+                                    <p className="text-[7.5px] font-black text-black/50 uppercase tracking-[0.25em] font-sans">Animal-Assisted Key Semen Analysis &middot; CASA v2.0</p>
+                                    <p className="text-[7px] font-semibold text-black/30 truncate mt-0.5">{facilityName.toUpperCase()}</p>
+                                  </div>
+                                  
+                                  {/* Pseudo Barcode / Clinical stamp */}
+                                  <div className="flex flex-col items-end">
+                                    <div className="flex items-center gap-[1px] h-6 mb-1">
+                                      {[1, 3, 1, 2, 4, 1, 3, 2, 1, 4, 2, 1, 3, 1].map((w, index) => (
+                                        <div key={index} className="bg-black h-full" style={{ width: `${w}px` }} />
+                                      ))}
+                                    </div>
+                                    <p className="text-[6.5px] font-mono font-bold text-black/40">SYS_UID: {results.patientId}-{new Date(results.timestamp).getTime().toString().substring(8)}</p>
+                                    <span className="text-[8px] font-mono mt-1 font-bold bg-black text-white px-1.5 py-0.5 rounded leading-none">CLINIC_COPY</span>
+                                  </div>
+                                </div>
+
+                                {/* Report Status Indicator bar */}
+                                <div className={cn(
+                                  "mb-6 p-3 rounded-xl border flex items-center justify-between text-xs font-bold leading-none uppercase tracking-wider",
+                                  results.summary.interpretation?.status === 'normal' 
+                                    ? "bg-emerald-50 border-emerald-200 text-emerald-800" 
+                                    : results.summary.interpretation?.status === 'borderline' 
+                                    ? "bg-amber-50 border-amber-200 text-amber-800" 
+                                    : "bg-red-50 border-red-200 text-red-800"
+                                )}>
+                                  <div className="flex items-center gap-2">
+                                    <div className={cn(
+                                      "w-2.5 h-2.5 rounded-full animate-pulse",
+                                      results.summary.interpretation?.status === 'normal' ? "bg-emerald-500" :
+                                      results.summary.interpretation?.status === 'borderline' ? "bg-amber-500" : "bg-red-500"
+                                    )} />
+                                    <span>DIAGNOSTIC STATUS: {results.summary.interpretation?.status || 'NOT READY'}</span>
+                                  </div>
+                                  <span className="text-[9px] font-mono opacity-60">Verified {new Date(results.timestamp).toLocaleDateString()}</span>
+                                </div>
+
+                                {/* Demographics and Collection Metadata block */}
+                                <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-slate-50 rounded-2xl border border-black/5 text-xs font-sans">
+                                  <div className="space-y-2.5">
+                                    <div>
+                                      <p className="text-[7.5px] font-bold text-black/40 uppercase tracking-widest">Patient Information</p>
+                                      <div className="mt-1 space-y-0.5">
+                                        <div className="flex justify-between border-b border-black/5 py-0.5">
+                                          <span className="text-black/50 font-medium">Patient ID:</span>
+                                          <span className="font-bold font-mono">{results.patientId}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-black/5 py-0.5">
+                                          <span className="text-black/50 font-medium">Species:</span>
+                                          <span className="font-bold capitalize">{results.species}</span>
+                                        </div>
+                                        <div className="flex justify-between py-0.5">
+                                          <span className="text-black/50 font-medium">Test Timestamp:</span>
+                                          <span className="font-bold font-mono">{new Date(results.timestamp).toLocaleString()}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-2.5 border-l border-black/10 pl-4">
+                                    <div>
+                                      <p className="text-[7.5px] font-bold text-black/40 uppercase tracking-widest">Collection & Physical Semen Characteristics</p>
+                                      <div className="mt-1 space-y-0.5">
+                                        <div className="flex justify-between border-b border-black/5 py-0.5">
+                                          <span className="text-black/50 font-medium">Method:</span>
+                                          <span className="font-bold">{collectionMethod}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-black/5 py-0.5">
+                                          <span className="text-black/50 font-medium">Volume / pH:</span>
+                                          <span className="font-bold font-mono text-emerald-800">{sampleVolume} mL / {samplePh}</span>
+                                        </div>
+                                        <div className="flex justify-between py-0.5">
+                                          <span className="text-black/50 font-medium">Appearance:</span>
+                                          <span className="font-bold truncate max-w-[120px]" title={sampleAppearance}>{sampleAppearance}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Section : Kinematics Analysis */}
+                                {reportSections.kinematics && (
+                                  <section className="space-y-3 mb-6 relative">
+                                    <div className="flex items-center justify-between border-b border-black/15 pb-1">
+                                      <h3 className="text-[9.5px] font-black text-black/80 uppercase tracking-wider">I. Motility & Advanced Kinematics</h3>
+                                      <span className="text-[7px] font-bold text-emerald-600 font-mono">Reference Normals Included</span>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {[
+                                        { label: 'Total Motility', val: `${results.summary.motility.total.toFixed(1)}%`, ref: `> ${results.settings.profile.minTotalMotility}%`, pass: results.summary.motility.total >= results.settings.profile.minTotalMotility },
+                                        { label: 'Progressive Motility', val: `${results.summary.motility.progressive.toFixed(1)}%`, ref: `> ${results.settings.profile.minProgressiveMotility}%`, pass: results.summary.motility.progressive >= results.settings.profile.minProgressiveMotility },
+                                        { label: 'Hyperactivation', val: `${results.summary.kinematics.hyperactivation.percentage.toFixed(1)}%`, ref: '< 15%', pass: results.summary.kinematics.hyperactivation.percentage < 15 },
+                                      ].map(col => (
+                                        <div key={col.label} className="p-3 bg-slate-50 border border-black/5 rounded-xl text-center">
+                                          <p className="text-[7.5px] font-bold text-black/50 uppercase leading-none mb-1">{col.label}</p>
+                                          <p className="text-sm font-black font-mono tracking-tight leading-none text-slate-900">{col.val}</p>
+                                          <div className="mt-1.5 flex items-center justify-center gap-1">
+                                            <span className={cn("w-1.5 h-1.5 rounded-full", col.pass ? "bg-emerald-500" : "bg-red-500")} />
+                                            <span className="text-[6.5px] font-bold text-black/40 font-mono">Ref: {col.ref}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* Sub-kinematics list details */}
+                                    <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 pt-1">
+                                      {[
+                                        { label: 'Curvilinear Velocity (VCL)', val: `${results.summary.kinematics.avgVcl.toFixed(1)} µm/s` },
+                                        { label: 'Straight-Line Velocity (VSL)', val: `${results.summary.kinematics.avgVsl.toFixed(1)} µm/s` },
+                                        { label: 'Average Path Velocity (VAP)', val: `${results.summary.kinematics.avgVap.toFixed(1)} µm/s` },
+                                        { label: 'Linearity Coefficient (LIN)', val: `${(results.summary.kinematics.avgLin * 100).toFixed(1)}%` },
+                                        { label: 'Straightness (STR)', val: `${(results.summary.kinematics.avgStr * 100).toFixed(1)}%` },
+                                        { label: 'Wobble Coefficient (WOB)', val: `${(results.summary.kinematics.avgWob * 100).toFixed(1)}%` },
+                                        { label: 'Amplitude of Lat. Head (ALH)', val: `${results.summary.kinematics.avgAlh.toFixed(2)} µm` },
+                                        { label: 'Beat Cross Frequency (BCF)', val: `${results.summary.kinematics.avgBcf.toFixed(1)} Hz` },
+                                      ].map(item => (
+                                        <div key={item.label} className="flex justify-between items-center text-[9px] border-b border-black/[0.04] pb-1 font-medium text-black/70">
+                                          <span>{item.label}</span>
+                                          <span className="font-mono font-black text-black">{item.val}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </section>
+                                )}
+
+                                {/* Section: Morphology defects */}
+                                {reportSections.morphology && (
+                                  <section className="space-y-3 mb-6">
+                                    <div className="flex items-center justify-between border-b border-black/15 pb-1">
+                                      <h3 className="text-[9.5px] font-black text-black/80 uppercase tracking-wider">II. Morphology & Indices</h3>
+                                      <span className="text-[7px] font-semibold text-black/40 font-mono">Visual morphometry verification</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-2">
+                                      <div className="p-3 bg-slate-50 border border-black/5 rounded-xl text-center">
+                                        <p className="text-[7.5px] font-bold text-black/50 uppercase leading-none mb-1">Normal Cells</p>
+                                        <p className="text-sm font-black font-mono tracking-tight leading-none text-slate-900">{results.summary.morphology.normal.toFixed(1)}%</p>
+                                        <p className="text-[6.5px] font-bold text-black/40 font-mono mt-1">Ref: &gt; {results.settings.profile.minNormalMorphology}%</p>
+                                      </div>
+                                      <div className="p-3 bg-slate-50 border border-black/5 rounded-xl text-center">
+                                        <p className="text-[7.5px] font-bold text-black/50 uppercase leading-none mb-1">TZI Index</p>
+                                        <p className="text-sm font-black font-mono tracking-tight leading-none text-slate-900">{results.summary.morphology.tzi.toFixed(2)}</p>
+                                        <p className="text-[6.5px] font-bold text-black/40 font-mono mt-1">Ref: &lt; 1.6 (Normal)</p>
+                                      </div>
+                                      <div className="p-3 bg-slate-50 border border-black/5 rounded-xl text-center">
+                                        <p className="text-[7.5px] font-bold text-black/50 uppercase leading-none mb-1">MAI Index</p>
+                                        <p className="text-sm font-black font-mono tracking-tight leading-none text-slate-900">{results.summary.morphology.mai.toFixed(2)}</p>
+                                        <p className="text-[6.5px] font-bold text-black/40 font-mono mt-1">Ref: &lt; 1.5</p>
+                                      </div>
+                                    </div>
+
+                                    {/* Detailed breakdown sub-grid */}
+                                    <div className="grid grid-cols-2 gap-6 pt-1 text-[9px]">
+                                      <div className="space-y-1">
+                                        <h4 className="text-[7px] font-black text-black/40 uppercase tracking-wider mb-1.5 border-b border-black/5 pb-0.5 font-sans">Head Defects Breakdown</h4>
+                                        {Object.entries(results.summary.morphology.headDefects).map(([key, val]) => (
+                                          <div key={key} className="flex justify-between items-center py-0.5 font-medium text-black/70">
+                                            <span className="capitalize">{key} defects</span>
+                                            <span className="font-mono font-black text-black">{(val as number).toFixed(1)}%</span>
+                                          </div>
+                                        ))}
+                                      </div>
+
+                                      <div className="space-y-1">
+                                        <h4 className="text-[7px] font-black text-black/40 uppercase tracking-wider mb-1.5 border-b border-black/5 pb-0.5 font-sans">Midpiece & Tail Defects</h4>
+                                        <div className="flex justify-between items-center py-0.5 font-medium text-black/70">
+                                          <span>Acrosome defects</span>
+                                          <span className="font-mono font-black text-black">{results.summary.morphology.acrosomeDefects.toFixed(1)}%</span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-0.5 font-medium text-black/70">
+                                          <span>Cytoplasmic droplets</span>
+                                          <span className="font-mono font-black text-black">{results.summary.morphology.cytoplasmicDroplets.toFixed(1)}%</span>
+                                        </div>
+                                        {Object.entries(results.summary.morphology.midpieceDefects).map(([key, val]) => (
+                                          <div key={key} className="flex justify-between items-center py-0.5 font-medium text-black/70">
+                                            <span className="capitalize">Mid: {key}</span>
+                                            <span className="font-mono font-black text-black">{(val as number).toFixed(1)}%</span>
+                                          </div>
+                                        ))}
+                                        {Object.entries(results.summary.morphology.tailDefects).map(([key, val]) => (
+                                          <div key={key} className="flex justify-between items-center py-0.5 font-medium text-black/70">
+                                            <span className="capitalize">Tail: {key}</span>
+                                            <span className="font-mono font-black text-black">{(val as number).toFixed(1)}%</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </section>
+                                )}
+
+                                {/* Section: Vitality &concentration / SDF */}
+                                {(reportSections.vitality || reportSections.sdf) && (
+                                  <section className="space-y-3 mb-6">
+                                    <div className="flex items-center justify-between border-b border-black/15 pb-1">
+                                      <h3 className="text-[9.5px] font-black text-black/80 uppercase tracking-wider">III. Concentration, DNA Fragmentation & Vitality</h3>
+                                      <span className="text-[7px] font-semibold text-black/40 font-mono">Cytometric viability measures</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3 text-[9px] font-medium text-left">
+                                      {reportSections.vitality && (
+                                        <div className="space-y-1">
+                                          <div className="flex justify-between border-b border-black/[0.04] pb-1">
+                                            <span className="text-black/70">Sperm Concentration:</span>
+                                            <span className="font-mono font-black text-black">{results.summary.concentration.toFixed(1)} Millions/mL</span>
+                                          </div>
+                                          <div className="flex justify-between border-b border-black/[0.04] pb-1">
+                                            <span className="text-black/70">Vitality (Percent Live):</span>
+                                            <span className="font-mono font-black text-black">{results.summary.vitality.live.toFixed(1)}%</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-black/70">Leukocytes Count:</span>
+                                            <span className="font-mono font-black text-black">{results.summary.leukocytes.toFixed(1)} M/mL</span>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {reportSections.sdf && (
+                                        <div className="space-y-1 border-l border-black/10 pl-4">
+                                          <div className="flex justify-between border-b border-black/[0.04] pb-1">
+                                            <span className="text-black/70">Halos (DFI Ratio):</span>
+                                            <span className="font-mono font-black text-red-600">{results.summary.sdf.dfi.toFixed(1)}% DFI</span>
+                                          </div>
+                                          <div className="flex justify-between border-b border-black/[0.04] pb-1">
+                                            <span className="text-black/70">Fragmented Count:</span>
+                                            <span className="font-mono font-black text-black">{results.summary.sdf.fragmentedCount} cells</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-black/70">Total SDF Sample size:</span>
+                                            <span className="font-mono font-black text-black">{results.summary.sdf.totalCount} cells</span>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </section>
+                                )}
+
+                                {/* Section: AI Assessment & Clinical Remarks */}
+                                {reportSections.ai && (
+                                  <section className="space-y-3 mb-6 border-t border-black/10 pt-4">
+                                    <h3 className="text-[9.5px] font-black text-black/80 uppercase tracking-wider mb-2">IV. Interpreter Clinical Summary</h3>
+                                    
+                                    {aiAnalysis && (
+                                      <div className="mb-2">
+                                        <p className="text-[7px] font-bold text-black/40 uppercase tracking-widest mb-1 leading-none font-sans">Automated ATSA Neural Assessment</p>
+                                        <div className="p-3 bg-slate-50 rounded-xl border border-black/5 text-[9.5px] text-black/80 font-medium leading-relaxed font-serif italic">
+                                          {aiAnalysis}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {results.summary.interpretation && (
+                                      <div className="p-3 bg-slate-50 rounded-xl border border-black/5 text-[9px] space-y-2">
+                                        <div>
+                                          <p className="text-[7px] font-bold text-black/40 uppercase tracking-widest leading-none mb-1 font-sans">Key Diagnostic Findings</p>
+                                          <ul className="space-y-0.5 list-none">
+                                            {results.summary.interpretation.comments.map((comment, i) => (
+                                              <li key={i} className="font-semibold text-black/80 leading-tight flex gap-1.5 align-top">
+                                                <span className="text-black/30 select-none">•</span>
+                                                <span>{comment}</span>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                        {results.summary.interpretation.recommendations.length > 0 && (
+                                          <div>
+                                            <p className="text-[7px] font-bold text-black/40 uppercase tracking-widest leading-none mb-1 font-sans">Recommended Treatment Protocol / AI Plan</p>
+                                            <ul className="space-y-0.5 list-none">
+                                              {results.summary.interpretation.recommendations.map((rec, i) => (
+                                                <li key={i} className="font-semibold text-emerald-800 leading-tight flex gap-1.5 align-top">
+                                                  <span className="text-emerald-400 select-none">→</span>
+                                                  <span>{rec}</span>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </section>
+                                )}
+
+                                {/* Dynamically Renders Doctor Manual custom Clinician Remarks on the Sheet itself */}
+                                {clinicianRemarks && (
+                                  <section className="mt-4 p-3 border-l-2 border-emerald-500 bg-emerald-50/20 text-[9px] space-y-1">
+                                    <p className="text-[7.5px] font-bold uppercase tracking-wider text-emerald-800 font-sans">Veterinary Clinical remarks (Physician Addendum)</p>
+                                    <p className="font-semibold text-black/90 font-sans leading-relaxed whitespace-pre-wrap">{clinicianRemarks}</p>
+                                  </section>
+                                )}
+
+                                {/* Signature Footer */}
+                                <div className="mt-12 pt-6 border-t border-black/10 flex justify-between items-end relative z-10 text-[9px]">
+                                  
+                                  {/* Doctor Sign section */}
+                                  <div className="space-y-4">
+                                    <div className="space-y-1">
+                                      <p className="text-[7.5px] font-bold text-black/40 uppercase tracking-wider font-sans">Authorized Laboratory Operator</p>
+                                      
+                                      {/* Cursive simulated signature path */}
+                                      <div className="h-6 flex items-end pl-2 font-serif text-lg font-semibold italic text-emerald-800 tracking-wide select-none leading-none border-b border-black/15 pb-1 pr-6 relative">
+                                        <span className="font-medium font-sans text-xs opacity-20 absolute left-2 bottom-5 pointer-events-none uppercase italic text-black font-mono">Signee verified</span>
+                                        {clinicianName}
+                                      </div>
+                                    </div>
+                                    <p className="text-[8px] font-bold text-black/50">{clinicianName}</p>
+                                  </div>
+
+                                  {/* Stamp seal verification */}
+                                  <div className="text-right space-y-2 flex flex-col items-end">
+                                    
+                                    {/* Verification stamp circle badge */}
+                                    <div className="w-16 h-16 rounded-full border-2 border-emerald-600/30 border-dashed p-1 flex items-center justify-center relative select-none animate-spin-slow">
+                                      <div className="absolute inset-2 rounded-full bg-emerald-500/5" />
+                                      <span className="text-[6.5px] text-emerald-700/60 font-black tracking-tighter uppercase block text-center leading-none">
+                                        ATSA DVM<br />
+                                        APPROVED<br />
+                                        v2.0 SEAL
+                                      </span>
+                                    </div>
+
+                                    <div className="text-right leading-tight font-sans">
+                                      <div className="text-[7px] font-bold text-black/40 uppercase flex items-center justify-end gap-1 font-mono">
+                                        <ShieldCheck className="w-2.5 h-2.5 text-emerald-600 inline" /> Digital Integrity Verified
+                                      </div>
+                                      <div className="text-[6.5px] text-black/30 uppercase mt-0.5 font-bold font-mono">
+                                        SHA-256 SECURED CRYPTO_ID: {new Date(results.timestamp).getTime().toString(16).toUpperCase()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* DOCUMENT EXPORT & TRANSMISSION TOOLBAR */}
+                            <div className="space-y-3">
+                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                                
+                                {/* 1. Native Print Dialogue */}
+                                <button 
+                                  onClick={printReport}
+                                  className={cn(
+                                    "p-3.5 border rounded-xl font-bold text-[10px] transition-all flex items-center justify-center gap-2 cursor-pointer",
+                                    theme === 'dark' ? "bg-white/5 hover:bg-white/10 border-white/10 text-white" : "bg-black/5 hover:bg-black/10 border-black/10 text-slate-900"
+                                  )}
+                                  title="Utilizes browser engine print dialogue layouts"
+                                >
+                                  <Printer className="w-3.5 h-3.5 text-emerald-500" />
+                                  Print Clinical
+                                </button>
+
+                                {/* 2. Lab Stick/Label print */}
+                                <button
+                                  onClick={() => setShowLabelModal(true)}
+                                  className={cn(
+                                    "p-3.5 border rounded-xl font-bold text-[10px] transition-all flex items-center justify-center gap-2 cursor-pointer",
+                                    theme === 'dark' ? "bg-white/5 hover:bg-white/10 border-white/10 text-white" : "bg-black/5 hover:bg-black/10 border-black/10 text-slate-900"
+                                  )}
+                                  title="Generate adhesive physical sample tube sticker labels"
+                                >
+                                  <Tag className="w-3.5 h-3.5 text-orange-500" />
+                                  Lab Sticker Label
+                                </button>
+
+                                {/* 3. Advanced PDF Generation */}
+                                <button 
+                                  onClick={exportToPDF}
+                                  className={cn(
+                                    "p-3.5 border rounded-xl font-bold text-[10px] transition-all flex items-center justify-center gap-2 cursor-pointer",
+                                    theme === 'dark' ? "bg-white/10 hover:bg-white/20 border-white/10 text-white" : "bg-black/10 hover:bg-black/20 border-black/10 text-slate-900"
+                                  )}
+                                  title="Export document layout as pixel-perfect scale 2.0 A4 PDF"
+                                >
+                                  <Download className="w-3.5 h-3.5 text-blue-500" />
+                                  Download PDF
+                                </button>
+
+                                {/* 4. Full Quantitative CSV sheet */}
+                                <button 
+                                  onClick={exportToCSV}
+                                  className={cn(
+                                    "p-3.5 border rounded-xl font-bold text-[10px] transition-all flex items-center justify-center gap-2 cursor-pointer",
+                                    theme === 'dark' ? "bg-white/5 hover:bg-white/10 border-white/10 text-white" : "bg-black/5 hover:bg-black/10 border-black/10 text-slate-900"
+                                  )}
+                                  title="Export advanced numerical tracking parameters schema for Excel"
+                                >
+                                  <FileSpreadsheet className="w-3.5 h-3.5 text-purple-500" />
+                                  Raw CSV Data
+                                </button>
+                              </div>
+
+                              <div className="flex gap-2">
+                                {/* 5. Copy Text Clinical representation */}
+                                <button
+                                  onClick={copyReportToClipboard}
+                                  className={cn(
+                                    "flex-1 py-3 border rounded-xl font-bold text-[10px] transition-all flex items-center justify-center gap-2 cursor-pointer",
+                                    theme === 'dark' ? "bg-teal-500/10 hover:bg-teal-500/20 border-teal-500/20 text-teal-400" : "bg-teal-50 hover:bg-teal-100 border-teal-100 text-teal-800"
+                                  )}
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                  {isCopied ? "System Clipboard Copied!" : "Copy Formatted Text (EMR Clipboard)"}
+                                </button>
+
+                                {/* 6. Persistent DB storage */}
+                                <button 
+                                  onClick={saveToHistory}
+                                  disabled={isSaving}
+                                  className={cn(
+                                    "px-6 py-3 rounded-xl font-bold text-[10px] shadow-lg transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer",
+                                    isSaving ? (theme === 'dark' ? "bg-white/5 text-white/40" : "bg-black/5 text-black/40") : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20"
+                                  )}
+                                >
+                                  {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                                  {isSaving ? "Saving..." : "Save to Cloud"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Generate AI Clinical Conclusion prompt fallback */}
+                            {!results.summary.interpretation && (
+                              <button 
+                                onClick={generateAIInterpretation}
+                                disabled={isGeneratingInterpretation}
+                                className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-500/10 cursor-pointer"
+                              >
+                                {isGeneratingInterpretation ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
+                                Run Predictive AI Lab Interpretation & Clinical Conclusion
+                              </button>
+                            )}
+
+                          </div>
+                        </div>
+
+                        {/* ========================================== */}
+                        {/* ADHESIVE PHYSICAL SPECIMEN LABEL PRINT DIALOGUE MODAL */}
+                        {/* ========================================== */}
+                        <AnimatePresence>
+                          {showLabelModal && (
+                            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className={cn(
+                                  "w-full max-w-md rounded-[24px] border overflow-hidden shadow-2xl p-6 relative flex flex-col space-y-4",
+                                  theme === 'dark' ? "bg-[#161616] border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
                                 )}
                               >
-                                <div className={cn(
-                                  "w-3 h-3 rounded-sm border flex items-center justify-center",
-                                  reportSections[section] ? "bg-emerald-500 border-emerald-500" : (theme === 'dark' ? "border-white/20" : "border-black/20")
-                                )}>
-                                  {reportSections[section] && <Check className="w-2 h-2 text-black" />}
-                                </div>
-                                {section}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="rounded-[32px] shadow-2xl overflow-hidden">
-                          <div id="analysis-report" className="p-8 bg-white text-black relative">
-                            {/* Report Header */}
-                          <div className="flex justify-between items-start mb-8 relative z-10">
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <Zap className="w-5 h-5 text-emerald-600 fill-current" />
-                                <h2 className="text-lg font-black tracking-tighter uppercase italic">ATSA AI Report</h2>
-                              </div>
-                              <p className="text-[8px] font-bold text-black/40 uppercase tracking-widest">Animal-Assisted Key Semen Analysis • v2.0</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[8px] font-bold text-black/40 uppercase">Report Date</p>
-                              <p className="text-[10px] font-mono font-bold">{new Date(results.timestamp).toLocaleDateString()}</p>
-                            </div>
-                          </div>
-                          
-                          {/* Patient Info */}
-                          <div className="grid grid-cols-2 gap-4 mb-8 p-4 bg-black/5 rounded-2xl border border-black/5">
-                            <div>
-                              <p className="text-[7px] font-bold text-black/30 uppercase">Patient ID</p>
-                              <p className="text-xs font-bold">{results.patientId}</p>
-                            </div>
-                            <div>
-                              <p className="text-[7px] font-bold text-black/30 uppercase">Species</p>
-                              <p className="text-xs font-bold">{results.species}</p>
-                            </div>
-                          </div>
-
-                          {/* Kinematics Section */}
-                          {reportSections.kinematics && (
-                            <section className="space-y-3 mb-8">
-                              <h3 className="text-[9px] font-black text-black/20 uppercase tracking-[0.2em] mb-4">Kinematics Analysis</h3>
-                              {[
-                                { label: 'Total Motility', val: `${results.summary.motility.total.toFixed(1)}%`, ref: `> ${results.settings.profile.minTotalMotility}%` },
-                                { label: 'Progressive', val: `${results.summary.motility.progressive.toFixed(1)}%`, ref: `> ${results.settings.profile.minProgressiveMotility}%` },
-                                { label: 'Hyperactivated', val: `${results.summary.kinematics.hyperactivation.percentage.toFixed(1)}%`, ref: '-' },
-                              ].map(row => (
-                                <div key={row.label} className="flex justify-between items-center border-b border-black/5 pb-2">
-                                  <span className="text-[10px] font-bold text-black/60">{row.label}</span>
-                                  <div className="text-right">
-                                    <span className="text-[11px] font-mono font-black">{row.val}</span>
-                                    <p className="text-[7px] text-black/30 font-bold">Ref: {row.ref}</p>
+                                <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                                  <div className="flex items-center gap-2">
+                                    <Tag className="w-5 h-5 text-orange-500" />
+                                    <h3 className="text-sm font-bold uppercase tracking-wider font-sans">Specimen Sticker Printer</h3>
                                   </div>
+                                  <button 
+                                    onClick={() => setShowLabelModal(false)}
+                                    className="p-1 px-2 hover:bg-white/5 text-slate-400 hover:text-white rounded-md text-xs font-bold font-mono transition-colors cursor-pointer"
+                                  >
+                                    ESC CLOSE
+                                  </button>
                                 </div>
-                              ))}
-                            </section>
-                          )}
 
-                          {/* Morphology Section */}
-                          {reportSections.morphology && (
-                            <section className="space-y-3 mb-8">
-                              <h3 className="text-[9px] font-black text-black/20 uppercase tracking-[0.2em] mb-4">Morphology Analysis</h3>
-                              {[
-                                { label: 'Normal Morphology', val: `${results.summary.morphology.normal.toFixed(1)}%`, ref: `> ${results.settings.profile.minNormalMorphology}%` },
-                                { label: 'TZI Index', val: results.summary.morphology.tzi.toFixed(2), ref: '< 1.6' },
-                                { label: 'MAI Index', val: results.summary.morphology.mai.toFixed(2), ref: '< 1.5' },
-                              ].map(row => (
-                                <div key={row.label} className="flex justify-between items-center border-b border-black/5 pb-2">
-                                  <span className="text-[10px] font-bold text-black/60">{row.label}</span>
-                                  <div className="text-right">
-                                    <span className="text-[11px] font-mono font-black">{row.val}</span>
-                                    <p className="text-[7px] text-black/30 font-bold">Ref: {row.ref}</p>
-                                  </div>
-                                </div>
-                              ))}
+                                <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">
+                                  Generate and print clinical adhesive sticker labels for microfluidic cassettes, slides, or cryopreservation vials (standards 50mm x 30mm layout).
+                                </p>
 
-                              {/* Detailed Morphology Breakdown */}
-                              <div className="mt-6 grid grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                  <h4 className="text-[7px] font-black text-black/40 uppercase tracking-widest">Head Defects</h4>
-                                  {Object.entries(results.summary.morphology.headDefects).map(([key, val]) => (
-                                    <div key={key} className="flex justify-between items-center text-[8px] font-bold">
-                                      <span className="capitalize text-black/60">{key}</span>
-                                      <span className="font-mono">{(val as number).toFixed(1)}%</span>
-                                    </div>
-                                  ))}
-                                </div>
-                                <div className="space-y-2">
-                                  <h4 className="text-[7px] font-black text-black/40 uppercase tracking-widest">Midpiece & Tail</h4>
-                                  <div className="flex justify-between items-center text-[8px] font-bold">
-                                    <span className="text-black/60">Acrosome Defects</span>
-                                    <span className="font-mono">{results.summary.morphology.acrosomeDefects.toFixed(1)}%</span>
-                                  </div>
-                                  <div className="flex justify-between items-center text-[8px] font-bold">
-                                    <span className="text-black/60">Cytoplasmic Droplets</span>
-                                    <span className="font-mono">{results.summary.morphology.cytoplasmicDroplets.toFixed(1)}%</span>
-                                  </div>
-                                  {Object.entries(results.summary.morphology.midpieceDefects).map(([key, val]) => (
-                                    <div key={key} className="flex justify-between items-center text-[8px] font-bold">
-                                      <span className="capitalize text-black/60">Mid: {key}</span>
-                                      <span className="font-mono">{(val as number).toFixed(1)}%</span>
-                                    </div>
-                                  ))}
-                                  {Object.entries(results.summary.morphology.tailDefects).map(([key, val]) => (
-                                    <div key={key} className="flex justify-between items-center text-[8px] font-bold">
-                                      <span className="capitalize text-black/60">Tail: {key}</span>
-                                      <span className="font-mono">{(val as number).toFixed(1)}%</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </section>
-                          )}
-
-                          {/* Vitality Section */}
-                          {reportSections.vitality && (
-                            <section className="space-y-3 mb-8">
-                              <h3 className="text-[9px] font-black text-black/20 uppercase tracking-[0.2em] mb-4">Vitality & Concentration</h3>
-                              {[
-                                { label: 'Concentration', val: `${results.summary.concentration.toFixed(1)} M/ml`, ref: `> ${results.settings.profile.minConcentration} M/ml` },
-                                { label: 'Vitality (Live)', val: `${results.summary.vitality.live.toFixed(1)}%`, ref: `> ${results.settings.profile.minVitality}%` },
-                                { label: 'Leukocytes', val: `${results.summary.leukocytes.toFixed(1)} M/ml`, ref: `< ${results.settings.profile.maxLeukocytes} M/ml` },
-                              ].map(row => (
-                                <div key={row.label} className="flex justify-between items-center border-b border-black/5 pb-2">
-                                  <span className="text-[10px] font-bold text-black/60">{row.label}</span>
-                                  <div className="text-right">
-                                    <span className="text-[11px] font-mono font-black">{row.val}</span>
-                                    <p className="text-[7px] text-black/30 font-bold">Ref: {row.ref}</p>
-                                  </div>
-                                </div>
-                              ))}
-                            </section>
-                          )}
-
-                          {/* SDF Section */}
-                          {reportSections.sdf && (
-                            <section className="space-y-3 mb-8">
-                              <h3 className="text-[9px] font-black text-black/20 uppercase tracking-[0.2em] mb-4">DNA Fragmentation (SDF)</h3>
-                              <div className="flex justify-between items-center border-b border-black/5 pb-2">
-                                <span className="text-[10px] font-bold text-black/60">DNA Fragmentation Index (DFI)</span>
-                                <div className="text-right">
-                                  <span className="text-[11px] font-mono font-black">{results.summary.sdf.dfi.toFixed(1)}%</span>
-                                  <p className="text-[7px] text-black/30 font-bold">Ref: {'< 30%'}</p>
-                                </div>
-                              </div>
-                            </section>
-                          )}
-
-                          {/* AI Summary Section */}
-                          {reportSections.ai && (
-                            <section className="space-y-4">
-                              <h3 className="text-[9px] font-black text-black/20 uppercase tracking-[0.2em] mb-4">Clinical Assessment</h3>
-                              
-                              {aiAnalysis && (
-                                <div className="mb-4">
-                                  <p className="text-[7px] font-bold text-black/30 uppercase mb-1">AI Analysis Summary</p>
-                                  <div className="p-4 bg-black/5 rounded-2xl border border-black/5">
-                                    <p className="text-[10px] text-black/70 leading-relaxed font-serif italic">
-                                      {aiAnalysis.length > 400 ? aiAnalysis.substring(0, 400) + '...' : aiAnalysis}
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {results.summary.interpretation ? (
-                                <div className="p-4 bg-black/5 rounded-2xl border border-black/5 space-y-3">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <div className={cn(
-                                      "w-2 h-2 rounded-full",
-                                      results.summary.interpretation.status === 'normal' ? "bg-emerald-500" : 
-                                      results.summary.interpretation.status === 'borderline' ? "bg-amber-500" : "bg-red-500"
-                                    )} />
-                                    <span className="text-[8px] font-black uppercase tracking-widest">
-                                      Status: {results.summary.interpretation.status}
-                                    </span>
-                                  </div>
-                                  
+                                {/* Interactive Label controls configuration inside modal */}
+                                <div className="space-y-3 bg-white/5 p-4 rounded-xl border border-white/5 text-xs font-semibold">
                                   <div>
-                                    <p className="text-[7px] font-bold text-black/30 uppercase mb-1">Findings</p>
-                                    <ul className="space-y-1">
-                                      {results.summary.interpretation.comments.map((comment, i) => (
-                                        <li key={i} className="text-[10px] font-medium leading-tight flex gap-2">
-                                          <span className="text-black/20">•</span>
-                                          {comment}
-                                        </li>
-                                      ))}
-                                    </ul>
+                                    <label className="text-[8px] font-bold text-slate-400 block mb-1 uppercase tracking-widest font-sans">Storage cryogenic address / location ID</label>
+                                    <input 
+                                      type="text" 
+                                      value={labelStorageLoc}
+                                      onChange={(e) => setLabelStorageLoc(e.target.value)}
+                                      className={cn(
+                                        "w-full px-3 py-1.5 rounded-lg text-xs font-bold border focus:outline-none focus:border-orange-500 bg-white/10 border-white/10 text-white"
+                                      )}
+                                      placeholder="Nitrogen Dewar location coordinates..."
+                                    />
                                   </div>
+                                  <div>
+                                    <label className="text-[8px] font-bold text-slate-400 block mb-1 uppercase tracking-widest font-sans">Adhesive label biological hazard advice</label>
+                                    <input 
+                                      type="text" 
+                                      value={labelWarning}
+                                      onChange={(e) => setLabelWarning(e.target.value)}
+                                      className="w-full px-3 py-1.5 rounded-lg text-xs font-bold border focus:outline-none focus:border-orange-500 bg-white/10 border-white/10 text-white"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Label print layout simulation */}
+                                <div className="p-4 bg-white text-black rounded-lg border-2 border-black border-dashed relative shadow-md text-left">
                                   
-                                  {results.summary.interpretation.recommendations.length > 0 && (
+                                  {/* Lab warning color stripe */}
+                                  <div className="absolute top-0 left-0 right-0 h-1.5 bg-orange-500" />
+                                  
+                                  <div className="flex justify-between items-start pt-1.5 font-sans">
                                     <div>
-                                      <p className="text-[7px] font-bold text-black/30 uppercase mb-1">Recommendations</p>
-                                      <ul className="space-y-1">
-                                        {results.summary.interpretation.recommendations.map((rec, i) => (
-                                          <li key={i} className="text-[10px] font-medium text-emerald-700 leading-tight flex gap-2">
-                                            <span className="text-emerald-300">→</span>
-                                            {rec}
-                                          </li>
-                                        ))}
-                                      </ul>
+                                      <p className="text-[11px] font-black tracking-tight uppercase italic leading-none">ATSA CASSETTE</p>
+                                      <p className="text-[6px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-0.5">Sperm diagnostics sticker</p>
                                     </div>
-                                  )}
+                                    <span className="text-[8px] uppercase font-bold text-orange-800 bg-orange-100 px-1 rounded font-mono">DVM_QUALIFIED</span>
+                                  </div>
+
+                                  {/* Primary parameters micro table */}
+                                  <div className="mt-3 grid grid-cols-2 gap-2 text-[8px] font-bold border-t border-b border-black/10 py-1.5 font-sans">
+                                    <div>
+                                      <p className="text-black/40 text-[6px]">PATIENT ID</p>
+                                      <p className="font-mono">{results.patientId}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-black/40 text-[6px]">SPECIES</p>
+                                      <p className="uppercase">{results.species}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-black/40 text-[6px]">CONC & MOTILITY</p>
+                                      <p className="font-mono">{results.summary.concentration.toFixed(1)}M/mL &middot; {results.summary.motility.total.toFixed(0)}%</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-black/40 text-[6px]">STORAGE LOCATION</p>
+                                      <p className="truncate font-mono">{labelStorageLoc}</p>
+                                    </div>
+                                  </div>
+
+                                  {/* Label Micro footer with barcode */}
+                                  <div className="mt-2.5 flex justify-between items-end">
+                                    <div className="leading-tight text-[6px] font-bold font-sans">
+                                      <p className="text-red-600 uppercase font-mono">{labelWarning}</p>
+                                      <p className="text-black/40 font-mono mt-0.5">{new Date(results.timestamp).toLocaleDateString()} {new Date(results.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                    </div>
+                                    <div className="flex items-center gap-[0.5px] h-4">
+                                      {[1, 2, 3, 1, 4, 1, 2, 3, 1, 2, 1, 3, 1].map((w, i) => (
+                                        <div key={i} className="bg-black h-full" style={{ width: `${w}px` }} />
+                                      ))}
+                                    </div>
+                                  </div>
                                 </div>
-                              ) : (
-                                <div className="p-4 bg-black/5 rounded-2xl border border-black/5 text-center">
-                                  <p className="text-[10px] text-black/40 italic">Clinical interpretation pending AI generation.</p>
+
+                                {/* Custom printing action triggers */}
+                                <div className="pt-2 flex gap-2 font-sans">
+                                  <button
+                                    onClick={() => setShowLabelModal(false)}
+                                    className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer"
+                                  >
+                                    Close
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setLabelPrinted(true);
+                                      setTimeout(() => {
+                                        setLabelPrinted(false);
+                                        setShowLabelModal(false);
+                                      }, 1500);
+                                    }}
+                                    className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold uppercase transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                                  >
+                                    {labelPrinted ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
+                                    {labelPrinted ? "Mocking Print..." : "Confirm Print Label"}
+                                  </button>
                                 </div>
-                              )}
-                            </section>
+                              </motion.div>
+                            </div>
                           )}
-                          
-                          <div className="mt-10 pt-4 border-t border-black/10 flex justify-between items-end">
-                            <div className="text-[7px] font-bold text-black/20 uppercase leading-tight">
-                              ATSA AI v2.0 Engine<br />
-                              Digital Signature Verified
-                            </div>
-                            <div className="w-16 h-16 bg-black/5 rounded-lg flex items-center justify-center">
-                              <div className="w-10 h-10 border-2 border-black/10 rounded-full border-dashed animate-spin-slow" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                        
-                        <div className="grid grid-cols-3 gap-3">
-                          <button className={cn(
-                            "py-4 border rounded-2xl font-bold text-[10px] transition-all",
-                            theme === 'dark' ? "bg-white/5 hover:bg-white/10 border-white/10 text-white" : "bg-black/5 hover:bg-black/10 border-black/10 text-slate-900"
-                          )}>
-                            Print Label
-                          </button>
-                          <button 
-                            onClick={exportToPDF}
-                            className={cn(
-                              "py-4 border rounded-2xl font-bold text-[10px] transition-all flex items-center justify-center gap-2",
-                              theme === 'dark' ? "bg-white/10 hover:bg-white/20 border-white/10 text-white" : "bg-black/10 hover:bg-black/20 border-black/10 text-slate-900"
-                            )}
-                          >
-                            <Download className="w-3 h-3" />
-                            PDF
-                          </button>
-                          <button 
-                            onClick={saveToHistory}
-                            disabled={isSaving || !user}
-                            className={cn(
-                              "py-4 rounded-2xl font-bold text-[10px] shadow-lg transition-all flex items-center justify-center gap-2",
-                              isSaving ? (theme === 'dark' ? "bg-white/5 text-white/40" : "bg-black/5 text-black/40") : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20"
-                            )}
-                          >
-                            {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
-                            {isSaving ? "Saving..." : "Save to Cloud"}
-                          </button>
-                        </div>
-                        
-                        {!results.summary.interpretation && (
-                          <button 
-                            onClick={generateAIInterpretation}
-                            disabled={isGeneratingInterpretation}
-                            className="w-full py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2"
-                          >
-                            {isGeneratingInterpretation ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
-                            Generate AI Clinical Conclusion
-                          </button>
-                        )}
+                        </AnimatePresence>
+
                       </div>
                     )}
                   </>
