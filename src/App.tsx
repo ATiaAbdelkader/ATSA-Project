@@ -503,18 +503,20 @@ export default function App() {
             >
               {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
-            <button 
-              onClick={() => setShowNotifications(!showNotifications)}
-              className={cn(
-                "p-2.5 border rounded-xl transition-all relative",
-                theme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:text-white" : "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-900",
-                showNotifications && (theme === 'dark' ? "bg-white/10 text-white" : "bg-slate-100 text-slate-900")
-              )}
-            >
-              <Bell className="w-5 h-5" />
-              {notifications.filter(n => !n.read).length > 0 && (
-                <span className="absolute top-2 right-2 w-2 h-2 bg-emerald-500 rounded-full border-2 border-[#0a0a0a]" />
-              )}
+            <div className="relative">
+              <button 
+                onClick={() => setShowNotifications(!showNotifications)}
+                className={cn(
+                  "p-2.5 border rounded-xl transition-all relative",
+                  theme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:text-white" : "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-900",
+                  showNotifications && (theme === 'dark' ? "bg-white/10 text-white" : "bg-slate-100 text-slate-900")
+                )}
+              >
+                <Bell className="w-5 h-5" />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-emerald-500 rounded-full border-2 border-[#0a0a0a]" />
+                )}
+              </button>
               
               {/* Notifications Dropdown */}
               <AnimatePresence>
@@ -524,7 +526,7 @@ export default function App() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
                     className={cn(
-                      "absolute right-0 mt-4 w-80 border rounded-2xl shadow-2xl overflow-hidden z-50",
+                      "absolute right-0 mt-2 w-80 border rounded-2xl shadow-2xl overflow-hidden z-50",
                       theme === 'dark' ? "bg-[#0f0f0f] border-white/10" : "bg-white border-black/10"
                     )}
                     onClick={(e) => e.stopPropagation()}
@@ -589,7 +591,7 @@ export default function App() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </button>
+            </div>
             <div className={cn("h-10 w-px mx-2", theme === 'dark' ? "bg-white/10" : "bg-slate-200")} />
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">

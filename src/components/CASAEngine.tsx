@@ -41,6 +41,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   LineChart, 
   Line, 
+  BarChart,
+  Bar,
+  Cell,
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -248,6 +251,12 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     sdf: true,
     ai: true
   });
+
+  const [isManualAnnotating, setIsManualAnnotating] = useState(false);
+  const [scatterX, setScatterX] = useState<'vsl' | 'vcl' | 'vap' | 'lin' | 'alh'>('vsl');
+  const [scatterY, setScatterY] = useState<'vsl' | 'vcl' | 'vap' | 'lin' | 'alh'>('vcl');
+  const [denaturationTime, setDenaturationTime] = useState(15);
+  const [lysisIntensity, setLysisIntensity] = useState(80);
 
   // Custom metadata and notes for Report section
   const [clinicianName, setClinicianName] = useState('Dr. Sarah Jenkins, DVM');
@@ -557,6 +566,8 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       highContrast: false,
       reportFormat: 'pdf' as 'pdf' | 'csv',
       notifications: true,
+      chamberDepth: 20,
+      chamberPreset: 'leja20'
     };
     if (saved) {
       try {
@@ -633,7 +644,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
         read: false,
         timestamp: new Date().toISOString(),
         uid: user.uid,
-        link
+        link: link || null
       });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, path);
@@ -1487,8 +1498,21 @@ Digital Signature Verified - ATSA AI Engine v2.0
       }
 
       if (settings.showParticles) {
-        particles.current.forEach(p => {
-          if (isAnalyzing && p.type !== 'immotile') {
+        const activeSpermsList = results ? results.spermatozoa.map(s => {
+          const lastPos = s.path[s.path.length - 1] || { x: 0, y: 0 };
+          return {
+            id: s.id,
+            x: lastPos.x,
+            y: lastPos.y,
+            vx: s.vsl || 1,
+            vy: s.vcl || 1,
+            type: s.classification,
+            path: s.path
+          };
+        }) : particles.current;
+
+        activeSpermsList.forEach(p => {
+          if (isAnalyzing && p.type !== 'immotile' && !results) {
             p.x += p.vx;
             p.y += p.vy;
             p.vx += (Math.random() - 0.5) * 0.4;
@@ -1497,7 +1521,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
             if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
           }
 
-          if (isAnalyzing) {
+          if (isAnalyzing && !results) {
             p.path.push({ x: p.x, y: p.y, t: frameCount / settings.fps });
             if (p.path.length > 100) p.path.shift();
           }
@@ -1828,7 +1852,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
 
     render();
     return () => cancelAnimationFrame(animationId);
-  }, [isAnalyzing, selectedSperm, settings.fps, canvasZoom, canvasOffset, videoFilters, showHeatmap]);
+  }, [isAnalyzing, selectedSperm, settings.fps, canvasZoom, canvasOffset, videoFilters, showHeatmap, results, isManualAnnotating]);
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.button === 1 || (e.button === 0 && e.altKey)) { // Middle click or Alt+Left click to pan
@@ -1867,6 +1891,92 @@ Digital Signature Verified - ATSA AI Engine v2.0
 
     if (isCalibrating) {
       handleCalibrationClick(x, y);
+      return;
+    }
+
+    if (isManualAnnotating && results) {
+      let closestObj: SpermData | null = null;
+      let minDistVal = 35 / canvasZoom;
+      results.spermatozoa.forEach(s => {
+        const lastPos = s.path[s.path.length - 1];
+        if (lastPos) {
+          const dist = Math.sqrt(Math.pow(lastPos.x - x, 2) + Math.pow(lastPos.y - y, 2));
+          if (dist < minDistVal) {
+            minDistVal = dist;
+            closestObj = s;
+          }
+        }
+      });
+
+      if (closestObj) {
+        const spermId = (closestObj as SpermData).id;
+        const currentClass = (closestObj as SpermData).classification;
+        let nextClass: 'progressive' | 'non-progressive' | 'immotile' | 'delete' = 'progressive';
+        if (currentClass === 'progressive') nextClass = 'non-progressive';
+        else if (currentClass === 'non-progressive') nextClass = 'immotile';
+        else if (currentClass === 'immotile') nextClass = 'delete';
+        else nextClass = 'progressive';
+
+        let updatedSpermatozoa = [...results.spermatozoa];
+        if (nextClass === 'delete') {
+          updatedSpermatozoa = updatedSpermatozoa.filter(s => s.id !== spermId);
+          createNotification("Manual Annotation Override", `Removed sperm cell tracking ID ${spermId}`, "warning");
+        } else {
+          updatedSpermatozoa = updatedSpermatozoa.map(s => {
+            if (s.id === spermId) {
+              return {
+                ...s,
+                classification: nextClass,
+                vcl: nextClass === 'immotile' ? 0.5 : (nextClass === 'non-progressive' ? 15 : 65),
+                vsl: nextClass === 'immotile' ? 0.0 : (nextClass === 'non-progressive' ? 5 : 45),
+              };
+            }
+            return s;
+          });
+          createNotification("Manual Annotation Override", `Sperm ${spermId} changed to ${nextClass.toUpperCase()}`, "success");
+        }
+
+        const updatedSummary = generateSummary(updatedSpermatozoa, settings);
+        setResults({
+          ...results,
+          spermatozoa: updatedSpermatozoa,
+          summary: updatedSummary
+        });
+      } else {
+        const newId = `M-${Date.now().toString().slice(-4)}`;
+        const path = Array.from({ length: 15 }, (_, idx) => ({
+          x: x + (Math.random() - 0.5) * 8,
+          y: y + (Math.random() - 0.5) * 8,
+          t: idx / settings.fps
+        }));
+        const kinematics = calculateKinematics(path, settings.fps, settings.micronsPerPixel);
+        const newSperm: SpermData = {
+          id: newId,
+          path,
+          ...kinematics,
+          classification: 'progressive',
+          morphology: {
+            head: 'normal',
+            vacuoles: 'absent',
+            acrosome: 'normal',
+            midpiece: 'normal',
+            tail: 'normal',
+            droplet: 'none'
+          },
+          morphometry: { area: 18, perimeter: 15, length: 6, width: 3.2, circularity: 0.85, elongation: 0.45 },
+          vitality: 'live',
+          sdf: { fragmented: false, haloSized: 18, dfi: 10 }
+        };
+
+        const updatedSpermatozoa = [...results.spermatozoa, newSperm];
+        const updatedSummary = generateSummary(updatedSpermatozoa, settings);
+        setResults({
+          ...results,
+          spermatozoa: updatedSpermatozoa,
+          summary: updatedSummary
+        });
+        createNotification("Manual Point Added", `Manually annotated cell ${newId} at screen coordinates (${x.toFixed(0)}, ${y.toFixed(0)})`, "success");
+      }
       return;
     }
 
@@ -2135,6 +2245,12 @@ Digital Signature Verified - ATSA AI Engine v2.0
                     <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Calibration: Pick 2 Points</span>
                   </div>
                 )}
+                {isManualAnnotating && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 border border-amber-500/40 rounded-full backdrop-blur-md animate-bounce">
+                    <Tag className="w-3 h-3 text-amber-400" />
+                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Manual Annotation Active: Click canvas to add sperm / Click cell to cycle class</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-4 px-4 py-2 bg-black/40 border border-white/10 rounded-2xl backdrop-blur-md">
                   <div>
                     <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">Processing Speed</p>
@@ -2188,7 +2304,10 @@ Digital Signature Verified - ATSA AI Engine v2.0
             <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-[24px]">
               <div className="flex items-center gap-1 border-r border-white/10 pr-3 mr-1">
                 <button 
-                  onClick={() => setIsCalibrating(!isCalibrating)}
+                  onClick={() => {
+                    setIsCalibrating(!isCalibrating);
+                    if (isManualAnnotating) setIsManualAnnotating(false);
+                  }}
                   className={cn(
                     "p-2 rounded-xl transition-all flex items-center gap-2",
                     isCalibrating ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20" : "hover:bg-white/10 text-white/60"
@@ -2197,6 +2316,20 @@ Digital Signature Verified - ATSA AI Engine v2.0
                 >
                   <Ruler className="w-4 h-4" />
                   <span className="text-[10px] font-bold uppercase tracking-widest">Calibrate</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setIsManualAnnotating(!isManualAnnotating);
+                    if (isCalibrating) setIsCalibrating(false);
+                  }}
+                  className={cn(
+                    "p-2 rounded-xl transition-all flex items-center gap-2 ml-1",
+                    isManualAnnotating ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" : "hover:bg-white/10 text-white/60"
+                  )}
+                  title="Manual Override & Point Annotation"
+                >
+                  <Tag className="w-4 h-4" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Manual Edit</span>
                 </button>
                 <div className="relative group">
                   <button className="p-2 hover:bg-white/10 text-white/60 hover:text-white rounded-xl transition-all">
@@ -3031,19 +3164,112 @@ Digital Signature Verified - ATSA AI Engine v2.0
                           </div>
                         </section>
 
-                        <section>
-                          <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">Velocity Distribution</h3>
-                          <div className="h-48 w-full bg-black/20 rounded-xl p-2">
+                        <section className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Kinematic Correlation</h3>
+                            <div className="flex items-center gap-1">
+                              <select
+                                value={scatterX}
+                                onChange={(e) => setScatterX(e.target.value as any)}
+                                className="text-[10px] uppercase font-mono bg-black/60 border border-white/10 rounded-lg px-2 py-1 text-white cursor-pointer"
+                              >
+                                <option value="vsl">X: VSL</option>
+                                <option value="vcl">X: VCL</option>
+                                <option value="vap">X: VAP</option>
+                                <option value="lin">X: LIN</option>
+                                <option value="alh">X: ALH</option>
+                              </select>
+                              <span className="text-white/25 text-[10px] font-bold">vs</span>
+                              <select
+                                value={scatterY}
+                                onChange={(e) => setScatterY(e.target.value as any)}
+                                className="text-[10px] uppercase font-mono bg-black/60 border border-white/10 rounded-lg px-2 py-1 text-white cursor-pointer"
+                              >
+                                <option value="vsl">Y: VSL</option>
+                                <option value="vcl">Y: VCL</option>
+                                <option value="vap">Y: VAP</option>
+                                <option value="lin">Y: LIN</option>
+                                <option value="alh">Y: ALH</option>
+                              </select>
+                            </div>
+                          </div>
+                          
+                          <div className="h-48 w-full bg-black/20 rounded-xl p-2 relative">
+                            <div className="absolute top-2 right-2 flex flex-col items-end pointer-events-none text-[8px] font-mono text-emerald-400 bg-black/40 px-2 py-1 rounded border border-white/5">
+                              <span className="font-bold">TOTAL CELLS: {results.spermatozoa.length}</span>
+                            </div>
                             <ResponsiveContainer width="100%" height="100%">
-                              <ScatterChart margin={{ top: 10, right: 10, bottom: 10, left: -20 }}>
+                              <ScatterChart margin={{ top: 15, right: 10, bottom: 10, left: -20 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                <XAxis type="number" dataKey="vsl" name="VSL" unit="µm/s" stroke="rgba(255,255,255,0.2)" fontSize={10} />
-                                <YAxis type="number" dataKey="vcl" name="VCL" unit="µm/s" stroke="rgba(255,255,255,0.2)" fontSize={10} />
-                                <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', fontSize: '10px' }} />
-                                <Scatter name="Spermatozoa" data={results.spermatozoa} fill="#10b981" />
+                                <XAxis type="number" dataKey={scatterX} name={scatterX.toUpperCase()} unit={scatterX === 'lin' ? '%' : 'µm/s'} stroke="rgba(255,255,255,0.2)" fontSize={10} />
+                                <YAxis type="number" dataKey={scatterY} name={scatterY.toUpperCase()} unit={scatterY === 'lin' ? '%' : 'µm/s'} stroke="rgba(255,255,255,0.2)" fontSize={10} />
+                                <Tooltip 
+                                  cursor={{ strokeDasharray: '3 3' }} 
+                                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', fontSize: '10px' }}
+                                  formatter={(value: any, name: any) => [`${value} ${name === 'LIN' ? '%' : 'µm/s'}`, name]}
+                                />
+                                <Scatter name="Spermatozoa" data={results.spermatozoa} fill="#10b981">
+                                  {results.spermatozoa.map((entry, index) => {
+                                    const isH = entry.isHyperactivated;
+                                    return <Cell key={`cell-${index}`} fill={isH ? '#c084fc' : entry.classification === 'progressive' ? '#34d399' : entry.classification === 'non-progressive' ? '#fbbf24' : '#ef4444'} />;
+                                  })}
+                                </Scatter>
                               </ScatterChart>
                             </ResponsiveContainer>
                           </div>
+
+                          <div className="flex gap-2 justify-center">
+                            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-purple-400" /><span className="text-[8px] text-white/50 uppercase font-bold">Hyperactive</span></div>
+                            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-emerald-400" /><span className="text-[8px] text-white/50 uppercase font-bold">Prog</span></div>
+                            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-yellow-400" /><span className="text-[8px] text-white/50 uppercase font-bold">Non-Prog</span></div>
+                            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-red-400" /><span className="text-[8px] text-white/50 uppercase font-bold">Immotile</span></div>
+                          </div>
+                        </section>
+
+                        <section className="space-y-3">
+                          <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Speed Range Kinematics Distribution</h3>
+                          {(() => {
+                            const totalCount = results.spermatozoa.length || 1;
+                            const rapid = results.spermatozoa.filter(s => s.classification === 'progressive' && s.vcl >= 45).length;
+                            const medium = results.spermatozoa.filter(s => s.classification === 'progressive' && s.vcl < 45 && s.vcl >= 15).length;
+                            const slow = results.spermatozoa.filter(s => s.classification === 'non-progressive').length;
+                            const staticCount = results.spermatozoa.filter(s => s.classification === 'immotile').length;
+
+                            const barData = [
+                              { name: 'Rapid (≥45µm/s)', count: rapid, pct: parseFloat(((rapid/totalCount)*100).toFixed(0)), color: '#10b981' },
+                              { name: 'Medium (15-45µm/s)', count: medium, pct: parseFloat(((medium/totalCount)*100).toFixed(0)), color: '#3b82f6' },
+                              { name: 'Slow (<15µm/s)', count: slow, pct: parseFloat(((slow/totalCount)*100).toFixed(0)), color: '#fbbf24' },
+                              { name: 'Static (0)', count: staticCount, pct: parseFloat(((staticCount/totalCount)*100).toFixed(0)), color: '#ef4444' }
+                            ];
+
+                            return (
+                              <div className="space-y-2">
+                                <div className="h-40 w-full bg-black/20 rounded-xl p-2">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={barData} margin={{ top: 10, right: 10, bottom: 5, left: -20 }}>
+                                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                      <XAxis dataKey="name" stroke="rgba(255,255,255,0.2)" fontSize={8} />
+                                      <YAxis stroke="rgba(255,255,255,0.2)" fontSize={8} unit="%" />
+                                      <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', fontSize: '10px' }} />
+                                      <Bar dataKey="pct" radius={[4, 4, 0, 0]}>
+                                        {barData.map((entry, index) => (
+                                          <Cell key={`bar-cell-${index}`} fill={entry.color} />
+                                        ))}
+                                      </Bar>
+                                    </BarChart>
+                                  </ResponsiveContainer>
+                                </div>
+                                <div className="grid grid-cols-4 gap-1">
+                                  {barData.map(item => (
+                                    <div key={item.name} className="bg-white/5 border border-white/5 p-2 rounded-lg text-center">
+                                      <p className="text-[10px] font-mono font-bold text-white/90">{item.pct}%</p>
+                                      <p className="text-[6px] uppercase font-bold text-white/30 truncate" title={item.name}>{item.name}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </section>
                       </div>
                     )}
@@ -3573,6 +3799,122 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                 "text-[8px] mt-1",
                                 theme === 'dark' ? "text-white/20" : "text-black/20"
                               )}>Sperm Chromatin Dispersion</p>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className={cn(
+                          "p-4 border rounded-2xl space-y-4",
+                          theme === 'dark' ? "bg-white/5 border-white/5 text-white" : "bg-black/5 border-black/5 text-slate-900"
+                        )}>
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Advanced SCD Halos Assay Simulator</h4>
+                            <span className="text-[8px] px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-full font-mono uppercase font-black">Interactive Sandbox</span>
+                          </div>
+                          <p className={cn(
+                            "text-[9px] leading-relaxed",
+                            theme === 'dark' ? "text-white/50" : "text-slate-600"
+                          )}>
+                            Simulate the acid denaturation and nuclear extraction steps of the Sperm Chromatin Dispersion (SCD) test. Observe how buffer protocols influence halo loop diameter and final diagnostic sensitivity.
+                          </p>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className={cn(
+                              "space-y-3 p-3 rounded-xl border",
+                              theme === 'dark' ? "bg-black/30 border-white/5" : "bg-white border-slate-200"
+                            )}>
+                              <h5 className={cn(
+                                "text-[9px] font-bold uppercase tracking-wider",
+                                theme === 'dark' ? "text-white/60" : "text-slate-700"
+                              )}>Assay Chemical Protocol</h5>
+                              
+                              <div>
+                                <div className="flex justify-between mb-1">
+                                  <span className={cn("text-[8px] uppercase font-mono", theme === 'dark' ? "text-white/40" : "text-slate-500")}>1. Acid Denaturation (sec)</span>
+                                  <span className={cn("text-[8px] font-mono font-bold", theme === 'dark' ? "text-white" : "text-slate-900")}>{denaturationTime}s</span>
+                                </div>
+                                <input 
+                                  type="range" min="5" max="30" step="1" 
+                                  value={denaturationTime}
+                                  onChange={(e) => setDenaturationTime(parseInt(e.target.value))}
+                                  className="w-full accent-emerald-500 cursor-pointer"
+                                />
+                              </div>
+
+                              <div>
+                                <div className="flex justify-between mb-1">
+                                  <span className={cn("text-[8px] uppercase font-mono", theme === 'dark' ? "text-white/40" : "text-slate-500")}>2. Lysis Extraction (%)</span>
+                                  <span className={cn("text-[8px] font-mono font-bold", theme === 'dark' ? "text-white" : "text-slate-900")}>{lysisIntensity}%</span>
+                                </div>
+                                <input 
+                                  type="range" min="30" max="100" step="5" 
+                                  value={lysisIntensity}
+                                  onChange={(e) => setLysisIntensity(parseInt(e.target.value))}
+                                  className="w-full accent-emerald-500 cursor-pointer"
+                                />
+                              </div>
+
+                              <div className={cn(
+                                "p-2 rounded-lg space-y-1 text-[8px] font-mono",
+                                theme === 'dark' ? "bg-white/5 text-white/40" : "bg-slate-50 text-slate-500"
+                              )}>
+                                <div className="flex justify-between">
+                                  <span>Protocol Standard:</span>
+                                  <span className="text-emerald-500 font-bold">HALOSPERM G2</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Nuclear Matrix Status:</span>
+                                  <span className={denaturationTime < 12 ? "text-amber-500 font-bold" : denaturationTime > 22 ? "text-red-500 font-bold" : "text-emerald-500 font-bold"}>
+                                    {denaturationTime < 12 ? "Under-denatured" : denaturationTime > 22 ? "Partially Cleaved" : "Optimal Cleavage"}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Extraction State:</span>
+                                  <span className={lysisIntensity < 50 ? "text-amber-500 font-bold" : "text-emerald-500 font-bold"}>
+                                    {lysisIntensity < 50 ? "Insufficient Lysis" : "Complete Core Wash"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className={cn(
+                              "p-3 border rounded-xl flex flex-col items-center justify-center relative select-none",
+                              theme === 'dark' ? "bg-black/50 border-white/5" : "bg-slate-50 border-slate-200"
+                            )}>
+                              {/* Glowing interactive halo viewer */}
+                              <svg viewBox="0 0 160 160" className="w-full h-24 aspect-square">
+                                <defs>
+                                  <radialGradient id="healthyHalo" cx="50%" cy="50%" r="50%">
+                                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+                                    <stop offset={`${Math.min(100, lysisIntensity * 0.95)}%`} stopColor="#059669" stopOpacity="0.1" />
+                                    <stop offset="100%" stopColor="#000000" stopOpacity="0" />
+                                  </radialGradient>
+                                  <radialGradient id="fragmentedHalo" cx="50%" cy="50%" r="50%">
+                                    <stop offset="0%" stopColor="#ef4444" stopOpacity="0.3" />
+                                    <stop offset={`${Math.max(10, denaturationTime * 1.5)}%`} stopColor="#b91c1c" stopOpacity="0.05" />
+                                    <stop offset="100%" stopColor="#000000" stopOpacity="0" />
+                                  </radialGradient>
+                                </defs>
+
+                                {/* Grid of Simulated Assays */}
+                                {/* Healthy Sperm 1 (Left) */}
+                                <g transform="translate(45, 80)">
+                                  <circle cx="0" cy="0" r={Math.max(10, (lysisIntensity/100) * 35)} fill="url(#healthyHalo)" className="animate-pulse" />
+                                  <ellipse cx="0" cy="0" rx="3.5" ry="2.2" fill={theme === 'dark' ? '#bcffd0' : '#10b981'} stroke="#10b981" strokeWidth="0.5" transform="rotate(-15)" />
+                                  <path d="M 0 0 Q -8 10 -6 20 T -12 35" fill="none" stroke="rgba(16,185,129,0.3)" strokeWidth="0.5" />
+                                  <text x="-15" y="-22" fill="#10b981" fontSize="6.5" fontWeight="bold" fontFamily="monospace">Intact DNA</text>
+                                  <text x="-15" y="44" fill={theme === 'dark' ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)"} fontSize="5" fontFamily="monospace">Halo: {((lysisIntensity/100) * 18).toFixed(1)}µm</text>
+                                </g>
+
+                                {/* Fragmented Sperm 2 (Right) */}
+                                <g transform="translate(115, 80)">
+                                  <circle cx="0" cy="0" r={Math.max(4, (denaturationTime/30) * 12)} fill="url(#fragmentedHalo)" />
+                                  <ellipse cx="0" cy="0" rx="3.2" ry="2.0" fill={theme === 'dark' ? '#ffd0d0' : '#ef4444'} stroke="#ef4444" strokeWidth="0.5" transform="rotate(25)" />
+                                  <path d="M 0 0 Q 5 8 15 18" fill="none" stroke="rgba(239,68,68,0.2)" strokeWidth="0.5" strokeDasharray="1 1" />
+                                  <text x="-14" y="-22" fill="#ef4444" fontSize="6.5" fontWeight="bold" fontFamily="monospace">Fragmented</text>
+                                  <text x="-14" y="44" fill={theme === 'dark' ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)"} fontSize="5" fontFamily="monospace">Halo: {((denaturationTime/30) * 4.5).toFixed(1)}µm</text>
+                                </g>
+                              </svg>
                             </div>
                           </div>
                         </section>
@@ -5179,44 +5521,99 @@ Digital Signature Verified - ATSA AI Engine v2.0
                         <h3 className={cn(
                           "text-[10px] font-black uppercase tracking-[0.2em] mb-6",
                           theme === 'dark' ? "text-white/20" : "text-black/20"
-                        )}>Hardware Calibration</h3>
-                        <div className="grid grid-cols-2 gap-4">
+                        )}>Hardware Calibration & Chamber</h3>
+                        <div className="space-y-4">
                           <div className="space-y-2">
                             <label className={cn(
                               "text-[10px] font-bold uppercase tracking-widest",
                               theme === 'dark' ? "text-white/40" : "text-black/40"
-                            )}>Frame Rate (FPS)</label>
-                            <input 
-                              type="number" 
-                              value={settings.fps}
-                              onChange={(e) => setSettings(prev => ({ ...prev, fps: parseInt(e.target.value) }))}
+                            )}>Counting Chamber Preset</label>
+                            <select
+                              value={settings.chamberPreset || 'leja20'}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                let depth = 20;
+                                let mpp = 0.65;
+                                if (val === 'leja20') { depth = 20; mpp = 0.65; }
+                                else if (val === 'leja10') { depth = 10; mpp = 0.65; }
+                                else if (val === 'makler') { depth = 10; mpp = 0.75; }
+                                else if (val === 'neubauer') { depth = 100; mpp = 1.20; }
+                                else { depth = settings.chamberDepth || 20; mpp = settings.micronsPerPixel || 0.65; }
+                                
+                                setSettings(prev => ({
+                                  ...prev,
+                                  chamberPreset: val,
+                                  chamberDepth: depth,
+                                  micronsPerPixel: mpp
+                                }));
+                                createNotification("Chamber Calibration Selected", `${val.toUpperCase()} preset applies depth of ${depth}µm and scale of ${mpp}µm/px`, "info");
+                              }}
                               className={cn(
                                 "w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500/50 transition-colors",
                                 theme === 'dark' ? "bg-black/40 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
                               )}
-                            />
+                            >
+                              <option value="leja20">Leja Slide 20 µm (Standard Clinical)</option>
+                              <option value="leja10">Leja Slide 10 µm (Fast Analysis)</option>
+                              <option value="makler">Makler Chamber 10 µm (Reusable grid)</option>
+                              <option value="neubauer">Improved Neubauer Hemocytometer (100 µm)</option>
+                              <option value="custom">Custom Configuration</option>
+                            </select>
                           </div>
-                          <div className="space-y-2">
-                            <label className={cn(
-                              "text-[10px] font-bold uppercase tracking-widest",
-                              theme === 'dark' ? "text-white/40" : "text-black/40"
-                            )}>µm per Pixel</label>
-                            <input 
-                              type="number" 
-                              step="0.01"
-                              value={settings.micronsPerPixel}
-                              onChange={(e) => setSettings(prev => ({ ...prev, micronsPerPixel: parseFloat(e.target.value) }))}
-                              className={cn(
-                                "w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500/50 transition-colors",
-                                theme === 'dark' ? "bg-black/40 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
-                              )}
-                            />
+
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="space-y-2">
+                              <label className={cn(
+                                "text-[10px] font-bold uppercase tracking-widest",
+                                theme === 'dark' ? "text-white/40" : "text-black/40"
+                              )}>Frame Rate</label>
+                              <input 
+                                type="number" 
+                                value={settings.fps}
+                                onChange={(e) => setSettings(prev => ({ ...prev, fps: parseInt(e.target.value) }))}
+                                className={cn(
+                                  "w-full border rounded-xl px-3 py-3 text-xs font-mono focus:outline-none focus:border-emerald-500/50 transition-colors",
+                                  theme === 'dark' ? "bg-black/40 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                                )}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className={cn(
+                                "text-[10px] font-bold uppercase tracking-widest",
+                                theme === 'dark' ? "text-white/40" : "text-black/40"
+                              )}>µm/px Scale</label>
+                              <input 
+                                type="number" 
+                                step="0.01"
+                                value={settings.micronsPerPixel}
+                                onChange={(e) => setSettings(prev => ({ ...prev, micronsPerPixel: parseFloat(e.target.value), chamberPreset: 'custom' }))}
+                                className={cn(
+                                  "w-full border rounded-xl px-3 py-3 text-xs font-mono focus:outline-none focus:border-emerald-500/50 transition-colors",
+                                  theme === 'dark' ? "bg-black/40 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                                )}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className={cn(
+                                "text-[10px] font-bold uppercase tracking-widest",
+                                theme === 'dark' ? "text-white/40" : "text-black/40"
+                              )}>Depth (µm)</label>
+                              <input 
+                                type="number" 
+                                value={settings.chamberDepth ?? 20}
+                                onChange={(e) => setSettings(prev => ({ ...prev, chamberDepth: parseInt(e.target.value), chamberPreset: 'custom' }))}
+                                className={cn(
+                                  "w-full border rounded-xl px-3 py-3 text-xs font-mono focus:outline-none focus:border-emerald-500/50 transition-colors",
+                                  theme === 'dark' ? "bg-black/40 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                                )}
+                              />
+                            </div>
                           </div>
                         </div>
                         <p className={cn(
-                          "text-[10px] mt-4 italic",
+                          "text-[10px] mt-4 italic leading-relaxed",
                           theme === 'dark' ? "text-white/20" : "text-black/20"
-                        )}>Standard calibration for 20x objective is typically 0.65 µm/px.</p>
+                        )}>Depth and pixel scale define the calculated analyzed volume, directly impacting Concentration M/ml measurements.</p>
                       </section>
 
                       <section>

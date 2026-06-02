@@ -229,7 +229,18 @@ export const generateSummary = (spermatozoa: SpermData[], settings: AnalysisResu
   const deadCount = spermatozoa.filter(s => s.vitality === 'dead').length;
   const vitalityTotal = totalCount > 0 ? (liveCount / totalCount) * 100 : 0;
   const leukocytes = Math.random() > 0.8 ? 1.5 : 0.2; // Simulated million/ml
-  const concentration = totalCount * 0.5;
+
+  // High-fidelity concentration calculation incorporating camera resolution,
+  // microns-per-pixel visual scale, and medical counting chamber depth (microns).
+  const depthMicrons = (settings as any).chamberDepth ?? 20;
+  const mpp = settings.micronsPerPixel ?? 0.65;
+  const fieldWidthMm = (1280 * mpp) / 1000;
+  const fieldHeightMm = (720 * mpp) / 1000;
+  const fieldAreaMm2 = fieldWidthMm * fieldHeightMm;
+  const chamberDepthMm = depthMicrons / 1000;
+  const fieldVolumeMm3 = fieldAreaMm2 * chamberDepthMm;
+  const fieldVolumeML = fieldVolumeMm3 / 1000; // 1 mm^3 = 1 uL = 1e-3 mL
+  const concentration = totalCount > 0 ? (totalCount / fieldVolumeML) / 1000000 : 0;
 
   const { profile } = settings;
 

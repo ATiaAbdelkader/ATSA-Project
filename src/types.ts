@@ -62,6 +62,8 @@ export interface AnalysisResult {
     fps: number;
     micronsPerPixel: number;
     profile: SpeciesProfile;
+    chamberDepth?: number;
+    chamberPreset?: string;
   };
   summary: {
     totalCount: number;
