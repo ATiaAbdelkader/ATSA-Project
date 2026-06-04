@@ -330,16 +330,16 @@ export default function App() {
               <p className={cn("text-sm", theme === 'dark' ? "text-white/40" : "text-slate-500")}>Enter your credentials to begin your session.</p>
             </div>
 
-            <form onSubmit={(e) => { e.preventDefault(); handleGuestLogin(); }} className="space-y-6">
+            <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-6">
               <div className="space-y-2">
                 <div className="flex justify-between items-center px-1">
                   <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Laboratory ID</label>
-                  <span className={cn("text-[10px] uppercase font-mono px-1.5 py-0.5 rounded", theme === 'dark' ? "text-emerald-400 bg-emerald-500/10" : "text-emerald-600 bg-emerald-50")}>Jury Guest Access</span>
+                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Required</span>
                 </div>
                 <div className="relative group">
                   <input 
                     type="text" 
-                    placeholder="Enter any text (e.g. JURY-CONGRESS)"
+                    placeholder="LAB-SECTOR-A4"
                     className={cn(
                       "w-full border rounded-2xl px-5 py-4 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50",
                       theme === 'dark' ? "bg-white/5 border-white/10 text-white placeholder:text-white/10" : "bg-white border-slate-200 text-slate-900 placeholder:text-slate-300"
@@ -351,7 +351,7 @@ export default function App() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center px-1">
                   <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Access Key</label>
-                  <span className={cn("text-[10px] uppercase font-mono px-1.5 py-0.5 rounded", theme === 'dark' ? "text-emerald-400 bg-emerald-500/10" : "text-emerald-600 bg-emerald-50")}>Bypassed</span>
+                  <button type="button" className="text-[10px] font-bold text-emerald-500/60 hover:text-emerald-500 uppercase tracking-widest transition-colors">Forgot Key?</button>
                 </div>
                 <div className="relative group">
                   <input 
@@ -366,38 +366,37 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-3 px-1">
-                <input type="checkbox" id="remember" defaultChecked className="w-4 h-4 rounded border-emerald-500/20 bg-emerald-500/10 text-emerald-500 focus:ring-emerald-500/50" />
-                <label htmlFor="remember" className={cn("text-xs font-medium", theme === 'dark' ? "text-white/40" : "text-slate-500")}>Bypass key validation for this session</label>
+                <input type="checkbox" id="remember" className="w-4 h-4 rounded border-emerald-500/20 bg-emerald-500/10 text-emerald-500 focus:ring-emerald-500/50" />
+                <label htmlFor="remember" className={cn("text-xs font-medium", theme === 'dark' ? "text-white/40" : "text-slate-500")}>Remember this workstation</label>
               </div>
 
               <button 
-                type="button"
-                onClick={handleGuestLogin}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black uppercase tracking-wider py-5 rounded-3xl mt-4 transition-all shadow-xl shadow-emerald-500/30 active:scale-[0.98] flex items-center justify-center gap-3 border border-emerald-400/20 cursor-pointer"
+                type="submit"
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-5 rounded-2xl mt-4 transition-all shadow-xl shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Award className="w-5 h-5 text-amber-300 fill-amber-300/20" />
-                Instant Jury & Reviewer Access
+                <LogIn className="w-5 h-5" />
+                Authenticate with Google
                 <ChevronRight className="w-4 h-4" />
               </button>
 
               <div className="relative flex py-2 items-center">
                 <div className="flex-grow border-t border-black/10 dark:border-white/5"></div>
-                <span className="flex-shrink mx-4 text-[8px] font-bold text-black/30 dark:text-white/25 uppercase tracking-widest font-mono">or standard google access</span>
+                <span className="flex-shrink mx-4 text-[8px] font-bold text-black/30 dark:text-white/25 uppercase tracking-widest font-mono">reviewer bypass portal</span>
                 <div className="flex-grow border-t border-black/10 dark:border-white/5"></div>
               </div>
 
               <button 
                 type="button"
-                onClick={handleLogin}
+                onClick={handleGuestLogin}
                 className={cn(
-                  "w-full font-bold py-4 rounded-2xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 border cursor-pointer",
+                  "w-full font-bold py-4 rounded-2xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 border cursor-pointer text-xs uppercase tracking-wider",
                   theme === 'dark' 
-                    ? "bg-white/5 hover:bg-white/10 text-white border-white/10" 
-                    : "bg-slate-100 hover:bg-slate-200 text-slate-900 border-slate-200"
+                    ? "bg-[#111] hover:bg-white/5 text-amber-400 border-amber-500/30" 
+                    : "bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200"
                 )}
               >
-                <LogIn className="w-4 h-4" />
-                Authenticate with Google
+                <Award className="w-4 h-4 text-amber-500" />
+                Instant Jury Access (By-Pass)
               </button>
             </form>
 

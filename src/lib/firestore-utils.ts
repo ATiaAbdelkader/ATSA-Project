@@ -29,15 +29,25 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  let activeUser: any = auth.currentUser;
+  if (!activeUser && typeof window !== 'undefined') {
+    const guest = localStorage.getItem('atsa_guest_session');
+    if (guest) {
+      try {
+        activeUser = JSON.parse(guest);
+      } catch (e) {}
+    }
+  }
+
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
+      userId: activeUser?.uid,
+      email: activeUser?.email,
+      emailVerified: activeUser?.emailVerified,
+      isAnonymous: activeUser?.isAnonymous,
+      tenantId: activeUser?.tenantId,
+      providerInfo: activeUser?.providerData?.map((provider: any) => ({
         providerId: provider.providerId,
         displayName: provider.displayName,
         email: provider.email,

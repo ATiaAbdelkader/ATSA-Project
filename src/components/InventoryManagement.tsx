@@ -56,8 +56,21 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
     expiryDate: ''
   });
 
+  const getActiveUser = () => {
+    if (auth.currentUser) return auth.currentUser;
+    const guest = localStorage.getItem('atsa_guest_session');
+    if (guest) {
+      try {
+        return JSON.parse(guest);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  };
+
   useEffect(() => {
-    const user = auth.currentUser;
+    const user = getActiveUser();
     if (!user) return;
 
     const q = query(collection(db, 'inventory'), where('uid', '==', user.uid));
@@ -76,7 +89,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = auth.currentUser;
+    const user = getActiveUser();
     if (!user) return;
 
     try {

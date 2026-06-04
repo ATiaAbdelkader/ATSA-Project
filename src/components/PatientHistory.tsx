@@ -54,11 +54,21 @@ enum OperationType {
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  let activeUser: any = auth.currentUser;
+  if (!activeUser && typeof window !== 'undefined') {
+    const guest = localStorage.getItem('atsa_guest_session');
+    if (guest) {
+      try {
+        activeUser = JSON.parse(guest);
+      } catch (e) {}
+    }
+  }
+
   const errInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
+      userId: activeUser?.uid,
+      email: activeUser?.email,
     },
     operationType,
     path
@@ -145,8 +155,22 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
     }));
   };
 
+  const getActiveUser = () => {
+    if (auth.currentUser) return auth.currentUser;
+    const guest = localStorage.getItem('atsa_guest_session');
+    if (guest) {
+      try {
+        return JSON.parse(guest);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  };
+
   useEffect(() => {
-    if (!searchId || !auth.currentUser) return;
+    const currentUser = getActiveUser();
+    if (!searchId || !currentUser) return;
 
     setIsLoading(true);
     setError(null);
@@ -155,7 +179,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
     const q = query(
       collection(db, path),
       where('patientId', '==', searchId),
-      where('uid', '==', auth.currentUser.uid),
+      where('uid', '==', currentUser.uid),
       orderBy('timestamp', 'asc')
     );
 

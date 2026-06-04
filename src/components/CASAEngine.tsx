@@ -605,7 +605,20 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      if (currentUser) {
+        setUser(currentUser);
+      } else {
+        const guest = localStorage.getItem('atsa_guest_session');
+        if (guest) {
+          try {
+            setUser(JSON.parse(guest));
+          } catch (e) {
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      }
     });
     return () => unsubscribe();
   }, []);
