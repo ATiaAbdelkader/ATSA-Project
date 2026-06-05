@@ -38,6 +38,7 @@ import type { PatientHistory, HistoricalDataPoint } from '../types';
 import { db, auth } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { GoogleGenAI } from "@google/genai";
+import { useLanguage } from '../context/LanguageContext';
 
 interface PatientHistoryProps {
   onBack: () => void;
@@ -78,6 +79,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, theme = 'dark' }) => {
+  const { t, dir } = useLanguage();
   const [searchId, setSearchId] = useState('');
   const [activeHistory, setActiveHistory] = useState<PatientHistory | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -224,14 +226,14 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-8 max-w-7xl mx-auto space-y-8" dir={dir}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <button 
             onClick={onBack}
             className={cn(
-              "p-2 rounded-xl transition-all",
+              "p-2 rounded-xl transition-all cursor-pointer",
               theme === 'dark' ? "hover:bg-white/5 text-white/40 hover:text-white" : "hover:bg-black/5 text-black/40 hover:text-black"
             )}
           >
@@ -241,11 +243,11 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
             <h2 className={cn(
               "text-2xl font-bold",
               theme === 'dark' ? "text-white" : "text-slate-900"
-            )}>Longitudinal Tracking</h2>
+            )}>{t('patientHistory')}</h2>
             <p className={cn(
               "text-sm",
               theme === 'dark' ? "text-white/40" : "text-black/40"
-            )}>Monitor patient progress and treatment efficacy</p>
+            )}>{t('patientHistorySearchTitle')}</p>
           </div>
         </div>
 
@@ -258,7 +260,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
             type="text" 
             value={searchId}
             onChange={(e) => setSearchId(e.target.value)}
-            placeholder="Search Patient ID (e.g. PAT-8821)"
+            placeholder={t('searchPlaceholder')}
             className={cn(
               "w-full border rounded-2xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all",
               theme === 'dark' ? "bg-[#0f0f0f] border-white/10 text-white placeholder:text-white/20" : "bg-white border-black/10 text-slate-900 placeholder:text-black/20"
@@ -288,7 +290,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
                   <div className="p-2 bg-emerald-500/10 rounded-lg">
                     <Sparkles className="w-4 h-4 text-emerald-500" />
                   </div>
-                  <h3 className={cn("font-bold", theme === 'dark' ? "text-white" : "text-slate-900")}>AI Clinical Insights</h3>
+                  <h3 className={cn("font-bold", theme === 'dark' ? "text-white" : "text-slate-900")}>{t('aiClinicalInsights')}</h3>
                 </div>
                 <button 
                   onClick={generateAISummary}
@@ -301,7 +303,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
                   )}
                 >
                   {isGeneratingAI ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                  {aiSummary ? 'Regenerate Summary' : 'Analyze Trends with AI'}
+                  {aiSummary ? t('regenerateSummary') : t('analyzeTrendsWithAI')}
                 </button>
               </div>
 
@@ -322,7 +324,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
                   <div className="h-full flex flex-col items-center justify-center text-center py-8">
                     <Sparkles className={cn("w-8 h-8 mb-3", theme === 'dark' ? "text-white/10" : "text-black/10")} />
                     <p className={cn("text-xs", theme === 'dark' ? "text-white/40" : "text-slate-500")}>
-                      Click the button above to generate an AI-powered clinical interpretation of this patient's historical trends.
+                      {t('aiTrendsInstruction')}
                     </p>
                   </div>
                 )}
@@ -333,17 +335,17 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
               "p-8 rounded-[32px] border",
               theme === 'dark' ? "bg-[#0f0f0f] border-white/10" : "bg-white border-black/10 shadow-sm"
             )}>
-              <h3 className={cn("text-[10px] font-bold uppercase tracking-widest mb-6", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Comparative Delta (vs Last)</h3>
+              <h3 className={cn("text-[10px] font-bold uppercase tracking-widest mb-6", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('comparativeDelta')}</h3>
               <div className="space-y-6">
                 {activeHistory.data.length >= 2 ? (() => {
                   const latest = activeHistory.data[activeHistory.data.length - 1];
                   const prev = activeHistory.data[activeHistory.data.length - 2];
                   
                   const metrics = [
-                    { label: 'Concentration', val: latest.concentration, prev: prev.concentration, unit: 'M/ml' },
-                    { label: 'Total Motility', val: latest.motility, prev: prev.motility, unit: '%' },
-                    { label: 'Normal Morph', val: latest.normalMorphology, prev: prev.normalMorphology, unit: '%' },
-                    { label: 'Vitality', val: latest.vitality, prev: prev.vitality, unit: '%' },
+                    { label: t('concentrationValue'), val: latest.concentration, prev: prev.concentration, unit: 'M/ml' },
+                    { label: t('motility'), val: latest.motility, prev: prev.motility, unit: '%' },
+                    { label: t('morphology'), val: latest.normalMorphology, prev: prev.normalMorphology, unit: '%' },
+                    { label: t('vitality'), val: latest.vitality, prev: prev.vitality, unit: '%' },
                   ];
 
                   return metrics.map(m => {
@@ -373,7 +375,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
                   <div className="h-full flex flex-col items-center justify-center text-center py-8">
                     <AlertCircle className={cn("w-8 h-8 mb-3", theme === 'dark' ? "text-white/10" : "text-black/10")} />
                     <p className={cn("text-xs", theme === 'dark' ? "text-white/40" : "text-slate-500")}>
-                      Need at least 2 samples to calculate comparative deltas.
+                      {t('needMoreSamplesDelta')}
                     </p>
                   </div>
                 )}
@@ -384,10 +386,10 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
           {/* Patient Overview Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: 'Patient ID', val: activeHistory.patientId, icon: Target, color: 'text-blue-500' },
-              { label: 'Species', val: activeHistory.species, icon: Activity, color: 'text-emerald-500' },
-              { label: 'Total Samples', val: activeHistory.data.length, icon: Calendar, color: 'text-purple-500' },
-              { label: 'Latest Status', val: activeHistory.data[activeHistory.data.length-1].motility > 40 ? 'Normal' : 'Abnormal', icon: TrendingUp, color: activeHistory.data[activeHistory.data.length-1].motility > 40 ? 'text-emerald-500' : 'text-red-500' },
+              { label: t('patientIdLabel'), val: activeHistory.patientId, icon: Target, color: 'text-blue-500' },
+              { label: t('species'), val: activeHistory.species, icon: Activity, color: 'text-emerald-500' },
+              { label: t('totalSamples'), val: activeHistory.data.length, icon: Calendar, color: 'text-purple-500' },
+              { label: t('latestStatusLabel'), val: activeHistory.data[activeHistory.data.length-1].motility > 40 ? t('statusNormal') : t('statusAbnormal'), icon: TrendingUp, color: activeHistory.data[activeHistory.data.length-1].motility > 40 ? 'text-emerald-500' : 'text-red-500' },
             ].map(card => (
               <div key={card.label} className={cn(
                 "border p-6 rounded-[32px]",
@@ -423,7 +425,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
               <span className={cn(
                 "text-[10px] font-bold uppercase tracking-widest",
                 theme === 'dark' ? "text-white/40" : "text-black/40"
-              )}>Display Settings</span>
+              )}>{t('displaySettings')}</span>
             </div>
             
             <div className="flex flex-wrap items-center gap-4">
@@ -434,15 +436,15 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
                   theme === 'dark' ? "bg-white/5 text-white/60 hover:bg-white/10" : "bg-black/5 text-black/60 hover:bg-black/10"
                 )}
               >
-                {visibleMetrics.length === 5 ? 'Clear All' : 'Select All'}
+                {visibleMetrics.length === 5 ? t('clearAll') : t('selectAll')}
               </button>
 
               {[
-                { id: 'concentration', label: 'Concentration', icon: Droplets, color: 'text-blue-500' },
-                { id: 'motility', label: 'Motility', icon: Activity, color: 'text-emerald-500' },
-                { id: 'morphology', label: 'Morphology', icon: Target, color: 'text-purple-500' },
-                { id: 'vitality', label: 'Vitality', icon: Activity, color: 'text-orange-500' },
-                { id: 'sdf', label: 'SDF (DFI)', icon: Target, color: 'text-red-500' }
+                { id: 'concentration', label: t('concentrationValue'), icon: Droplets, color: 'text-blue-500' },
+                { id: 'motility', label: t('motility'), icon: Activity, color: 'text-emerald-500' },
+                { id: 'morphology', label: t('morphology'), icon: Target, color: 'text-purple-500' },
+                { id: 'vitality', label: t('vitality'), icon: Activity, color: 'text-orange-500' },
+                { id: 'sdf', label: t('tabSdf'), icon: Target, color: 'text-red-500' }
               ].map(metric => (
                 <div key={metric.id} className="flex items-center gap-2">
                   <button
@@ -491,7 +493,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
                     <h3 className={cn(
                       "font-bold",
                       theme === 'dark' ? "text-white" : "text-slate-900"
-                    )}>Concentration Trend</h3>
+                    )}>{t('concentrationTrend')}</h3>
                   </div>
                   <div className="flex items-center gap-4">
                     <span className={cn(
@@ -570,7 +572,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
                     <h3 className={cn(
                       "font-bold",
                       theme === 'dark' ? "text-white" : "text-slate-900"
-                    )}>Motility & Progression</h3>
+                    )}>{t('motilityTrend')}</h3>
                   </div>
                   <span className={cn(
                     "text-[10px] font-bold uppercase",
@@ -655,7 +657,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
                     <h3 className={cn(
                       "font-bold",
                       theme === 'dark' ? "text-white" : "text-slate-900"
-                    )}>Normal Morphology Trend</h3>
+                    )}>{t('morphologyTrend')}</h3>
                   </div>
                   <span className={cn(
                     "text-[10px] font-bold uppercase",
@@ -720,7 +722,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
                     <h3 className={cn(
                       "font-bold",
                       theme === 'dark' ? "text-white" : "text-slate-900"
-                    )}>Vitality Trend</h3>
+                    )}>{t('vitalityTrend')}</h3>
                   </div>
                   <span className={cn(
                     "text-[10px] font-bold uppercase",
@@ -785,7 +787,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
                     <h3 className={cn(
                       "font-bold",
                       theme === 'dark' ? "text-white" : "text-slate-900"
-                    )}>DNA Fragmentation (DFI)</h3>
+                    )}>{t('sdfTrend')}</h3>
                   </div>
                   <span className={cn(
                     "text-[10px] font-bold uppercase",
@@ -854,14 +856,14 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
           <h3 className={cn(
             "text-xl font-bold mb-2",
             theme === 'dark' ? "text-white" : "text-slate-900"
-          )}>No History Found</h3>
+          )}>{searchId ? t('noHistoricalRecords') : "Enter ID"}</h3>
           <p className={cn(
             "max-w-sm",
             theme === 'dark' ? "text-white/40" : "text-black/40"
           )}>
             {searchId 
-              ? `We couldn't find any longitudinal data for patient ID "${searchId}". Please verify the ID or register a new sample.`
-              : "Enter a Patient ID above to view their historical analysis trends."}
+              ? `${t('noHistoricalRecords')} (ID: "${searchId}").`
+              : t('searchPlaceholder')}
           </p>
           {error && <p className="mt-4 text-red-500 text-sm">{error}</p>}
         </div>

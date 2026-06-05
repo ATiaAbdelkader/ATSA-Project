@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils';
+import { useLanguage } from '../context/LanguageContext';
 
 const GUIDE_DETAILS: Record<string, {
   title: string;
@@ -144,16 +145,17 @@ interface HelpCenterProps {
 }
 
 export const HelpCenter: React.FC<HelpCenterProps> = ({ onBack, theme = 'dark' }) => {
+  const { t, dir } = useLanguage();
   const [activeCategory, setActiveCategory] = useState<'guides' | 'metrics' | 'videos' | 'faq' | 'species'>('guides');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGuideId, setSelectedGuideId] = useState<string | null>(null);
 
   const categories = [
-    { id: 'guides', label: 'User Guides', icon: BookOpen },
-    { id: 'metrics', label: 'Metrics Library', icon: Info },
-    { id: 'species', label: 'Species Standards', icon: PawPrint },
-    { id: 'videos', label: 'Training Videos', icon: Video },
-    { id: 'faq', label: 'Troubleshooting', icon: AlertCircle },
+    { id: 'guides', label: t('userGuides'), icon: BookOpen },
+    { id: 'metrics', label: t('metricsLibrary'), icon: Info },
+    { id: 'species', label: t('speciesStandards'), icon: PawPrint },
+    { id: 'videos', label: t('trainingVideos'), icon: Video },
+    { id: 'faq', label: t('troubleshooting'), icon: AlertCircle },
   ] as const;
 
   const guides = [
@@ -226,7 +228,7 @@ export const HelpCenter: React.FC<HelpCenterProps> = ({ onBack, theme = 'dark' }
     <div className={cn(
       "flex flex-col h-full",
       theme === 'dark' ? "bg-[#0a0a0a]" : "bg-white"
-    )}>
+    )} dir={dir}>
       {/* Header */}
       <div className={cn(
         "p-8 border-b flex items-center justify-between",
@@ -237,7 +239,7 @@ export const HelpCenter: React.FC<HelpCenterProps> = ({ onBack, theme = 'dark' }
             <button 
               onClick={onBack}
               className={cn(
-                "p-2 rounded-xl transition-colors",
+                "p-2 rounded-xl transition-colors cursor-pointer",
                 theme === 'dark' ? "hover:bg-white/5" : "hover:bg-black/5"
               )}
             >
@@ -247,7 +249,7 @@ export const HelpCenter: React.FC<HelpCenterProps> = ({ onBack, theme = 'dark' }
               )} />
             </button>
           )}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mr-auto">
             <div className="p-2 bg-blue-500/10 rounded-xl">
               <HelpCircle className="w-6 h-6 text-blue-500" />
             </div>
@@ -255,11 +257,11 @@ export const HelpCenter: React.FC<HelpCenterProps> = ({ onBack, theme = 'dark' }
               <h2 className={cn(
                 "text-2xl font-bold tracking-tight",
                 theme === 'dark' ? "text-white" : "text-slate-900"
-              )}>Help & Training Center</h2>
+              )}>{t('helpAndTrainingCenter')}</h2>
               <p className={cn(
                 "text-xs",
                 theme === 'dark' ? "text-white/40" : "text-black/40"
-              )}>Master the ATSA CASA Engine and Laboratory Standards</p>
+              )}>{t('masterCASA')}</p>
             </div>
           </div>
         </div>
@@ -271,7 +273,7 @@ export const HelpCenter: React.FC<HelpCenterProps> = ({ onBack, theme = 'dark' }
           )} />
           <input 
             type="text" 
-            placeholder="Search topics..."
+            placeholder={t('searchTopics')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={cn(
@@ -296,7 +298,7 @@ export const HelpCenter: React.FC<HelpCenterProps> = ({ onBack, theme = 'dark' }
                 setSelectedGuideId(null);
               }}
               className={cn(
-                "w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-medium transition-all group",
+                "w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-medium transition-all group cursor-pointer",
                 activeCategory === cat.id 
                   ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20" 
                   : (theme === 'dark' ? "text-white/40 hover:text-white hover:bg-white/5" : "text-black/40 hover:text-black hover:bg-black/5")
@@ -312,10 +314,10 @@ export const HelpCenter: React.FC<HelpCenterProps> = ({ onBack, theme = 'dark' }
               "p-5 border rounded-[24px]",
               theme === 'dark' ? "bg-emerald-500/5 border-emerald-500/10" : "bg-emerald-50 border-emerald-500/20"
             )}>
-              <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-2">System Status</p>
+              <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-2">{t('systemStatus')}</p>
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[11px] text-emerald-500/80">All Engines Operational</span>
+                <span className="text-[11px] text-emerald-500/80">{t('allEnginesOperational')}</span>
               </div>
             </div>
           </div>

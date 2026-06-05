@@ -11,6 +11,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { SAMPLE_SPECIES, SPECIES_PROFILES } from '../utils';
 import { cn } from '../utils';
+import { useLanguage } from '../context/LanguageContext';
 
 interface SampleRegistrationProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ interface SampleRegistrationProps {
 }
 
 export const SampleRegistration: React.FC<SampleRegistrationProps> = ({ isOpen, onClose, onRegister, theme = 'dark' }) => {
+  const { t, dir } = useLanguage();
   const [formData, setFormData] = useState({
     patientId: '',
     species: 'Bovine',
@@ -44,7 +46,7 @@ export const SampleRegistration: React.FC<SampleRegistrationProps> = ({ isOpen, 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir={dir}>
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -70,16 +72,16 @@ export const SampleRegistration: React.FC<SampleRegistrationProps> = ({ isOpen, 
                 <h2 className={cn(
                   "text-xl font-semibold",
                   theme === 'dark' ? "text-white" : "text-slate-900"
-                )}>Sample Registration</h2>
+                )}>{t('registerSampleTitle')}</h2>
                 <p className={cn(
                   "text-xs mt-1",
                   theme === 'dark' ? "text-white/40" : "text-black/40"
-                )}>Capture patient intake and sample metadata</p>
+                )}>{t('captureMetadata')}</p>
               </div>
               <button 
                 onClick={onClose}
                 className={cn(
-                  "p-2 rounded-full transition-colors",
+                  "p-2 rounded-full transition-colors cursor-pointer",
                   theme === 'dark' ? "hover:bg-white/5 text-white/40 hover:text-white" : "hover:bg-black/5 text-black/40 hover:text-black"
                 )}
               >
@@ -94,7 +96,7 @@ export const SampleRegistration: React.FC<SampleRegistrationProps> = ({ isOpen, 
                     "text-[10px] font-bold uppercase tracking-widest flex items-center gap-2",
                     theme === 'dark' ? "text-white/40" : "text-black/40"
                   )}>
-                    <User className="w-3 h-3" /> Patient ID
+                    <User className="w-3 h-3" /> {t('patientIdLabel')}
                   </label>
                   <input 
                     required
@@ -103,7 +105,7 @@ export const SampleRegistration: React.FC<SampleRegistrationProps> = ({ isOpen, 
                     onChange={e => setFormData({...formData, patientId: e.target.value})}
                     placeholder="e.g. PAT-9928"
                     className={cn(
-                      "w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all",
+                       "w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all",
                       theme === 'dark' ? "bg-black/40 border-white/10 text-white placeholder:text-white/20" : "bg-slate-50 border-black/10 text-slate-900 placeholder:text-black/20"
                     )}
                   />
@@ -113,7 +115,7 @@ export const SampleRegistration: React.FC<SampleRegistrationProps> = ({ isOpen, 
                     "text-[10px] font-bold uppercase tracking-widest flex items-center gap-2",
                     theme === 'dark' ? "text-white/40" : "text-black/40"
                   )}>
-                    <Dna className="w-3 h-3" /> Species
+                    <Dna className="w-3 h-3" /> {t('species')}
                   </label>
                   <select 
                     value={formData.species}
@@ -134,7 +136,7 @@ export const SampleRegistration: React.FC<SampleRegistrationProps> = ({ isOpen, 
                     "text-[10px] font-bold uppercase tracking-widest flex items-center gap-2",
                     theme === 'dark' ? "text-white/40" : "text-black/40"
                   )}>
-                    <Calendar className="w-3 h-3" /> Collection Time
+                    <Calendar className="w-3 h-3" /> {t('collectionTime')}
                   </label>
                   <input 
                     required
@@ -152,7 +154,7 @@ export const SampleRegistration: React.FC<SampleRegistrationProps> = ({ isOpen, 
                     "text-[10px] font-bold uppercase tracking-widest flex items-center gap-2",
                     theme === 'dark' ? "text-white/40" : "text-black/40"
                   )}>
-                    Abstinence (Days)
+                    {t('abstinenceDays')}
                   </label>
                   <input 
                     type="number"
@@ -171,12 +173,12 @@ export const SampleRegistration: React.FC<SampleRegistrationProps> = ({ isOpen, 
                   "text-[10px] font-bold uppercase tracking-widest flex items-center gap-2",
                   theme === 'dark' ? "text-white/40" : "text-black/40"
                 )}>
-                  <FileText className="w-3 h-3" /> Preparation Notes
+                  <FileText className="w-3 h-3" /> {t('preparationNotesLabel')}
                 </label>
                 <textarea 
                   value={formData.notes}
                   onChange={e => setFormData({...formData, notes: e.target.value})}
-                  placeholder="Describe sample preparation, dilution, or specific observations..."
+                  placeholder={t('preparationNotesPlaceholder')}
                   className={cn(
                     "w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all h-24 resize-none",
                     theme === 'dark' ? "bg-black/40 border-white/10 text-white placeholder:text-white/20" : "bg-slate-50 border-black/10 text-slate-900 placeholder:text-black/20"
@@ -187,9 +189,9 @@ export const SampleRegistration: React.FC<SampleRegistrationProps> = ({ isOpen, 
               <div className="pt-4">
                 <button 
                   type="submit"
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 group"
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 group cursor-pointer"
                 >
-                  Confirm Registration
+                  {t('confirmRegistration')}
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
@@ -206,7 +208,7 @@ export const SampleRegistration: React.FC<SampleRegistrationProps> = ({ isOpen, 
                 "text-[10px] leading-tight",
                 theme === 'dark' ? "text-white/40" : "text-black/40"
               )}>
-                Data will be encrypted and stored in compliance with WHO 2010 laboratory standards.
+                {t('dataPrivacyStandards')}
               </p>
             </div>
           </motion.div>

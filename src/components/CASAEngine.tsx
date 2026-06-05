@@ -35,7 +35,14 @@ import {
   Copy,
   FileSpreadsheet,
   FileText,
-  Tag
+  Tag,
+  Sparkles,
+  Compass,
+  Heart,
+  Clock,
+  Calculator,
+  Tv,
+  TrendingUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -54,6 +61,7 @@ import {
   ZAxis
 } from 'recharts';
 import { cn, SPECIES_PROFILES } from '../utils';
+import { useLanguage } from '../context/LanguageContext';
 import type { SpermData, AnalysisResult, SpeciesProfile } from '../types';
 import { calculateKinematics, generateSummary } from '../services/casaService';
 import { HelpCenter } from './HelpCenter';
@@ -211,6 +219,7 @@ interface CASAEngineProps {
 }
 
 export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientData }) => {
+  const { t, dir } = useLanguage();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showStats, setShowStats] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
@@ -2127,6 +2136,140 @@ Digital Signature Verified - ATSA AI Engine v2.0
         </div>
       </header>
 
+      {/* Dynamic Navigation/Analysis Tabs Cockpit - Premium Design */}
+      <div className={cn(
+        "border-b px-6 py-2 flex items-center justify-between transition-all select-none overflow-x-auto no-scrollbar gap-4 shrink-0",
+        theme === 'dark' ? "bg-[#0b0b0b] border-white/5" : "bg-slate-50/90 border-slate-200"
+      )}>
+        {/* Left Side: Active Module State Badge */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className={cn(
+            "p-1.5 rounded-lg flex items-center justify-center transition-all",
+            theme === 'dark' ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border border-emerald-100"
+          )}>
+            {/* Display active tab icon */}
+            {activeTab === 'live' && <Tv className="w-3.5 h-3.5 animate-pulse" />}
+            {activeTab === 'kinematics' && <Activity className="w-3.5 h-3.5" />}
+            {activeTab === 'morphology' && <Compass className="w-3.5 h-3.5" />}
+            {activeTab === 'vitality' && <Heart className="w-3.5 h-3.5" />}
+            {activeTab === 'sdf' && <Dna className="w-3.5 h-3.5" />}
+            {activeTab === 'ai' && <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" />}
+            {activeTab === 'report' && <FileText className="w-3.5 h-3.5" />}
+            {activeTab === 'history' && <Clock className="w-3.5 h-3.5" />}
+            {activeTab === 'calculator' && <Calculator className="w-3.5 h-3.5" />}
+            {activeTab === 'validation' && <CheckCircle2 className="w-3.5 h-3.5" />}
+          </div>
+          <div>
+            <div className={cn("text-[8px] uppercase tracking-widest font-black leading-none", theme === 'dark' ? "text-white/30" : "text-slate-400")}>
+              CASA CORE MODULE
+            </div>
+            <div className={cn("text-xs font-bold capitalize mt-0.5", theme === 'dark' ? "text-white" : "text-slate-900")}>
+              {activeTab === 'live' ? t('tabLive') :
+               activeTab === 'kinematics' ? t('tabKinematics') :
+               activeTab === 'morphology' ? t('tabMorphology') :
+               activeTab === 'vitality' ? t('tabVitality') :
+               activeTab === 'sdf' ? t('tabSdf') :
+               activeTab === 'ai' ? t('tabAi') :
+               activeTab === 'report' ? t('tabReport') :
+               activeTab === 'history' ? t('tabHistory') :
+               activeTab === 'calculator' ? t('tabCalculator') :
+               activeTab === 'validation' ? t('tabValidation') : activeTab}
+            </div>
+          </div>
+        </div>
+
+        {/* Center: The Gorgeous Interactive Tab Control */}
+        <div className={cn(
+          "flex p-1 rounded-xl max-w-full overflow-x-auto no-scrollbar border relative shrink-0",
+          theme === 'dark' ? "bg-black/50 border-white/5" : "bg-slate-200/40 border-slate-200/80"
+        )}>
+          {([
+            { id: 'live', labelKey: 'tabLive', icon: Tv, color: 'text-red-500', pulsing: true, glowing: false },
+            { id: 'kinematics', labelKey: 'tabKinematics', icon: Activity, color: 'text-emerald-500', pulsing: false, glowing: false },
+            { id: 'morphology', labelKey: 'tabMorphology', icon: Compass, color: 'text-purple-500', pulsing: false, glowing: false },
+            { id: 'vitality', labelKey: 'tabVitality', icon: Heart, color: 'text-rose-500', pulsing: false, glowing: false },
+            { id: 'sdf', labelKey: 'tabSdf', icon: Dna, color: 'text-sky-500', pulsing: false, glowing: false },
+            { id: 'ai', labelKey: 'tabAi', icon: Sparkles, color: 'text-purple-400', pulsing: false, glowing: true },
+            { id: 'report', labelKey: 'tabReport', icon: FileText, color: 'text-blue-500', pulsing: false, glowing: false },
+            { id: 'history', labelKey: 'tabHistory', icon: Clock, color: 'text-amber-500', pulsing: false, glowing: false },
+            { id: 'calculator', labelKey: 'tabCalculator', icon: Calculator, color: 'text-indigo-500', pulsing: false, glowing: false },
+            { id: 'validation', labelKey: 'tabValidation', icon: CheckCircle2, color: 'text-teal-500', pulsing: false, glowing: false },
+          ] as const).map(({ id, labelKey, icon: TabIcon, color, pulsing, glowing }) => {
+            const isActive = activeTab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => {
+                  setActiveTab(id);
+                  setShowStats(true); // Always reveal stats sidebar on tab click for standard workflows!
+                }}
+                className={cn(
+                  "relative flex items-center gap-2 px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all duration-300 ease-out whitespace-nowrap cursor-pointer group select-none",
+                  isActive
+                    ? (theme === 'dark' ? "text-white" : "text-slate-950")
+                    : (theme === 'dark' ? "text-white/40 hover:text-white/80" : "text-slate-500 hover:text-slate-800")
+                )}
+              >
+                {/* Micro animation or glow pill background */}
+                {isActive && (
+                  <motion.div
+                    layoutId="activeCASAEngineTabPill"
+                    className={cn(
+                      "absolute inset-0 rounded-lg -z-10",
+                      theme === 'dark' 
+                        ? "bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 shadow-inner" 
+                        : "bg-white shadow-sm border border-slate-200"
+                    )}
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+
+                {/* Left Line Accent details on selection */}
+                {isActive && (
+                  <span className="absolute left-1.5 top-1/2 -translate-y-1/2 w-0.5 h-2.5 bg-emerald-500 rounded-full animate-bounce" />
+                )}
+
+                {/* Tab Icon */}
+                <TabIcon className={cn(
+                  "w-3.5 h-3.5 transition-transform duration-300 group-hover:scale-110",
+                  isActive ? color : "text-current",
+                  pulsing && isActive && "animate-pulse"
+                )} />
+
+                {/* Tab Text */}
+                <span className={cn(
+                  "transition-all duration-300",
+                  isActive ? "tracking-wide font-black" : "text-opacity-80"
+                )}>
+                  {t(labelKey)}
+                </span>
+
+                {/* Mini Glow Dot for AI tab */}
+                {glowing && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 absolute top-1 right-1 animate-ping" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right Side: Quick Action Toggle Stats Panel */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowStats(!showStats)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 border rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all cursor-pointer shadow-sm",
+              showStats 
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" 
+                : (theme === 'dark' ? "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800")
+            )}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>{showStats ? "Hide Analytics" : "Show Analytics"}</span>
+          </button>
+        </div>
+      </div>
+
       <div className="flex flex-1 overflow-hidden">
         {/* Main Workspace */}
         <main className={cn("flex-1 relative flex items-center justify-center overflow-hidden transition-colors", theme === 'dark' ? "bg-black" : "bg-slate-200")}>
@@ -2197,10 +2340,10 @@ Digital Signature Verified - ATSA AI Engine v2.0
                       <button onClick={startCamera} className="px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-semibold transition-all">Try Again</button>
                     </div>
                   ) : (
-                    <div className="max-w-xl w-full flex flex-col items-center gap-6">
+                    <div className="max-w-xl w-full flex flex-col items-center gap-6" dir={dir}>
                       <div className="flex items-center gap-3 bg-purple-500/10 border border-purple-500/20 px-4 py-2 rounded-full backdrop-blur-md">
                         <BrainCircuit className="w-5 h-5 text-purple-400" />
-                        <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Supports Real Video Analysis</span>
+                        <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">{t('supportRealVideoLabel')}</span>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
@@ -2215,8 +2358,8 @@ Digital Signature Verified - ATSA AI Engine v2.0
                           )}
                         >
                           <Camera className="w-10 h-10 mb-3 text-emerald-500 group-hover:scale-110 transition-transform" />
-                          <h4 className={cn("text-xs font-bold uppercase tracking-wider mb-1", theme === 'dark' ? "text-white" : "text-slate-800")}>Microscope Live</h4>
-                          <p className={cn("text-[10px] leading-relaxed", theme === 'dark' ? "text-white/40" : "text-slate-500")}>Connect real-time optical feed for direct tracking</p>
+                          <h4 className={cn("text-xs font-bold uppercase tracking-wider mb-1", theme === 'dark' ? "text-white" : "text-slate-800")}>{t('microscopeLiveLabel')}</h4>
+                          <p className={cn("text-[10px] leading-relaxed", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('connectRealtimeOpticalFeed')}</p>
                         </div>
 
                         {/* Option 2: Drag & Drop / Upload */}
@@ -2230,14 +2373,14 @@ Digital Signature Verified - ATSA AI Engine v2.0
                           )}
                         >
                           <Upload className="w-10 h-10 mb-3 text-purple-400 group-hover:scale-110 transition-transform" />
-                          <h4 className={cn("text-xs font-bold uppercase tracking-wider mb-1", theme === 'dark' ? "text-white" : "text-slate-800")}>Upload Lab File</h4>
-                          <p className={cn("text-[10px] leading-relaxed", theme === 'dark' ? "text-white/40" : "text-slate-500")}>Drag & drop microscopy MP4 or click to select</p>
+                          <h4 className={cn("text-xs font-bold uppercase tracking-wider mb-1", theme === 'dark' ? "text-white" : "text-slate-800")}>{t('uploadLabFileLabel')}</h4>
+                          <p className={cn("text-[10px] leading-relaxed", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('dragDropMicroscopy')}</p>
                         </div>
                       </div>
 
                       <div className="w-full flex items-center justify-center gap-3">
                         <div className="h-px flex-1 bg-white/5" />
-                        <span className={cn("text-[9px] font-mono uppercase tracking-widest", theme === 'dark' ? "text-white/20" : "text-slate-400")}>Supported formats: MP4, AVI, PNG, JPG</span>
+                        <span className={cn("text-[9px] font-mono uppercase tracking-widest", theme === 'dark' ? "text-white/20" : "text-slate-400")}>{t('supportedFormats')}</span>
                         <div className="h-px flex-1 bg-white/5" />
                       </div>
                     </div>
@@ -2247,31 +2390,31 @@ Digital Signature Verified - ATSA AI Engine v2.0
               <div className="scanline" />
               
               {/* Neural Network Status Overlay */}
-              <div className="absolute top-6 left-6 z-30 flex flex-col gap-2 pointer-events-none">
+              <div className="absolute top-6 left-6 z-30 flex flex-col gap-2 pointer-events-none" dir={dir}>
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full backdrop-blur-md">
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Neural Network Active</span>
+                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{t('neuralNetworkActive')}</span>
                 </div>
                 {isCalibrating && (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 border border-blue-500/40 rounded-full backdrop-blur-md animate-bounce">
                     <Ruler className="w-3 h-3 text-blue-400" />
-                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Calibration: Pick 2 Points</span>
+                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{t('calibrationPickPoints')}</span>
                   </div>
                 )}
                 {isManualAnnotating && (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 border border-amber-500/40 rounded-full backdrop-blur-md animate-bounce">
                     <Tag className="w-3 h-3 text-amber-400" />
-                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Manual Annotation Active: Click canvas to add sperm / Click cell to cycle class</span>
+                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">{t('manualAnnotationActive')}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-4 px-4 py-2 bg-black/40 border border-white/10 rounded-2xl backdrop-blur-md">
                   <div>
-                    <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">Processing Speed</p>
+                    <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">{t('processingSpeed')}</p>
                     <p className="text-xs font-mono font-bold text-white/90">3.2s / 500k cells</p>
                   </div>
                   <div className="w-px h-6 bg-white/10" />
                   <div>
-                    <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">AI Accuracy</p>
+                    <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">{t('aiAccuracy')}</p>
                     <p className="text-xs font-mono font-bold text-emerald-500">95.2%</p>
                   </div>
                   {videoFilters.cvMode !== 'none' && (
@@ -2328,7 +2471,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                   title="Calibrate Scale (Draw 100μm line)"
                 >
                   <Ruler className="w-4 h-4" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Calibrate</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest">{t('calibrateBtn')}</span>
                 </button>
                 <button 
                   onClick={() => {
@@ -2342,7 +2485,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                   title="Manual Override & Point Annotation"
                 >
                   <Tag className="w-4 h-4" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Manual Edit</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest">{t('manualEditBtn')}</span>
                 </button>
                 <div className="relative group">
                   <button className="p-2 hover:bg-white/10 text-white/60 hover:text-white rounded-xl transition-all">
@@ -2352,7 +2495,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                     <div className="space-y-4">
                       <div>
                         <div className="flex justify-between mb-1">
-                          <span className="text-[10px] text-white/40 uppercase font-bold">Brightness</span>
+                          <span className="text-[10px] text-white/40 uppercase font-bold">{t('brightnessLabel')}</span>
                           <span className="text-[10px] text-white font-mono">{videoFilters.brightness}x</span>
                         </div>
                         <input 
@@ -2364,7 +2507,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                       </div>
                       <div>
                         <div className="flex justify-between mb-1">
-                          <span className="text-[10px] text-white/40 uppercase font-bold">Contrast</span>
+                          <span className="text-[10px] text-white/40 uppercase font-bold">{t('contrastLabel')}</span>
                           <span className="text-[10px] text-white font-mono">{videoFilters.contrast}x</span>
                         </div>
                         <input 
@@ -2376,7 +2519,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                       </div>
                       <div className="pt-2 border-t border-white/10">
                         <div className="flex justify-between mb-1">
-                          <span className="text-[10px] text-white/40 uppercase font-bold">CV Area Threshold (px²)</span>
+                          <span className="text-[10px] text-white/40 uppercase font-bold">{t('cvAreaThresholdLabel')} (px²)</span>
                           <span className="text-[10px] text-emerald-400 font-mono">{videoFilters.cvAreaThreshold}</span>
                         </div>
                         <input 
@@ -2461,19 +2604,19 @@ Digital Signature Verified - ATSA AI Engine v2.0
               <button 
                 onClick={toggleAnalysis}
                 className={cn(
-                  "flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all",
+                  "flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all cursor-pointer",
                   isAnalyzing ? "bg-red-500 hover:bg-red-600 text-white" : "bg-emerald-500 hover:bg-emerald-600 text-white"
                 )}
               >
                 {isAnalyzing ? <Square className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
-                {isAnalyzing ? "Stop Analysis" : "Start CASA Engine"}
+                {isAnalyzing ? t('stopAnalysisBtn') : t('startCASAEngineBtn')}
               </button>
               <div className="w-px h-8 bg-white/10 mx-1" />
-              <button className="p-3 hover:bg-white/10 rounded-xl transition-colors text-white/60"><Camera className="w-5 h-5" /></button>
+              <button className="p-3 hover:bg-white/10 rounded-xl transition-colors text-white/60 cursor-pointer"><Camera className="w-5 h-5" /></button>
               <button 
                 onClick={() => setSettings(prev => ({ ...prev, highContrast: !prev.highContrast }))}
                 className={cn(
-                  "p-3 rounded-xl transition-all",
+                  "p-3 rounded-xl transition-all cursor-pointer",
                   settings.highContrast ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" : "bg-white/10 hover:bg-white/20 text-white"
                 )}
                 title="Toggle Field Mode (High Contrast)"
@@ -2483,7 +2626,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
               <button 
                 onClick={() => setShowHeatmap(!showHeatmap)}
                 className={cn(
-                  "p-3 rounded-xl transition-all",
+                  "p-3 rounded-xl transition-all cursor-pointer",
                   showHeatmap ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20" : "bg-white/10 hover:bg-white/20 text-white"
                 )}
                 title="Toggle Heatmap"
@@ -2493,7 +2636,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
               <button 
                 onClick={() => setActiveTab('calculator')}
                 className={cn(
-                  "p-3 rounded-xl transition-all",
+                  "p-3 rounded-xl transition-all cursor-pointer",
                   activeTab === 'calculator' ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "bg-white/10 hover:bg-white/20 text-white"
                 )}
                 title="Dose & Dilution Calculator"
@@ -2502,7 +2645,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
               </button>
               <button 
                 onClick={() => setShowStats(!showStats)} 
-                className={cn("p-3 rounded-xl transition-colors", showStats ? "bg-white/10 text-white" : "hover:bg-white/10 text-white/60")}
+                className={cn("p-3 rounded-xl transition-colors cursor-pointer", showStats ? "bg-white/10 text-white" : "hover:bg-white/10 text-white/60")}
               >
                 <BarChart3 className="w-5 h-5" />
               </button>
@@ -2518,12 +2661,12 @@ Digital Signature Verified - ATSA AI Engine v2.0
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all",
+                  "flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all cursor-pointer",
                   isUploading ? "bg-white/5 text-white/40" : "bg-white/10 hover:bg-white/20 text-white"
                 )}
               >
                 {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                <span className="text-xs uppercase tracking-widest font-bold">AI Upload (Image/Video)</span>
+                <span className="text-xs uppercase tracking-widest font-bold">{t('aiUploadBtn')}</span>
               </button>
             </div>
           </div>
@@ -2539,22 +2682,46 @@ Digital Signature Verified - ATSA AI Engine v2.0
                 theme === 'dark' ? "bg-[#0f0f0f] border-white/10" : "bg-white border-slate-200"
               )}
             >
-              <div className={cn("p-4 border-b", theme === 'dark' ? "border-white/10" : "border-slate-100")}>
-                <div className={cn("flex p-1 rounded-lg overflow-x-auto no-scrollbar", theme === 'dark' ? "bg-black/40" : "bg-slate-100")}>
-                  {(['live', 'kinematics', 'morphology', 'vitality', 'sdf', 'ai', 'report', 'history', 'calculator', 'validation'] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={cn(
-                        "flex-none px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider rounded-md transition-all whitespace-nowrap",
-                        activeTab === tab 
-                          ? (theme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") 
-                          : (theme === 'dark' ? "text-white/40 hover:text-white/60" : "text-slate-400 hover:text-slate-600")
-                      )}
-                    >
-                      {tab}
-                    </button>
-                  ))}
+              <div className={cn("p-4 border-b flex items-center justify-between", theme === 'dark' ? "border-white/10" : "border-slate-100")}>
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "p-1.5 rounded-lg flex items-center justify-center",
+                    theme === 'dark' ? "bg-white/5 text-emerald-400" : "bg-slate-50 text-emerald-600"
+                  )}>
+                    {activeTab === 'live' && <Tv className="w-3.5 h-3.5 text-red-500 animate-pulse" />}
+                    {activeTab === 'kinematics' && <Activity className="w-3.5 h-3.5 text-emerald-500" />}
+                    {activeTab === 'morphology' && <Compass className="w-3.5 h-3.5 text-purple-500" />}
+                    {activeTab === 'vitality' && <Heart className="w-3.5 h-3.5 text-rose-500" />}
+                    {activeTab === 'sdf' && <Dna className="w-3.5 h-3.5 text-sky-500" />}
+                    {activeTab === 'ai' && <Sparkles className="w-3.5 h-3.5 text-purple-400" />}
+                    {activeTab === 'report' && <FileText className="w-3.5 h-3.5 text-blue-500" />}
+                    {activeTab === 'history' && <Clock className="w-3.5 h-3.5 text-amber-500" />}
+                    {activeTab === 'calculator' && <Calculator className="w-3.5 h-3.5 text-indigo-500" />}
+                    {activeTab === 'validation' && <CheckCircle2 className="w-3.5 h-3.5 text-teal-500" />}
+                  </div>
+                  <div>
+                    <h2 className={cn("text-xs font-bold leading-none capitalize", theme === 'dark' ? "text-white" : "text-slate-900")}>
+                      {activeTab === 'live' ? t('tabLive') :
+                       activeTab === 'kinematics' ? t('tabKinematics') :
+                       activeTab === 'morphology' ? t('tabMorphology') :
+                       activeTab === 'vitality' ? t('tabVitality') :
+                       activeTab === 'sdf' ? t('tabSdf') :
+                       activeTab === 'ai' ? t('tabAi') :
+                       activeTab === 'report' ? t('tabReport') :
+                       activeTab === 'history' ? t('tabHistory') :
+                       activeTab === 'calculator' ? t('tabCalculator') :
+                       activeTab === 'validation' ? t('tabValidation') : activeTab}
+                    </h2>
+                    <p className={cn("text-[9px] font-medium uppercase tracking-wider mt-1", theme === 'dark' ? "text-white/30" : "text-slate-400")}>
+                      Analysis Module Panel
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Visual Status Tag */}
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/25">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-widest">Active</span>
                 </div>
               </div>
 
@@ -2563,13 +2730,13 @@ Digital Signature Verified - ATSA AI Engine v2.0
                   <div className="space-y-6">
                     <section>
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Historical Data</h3>
+                        <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{t('historyTrackerTitle')}</h3>
                         {!user && (
                           <button 
                             onClick={() => signInWithPopup(auth, googleProvider)}
                             className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-[8px] font-bold uppercase tracking-widest text-white transition-all"
                           >
-                            Sign In
+                            {t('signInButton')}
                           </button>
                         )}
                       </div>
@@ -2578,14 +2745,14 @@ Digital Signature Verified - ATSA AI Engine v2.0
                         <div className="bg-black/40 p-6 rounded-2xl border border-white/5 text-center">
                           <ShieldCheck className="w-8 h-8 text-white/10 mx-auto mb-3" />
                           <p className="text-[10px] text-white/40 leading-relaxed">
-                            Sign in to sync your analysis history to the cloud and track fertility trends.
+                            {t('signInSyncMessage')}
                           </p>
                         </div>
                       ) : history.length === 0 ? (
                         <div className="bg-black/40 p-6 rounded-2xl border border-white/5 text-center">
                           <Activity className="w-8 h-8 text-white/10 mx-auto mb-3" />
                           <p className="text-[10px] text-white/40 leading-relaxed">
-                            No historical data found for this patient. Save an analysis to start tracking.
+                            {t('noHistoryForPatient')}
                           </p>
                         </div>
                       ) : (
@@ -2646,7 +2813,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                 {activeTab === 'calculator' && (
                   <div className="space-y-6">
                     <section>
-                      <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-4">Laboratory Utilities</h3>
+                      <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-4">{t('labUtilitiesTitle')}</h3>
 
                       {/* Tab Sub-Selector */}
                       <div className="flex bg-black/45 p-1 rounded-xl border border-white/5 mb-6">
@@ -2659,7 +2826,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                           )}
                         >
                           <Zap className="w-3.5 h-3.5" />
-                          Dose & Dilution Extender
+                          {t('doseAndDilutionExtender')}
                         </button>
                         <button
                           type="button"
@@ -2670,7 +2837,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                           )}
                         >
                           <LayoutGrid className="w-3.5 h-3.5" />
-                          Multi-Field Microscope QC
+                          {t('multiFieldQC')}
                         </button>
                       </div>
 

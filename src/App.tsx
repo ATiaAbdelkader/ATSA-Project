@@ -32,8 +32,33 @@ import { auth, db, googleProvider } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { collection, addDoc, query, where, orderBy, limit, onSnapshot, Timestamp, doc, updateDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from './lib/firestore-utils';
+import { useLanguage } from './context/LanguageContext';
 
 export default function App() {
+  const { language, setLanguage, t, dir } = useLanguage();
+  
+  const LanguageSelect = () => {
+    return (
+      <div className="flex items-center gap-1 p-1 bg-black/10 dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/[0.05]">
+        {(['en', 'fr', 'ar'] as const).map((lang) => (
+          <button
+            key={lang}
+            type="button"
+            onClick={() => setLanguage(lang)}
+            className={cn(
+              "px-3 py-1.5 text-[10px] font-black rounded-xl uppercase tracking-wider transition-all cursor-pointer",
+              language === lang 
+                ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/15" 
+                : "text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            )}
+          >
+            {lang}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   const [appState, setAppState] = useState<AppState>('login');
   const [isRegModalOpen, setIsRegModalOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -244,7 +269,7 @@ export default function App() {
 
   if (appState === 'login') {
     return (
-      <div className={cn("min-h-screen flex flex-col lg:flex-row font-sans transition-colors duration-500", theme === 'dark' ? "bg-[#050505]" : "bg-slate-50")}>
+      <div dir={dir} className={cn("min-h-screen flex flex-col lg:flex-row font-sans transition-colors duration-500", theme === 'dark' ? "bg-[#050505]" : "bg-slate-50")}>
         {/* Left Side: Information & Branding */}
         <div className={cn(
           "flex-1 relative overflow-hidden flex flex-col justify-center p-12 lg:p-24",
@@ -267,22 +292,22 @@ export default function App() {
                 <Microscope className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className={cn("text-4xl font-black tracking-tighter", theme === 'dark' ? "text-white" : "text-slate-900")}>ATSA <span className="text-emerald-500">V2.0</span></h1>
-                <p className={cn("text-xs font-bold uppercase tracking-[0.2em]", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Advanced Tailored Sperm Analysis</p>
+                <h1 className={cn("text-4xl font-black tracking-tighter", theme === 'dark' ? "text-white" : "text-slate-900")}>{t('brandTitle')} <span className="text-emerald-500">V2.0</span></h1>
+                <p className={cn("text-xs font-bold uppercase tracking-[0.2em]", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('brandSubtitle')}</p>
               </div>
             </div>
 
             <h2 className={cn("text-5xl lg:text-7xl font-light leading-[1.1] mb-8 tracking-tight", theme === 'dark' ? "text-white" : "text-slate-900")}>
-              Precision in <br />
-              <span className="font-serif italic text-emerald-500">every movement.</span>
+              {t('sloganPrefix')} <br />
+              <span className="font-serif italic text-emerald-500">{t('sloganHighlight')}</span>
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-12">
               {[
-                { title: 'AI-Powered CASA', desc: 'Real-time kinematic analysis with neural-network tracking.', icon: Activity },
-                { title: 'WHO Compliant', desc: 'Fully adheres to WHO 2010 laboratory standards.', icon: ClipboardList },
-                { title: 'Multi-Species', desc: 'Optimized profiles for Ovine, Caprine, and Bovine.', icon: Users },
-                { title: 'Secure Vault', desc: 'Enterprise-grade encryption for all patient records.', icon: FileText },
+                { title: t('feature1Title'), desc: t('feature1Desc'), icon: Activity },
+                { title: t('feature2Title'), desc: t('feature2Desc'), icon: ClipboardList },
+                { title: t('feature3Title'), desc: t('feature3Desc'), icon: Users },
+                { title: t('feature4Title'), desc: t('feature4Desc'), icon: FileText },
               ].map((feature, i) => (
                 <motion.div 
                   key={feature.title}
@@ -306,9 +331,9 @@ export default function App() {
           <div className={cn("mt-auto pt-12 flex flex-wrap items-center gap-x-8 gap-y-4 text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/20" : "text-slate-300")}>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              System Online
+              {t('systemOnline')}
             </div>
-            <div>Founder: Dr. Abdelkader Atia</div>
+            <div>{t('founder')}</div>
             <div>v2.0.1309-STABLE</div>
             <div>© 2026 ATSA TECHNOLOGIES</div>
           </div>
@@ -325,16 +350,21 @@ export default function App() {
             transition={{ delay: 0.2 }}
             className="w-full max-w-sm mx-auto"
           >
-            <div className="mb-10">
-              <h3 className={cn("text-2xl font-bold mb-2", theme === 'dark' ? "text-white" : "text-slate-900")}>Laboratory Access</h3>
-              <p className={cn("text-sm", theme === 'dark' ? "text-white/40" : "text-slate-500")}>Enter your credentials to begin your session.</p>
+            <div className="mb-10 flex flex-col gap-6">
+              <div className="flex justify-end">
+                <LanguageSelect />
+              </div>
+              <div>
+                <h3 className={cn("text-2xl font-bold mb-2", theme === 'dark' ? "text-white" : "text-slate-900")}>{t('labAccess')}</h3>
+                <p className={cn("text-sm", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('labAccessDesc')}</p>
+              </div>
             </div>
 
             <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-6">
               <div className="space-y-2">
                 <div className="flex justify-between items-center px-1">
-                  <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Laboratory ID</label>
-                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Required</span>
+                  <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('labId')}</label>
+                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">{t('required')}</span>
                 </div>
                 <div className="relative group">
                   <input 
@@ -350,8 +380,8 @@ export default function App() {
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center px-1">
-                  <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Access Key</label>
-                  <button type="button" className="text-[10px] font-bold text-emerald-500/60 hover:text-emerald-500 uppercase tracking-widest transition-colors">Forgot Key?</button>
+                  <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('accessKey')}</label>
+                  <button type="button" className="text-[10px] font-bold text-emerald-500/60 hover:text-emerald-500 uppercase tracking-widest transition-colors">{t('forgotKey')}</button>
                 </div>
                 <div className="relative group">
                   <input 
@@ -367,7 +397,7 @@ export default function App() {
 
               <div className="flex items-center gap-3 px-1">
                 <input type="checkbox" id="remember" className="w-4 h-4 rounded border-emerald-500/20 bg-emerald-500/10 text-emerald-500 focus:ring-emerald-500/50" />
-                <label htmlFor="remember" className={cn("text-xs font-medium", theme === 'dark' ? "text-white/40" : "text-slate-500")}>Remember this workstation</label>
+                <label htmlFor="remember" className={cn("text-xs font-medium", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('rememberWorkstation')}</label>
               </div>
 
               <button 
@@ -375,13 +405,13 @@ export default function App() {
                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-5 rounded-2xl mt-4 transition-all shadow-xl shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogIn className="w-5 h-5" />
-                Authenticate with Google
+                {t('authGoogle')}
                 <ChevronRight className="w-4 h-4" />
               </button>
 
               <div className="relative flex py-2 items-center">
                 <div className="flex-grow border-t border-black/10 dark:border-white/5"></div>
-                <span className="flex-shrink mx-4 text-[8px] font-bold text-black/30 dark:text-white/25 uppercase tracking-widest font-mono">reviewer bypass portal</span>
+                <span className="flex-shrink mx-4 text-[8px] font-bold text-black/30 dark:text-white/25 uppercase tracking-widest font-mono">{t('reviewerBypass')}</span>
                 <div className="flex-grow border-t border-black/10 dark:border-white/5"></div>
               </div>
 
@@ -396,14 +426,14 @@ export default function App() {
                 )}
               >
                 <Award className="w-4 h-4 text-amber-500" />
-                Instant Jury Access (By-Pass)
+                {t('instantJuryAccess')}
               </button>
             </form>
 
             <div className={cn("mt-12 p-6 rounded-3xl border border-dashed text-center", theme === 'dark' ? "border-white/10 bg-white/5" : "border-slate-200 bg-slate-50")}>
-              <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Security Notice</p>
+              <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('securityNoticeTitle')}</p>
               <p className={cn("text-xs leading-relaxed", theme === 'dark' ? "text-white/20" : "text-slate-400")}>
-                This system is for authorized laboratory personnel only. All access attempts are logged and monitored for compliance.
+                {t('securityNoticeDesc')}
               </p>
             </div>
           </motion.div>
@@ -427,7 +457,7 @@ export default function App() {
   }
 
   return (
-    <div className={cn("min-h-screen font-sans flex transition-colors duration-300", theme === 'dark' ? "bg-[#0a0a0a] text-white" : "bg-slate-50 text-slate-900")}>
+    <div dir={dir} className={cn("min-h-screen font-sans flex transition-colors duration-300", theme === 'dark' ? "bg-[#0a0a0a] text-white" : "bg-slate-50 text-slate-900")}>
       {/* Sidebar Navigation */}
       <aside className={cn(
         "w-20 lg:w-64 border-r flex flex-col transition-all relative z-30 shrink-0",
@@ -459,11 +489,11 @@ export default function App() {
 
         <nav className="flex-1 px-3 py-6 space-y-1.5">
           {[
-            { id: 'dashboard', icon: Activity, label: 'Dashboard', badge: 'Active' },
-            { id: 'analysis', icon: Microscope, label: 'CASA Engine', hot: true },
-            { id: 'history', icon: Clock, label: 'Patient History' },
-            { id: 'inventory', icon: Package, label: 'Inventory' },
-            { id: 'help', icon: BookOpen, label: 'Help & Training' },
+            { id: 'dashboard', icon: Activity, label: t('dashboard'), badge: t('active') },
+            { id: 'analysis', icon: Microscope, label: t('casaEngine'), hot: true },
+            { id: 'history', icon: Clock, label: t('patientHistory') },
+            { id: 'inventory', icon: Package, label: t('inventory') },
+            { id: 'help', icon: BookOpen, label: t('helpOverview') },
           ].map((item) => {
             const isActive = appState === item.id;
             return (
@@ -471,7 +501,7 @@ export default function App() {
                 key={item.id}
                 onClick={() => setAppState(item.id as AppState)}
                 className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 relative group overflow-hidden",
+                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 relative group overflow-hidden cursor-pointer",
                   isActive
                     ? "bg-gradient-to-r from-emerald-500/[0.08] to-emerald-500/[0.02] text-emerald-500 border-l-2 border-emerald-500 font-semibold"
                     : theme === 'dark'
@@ -488,7 +518,7 @@ export default function App() {
                 <span className="font-medium hidden lg:block text-sm">{item.label}</span>
                 
                 {/* Optional Badge decoration */}
-                {item.badge && isActive && (
+                {item.id === 'dashboard' && isActive && (
                   <span className="hidden lg:inline-block absolute right-4 text-[8px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500">
                     {item.badge}
                   </span>
@@ -503,18 +533,18 @@ export default function App() {
 
         <div className={cn("p-4 border-t space-y-1.5", theme === 'dark' ? "border-white/[0.04]" : "border-slate-100")}>
           <button className={cn(
-            "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300",
+            "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 cursor-pointer",
             theme === 'dark' ? "text-white/40 hover:bg-white/5 hover:text-white" : "text-slate-400 hover:bg-slate-50 hover:text-slate-900"
           )}>
             <Settings className="w-5 h-5" />
-            <span className="font-medium hidden lg:block text-sm">Settings</span>
+            <span className="font-medium hidden lg:block text-sm">{t('settings')}</span>
           </button>
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400/60 hover:bg-red-500/10 hover:text-red-400 transition-all duration-300"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400/60 hover:bg-red-500/10 hover:text-red-400 transition-all duration-300 cursor-pointer"
           >
             <LogOut className="w-5 h-5" />
-            <span className="font-medium hidden lg:block text-sm">Logout</span>
+            <span className="font-medium hidden lg:block text-sm">{t('logout')}</span>
           </button>
         </div>
       </aside>
@@ -529,24 +559,25 @@ export default function App() {
           <div className="flex items-center gap-6">
             <div className="hidden md:flex flex-col">
               <span className={cn("text-[9px] font-black uppercase tracking-widest leading-none mb-1.5", theme === 'dark' ? "text-white/30" : "text-slate-400")}>
-                System Date
+                {t('systemDate')}
               </span>
               <span className={cn("text-xs font-semibold tabular-nums", theme === 'dark' ? "text-emerald-400" : "text-emerald-600")}>
-                Sunday, May 31, 2026
+                {new Date().toLocaleDateString(language === 'ar' ? 'ar-EG' : language === 'fr' ? 'fr-FR' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </span>
             </div>
             <div className="hidden md:block w-px h-8 bg-white/[0.04] dark:bg-white/[0.04] bg-slate-200" />
             <div>
-              <h2 className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Welcome back</h2>
+              <h2 className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('welcomeBack')}</h2>
               <p className={cn("text-base font-bold tracking-tight", theme === 'dark' ? "text-white" : "text-slate-900")}>{user?.displayName || user?.email}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
+            <LanguageSelect />
             <button 
               onClick={toggleTheme}
               className={cn(
-                "p-2.5 border rounded-xl transition-all",
+                "p-2.5 border rounded-xl transition-all cursor-pointer",
                 theme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:text-white" : "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-900"
               )}
             >
@@ -671,33 +702,33 @@ export default function App() {
                     <div>
                       <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/15 mb-6 text-xs text-white/95 font-bold uppercase tracking-widest leading-none">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
-                        System Ready
+                        {t('systemReady')}
                       </div>
                       <h2 className="text-3xl lg:text-4xl font-black text-white tracking-tight mb-3">
-                        Precision CASA Analysis
+                        {t('precisionAnalysis')}
                       </h2>
                       <p className="text-white/80 text-sm max-w-md leading-relaxed mb-8">
-                        Process high-speed microscopy recordings instantly. System is fully optimized for Ovine, Caprine, and Bovine profiles adhering to WHO international standards.
+                        {t('heroDescription')}
                       </p>
                     </div>
 
                     <div className="flex flex-wrap gap-4 mt-auto">
                       <button 
                         onClick={() => setIsRegModalOpen(true)}
-                        className="px-6 py-4 bg-white text-emerald-800 font-bold rounded-2xl hover:bg-emerald-50/95 shadow-lg active:scale-95 transition-all flex items-center gap-2 text-sm"
+                        className="px-6 py-4 bg-white text-emerald-800 font-bold rounded-2xl hover:bg-emerald-50/95 shadow-lg active:scale-95 transition-all flex items-center gap-2 text-sm cursor-pointer"
                       >
                         <ClipboardList className="w-5 h-5 text-emerald-600" />
-                        Register New Sample
+                        {t('registerNewSample')}
                       </button>
                       <button 
                         onClick={() => {
                           if (!activePatient) setIsRegModalOpen(true);
                           else setAppState('analysis');
                         }}
-                        className="px-6 py-4 bg-black/20 backdrop-blur-md text-white font-bold rounded-2xl hover:bg-black/30 border border-white/15 active:scale-95 transition-all flex items-center gap-2 text-sm"
+                        className="px-6 py-4 bg-black/20 backdrop-blur-md text-white font-bold rounded-2xl hover:bg-black/30 border border-white/15 active:scale-95 transition-all flex items-center gap-2 text-sm cursor-pointer"
                       >
                         <Play className="w-5 h-5 fill-current text-emerald-300" />
-                        Access CASA Engine
+                        {t('accessCasaEngine')}
                       </button>
                     </div>
                   </div>
@@ -730,7 +761,7 @@ export default function App() {
                             <Users className="w-4 h-4 text-blue-500" />
                           </div>
                           <div>
-                            <p className={cn("text-xs font-semibold", theme === 'dark' ? "text-white/60" : "text-slate-600")}>Samples Today</p>
+                            <p className={cn("text-xs font-semibold", theme === 'dark' ? "text-white/60" : "text-slate-600")}>{t('statsToday')}</p>
                             <p className={cn("text-[9px] uppercase tracking-wider font-bold opacity-40", theme === 'dark' ? "text-white/30" : "text-slate-400")}>Secure Firestore</p>
                           </div>
                         </div>
@@ -744,7 +775,7 @@ export default function App() {
                             <Clock className="w-4 h-4 text-emerald-500" />
                           </div>
                           <div>
-                            <p className={cn("text-xs font-semibold", theme === 'dark' ? "text-white/60" : "text-slate-600")}>Avg. Processing</p>
+                            <p className={cn("text-xs font-semibold", theme === 'dark' ? "text-white/60" : "text-slate-600")}>{t('avgProcessing')}</p>
                             <p className={cn("text-[9px] uppercase tracking-wider font-bold opacity-40", theme === 'dark' ? "text-white/30" : "text-slate-400")}>Optimized Pipeline</p>
                           </div>
                         </div>
@@ -773,7 +804,7 @@ export default function App() {
                   </div>
 
                   <div className={cn("pt-5 border-t", theme === 'dark' ? "border-white/[0.05]" : "border-slate-100")}>
-                    <button className="w-full text-emerald-500 hover:text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 hover:gap-2.5 transition-all duration-300">
+                    <button className="w-full text-emerald-500 hover:text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 hover:gap-2.5 transition-all duration-300 cursor-pointer">
                       View Diagnostics Link <ArrowUpRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -855,7 +886,7 @@ export default function App() {
                   <div className="flex items-center gap-3">
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                     <h3 className={cn("text-sm font-bold uppercase tracking-wider", theme === 'dark' ? "text-white" : "text-slate-900")}>
-                      Recent Analyses
+                      {t('recentSpermAnalyses')}
                     </h3>
                     {isBatchMode && (
                       <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-500 text-[10px] font-black rounded-lg">
@@ -871,27 +902,27 @@ export default function App() {
                             setIsBatchMode(false);
                             setSelectedAnalyses([]);
                           }}
-                          className={cn("text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-xl transition-colors", theme === 'dark' ? "text-white/40 hover:text-white" : "text-slate-400 hover:text-slate-900")}
+                          className={cn("text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-xl transition-colors cursor-pointer", theme === 'dark' ? "text-white/40 hover:text-white" : "text-slate-400 hover:text-slate-900")}
                         >
-                          Cancel
+                          {t('cancel')}
                         </button>
                         <button 
                           onClick={handleBatchExport}
                           disabled={selectedAnalyses.length === 0}
-                          className="text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all disabled:opacity-50 shadow-md shadow-emerald-500/10"
+                          className="text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all disabled:opacity-50 shadow-md shadow-emerald-500/10 cursor-pointer"
                         >
-                          Export PDF Batch
+                          {t('batchExportSelected')}
                         </button>
                       </>
                     ) : (
                       <>
                         <button 
                           onClick={() => setIsBatchMode(true)}
-                          className={cn("text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent hover:border-emerald-500/10 transition-all", theme === 'dark' ? "text-white/40 hover:text-white bg-white/[0.02]" : "text-slate-500 hover:text-slate-900 bg-slate-50")}
+                          className={cn("text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent hover:border-emerald-500/10 transition-all cursor-pointer", theme === 'dark' ? "text-white/40 hover:text-white bg-white/[0.02]" : "text-slate-500 hover:text-slate-900 bg-slate-50")}
                         >
-                          Batch Export
+                          {t('batchMode')}
                         </button>
-                        <button className={cn("text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent hover:border-emerald-500/10 transition-all", theme === 'dark' ? "text-white/40 hover:text-white bg-white/[0.02]" : "text-slate-500 hover:text-slate-900 bg-slate-50")}>
+                        <button className={cn("text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent hover:border-emerald-500/10 transition-all cursor-pointer", theme === 'dark' ? "text-white/40 hover:text-white bg-white/[0.02]" : "text-slate-500 hover:text-slate-900 bg-slate-50")}>
                           View All
                         </button>
                       </>
@@ -903,10 +934,10 @@ export default function App() {
                     <thead>
                       <tr className={cn("text-[9px] font-black uppercase tracking-widest border-b", theme === 'dark' ? "text-white/30 border-white/[0.04]" : "text-slate-400 border-slate-100")}>
                         {isBatchMode && <th className="px-6 py-4 w-10"></th>}
-                        <th className="px-6 py-4">Sample Identifier</th>
-                        <th className="px-6 py-4">Species Type</th>
-                        <th className="px-6 py-4">Sperm Concentration</th>
-                        <th className="px-6 py-4">Total Motility</th>
+                        <th className="px-6 py-4">{t('id')}</th>
+                        <th className="px-6 py-4">{t('species')}</th>
+                        <th className="px-6 py-4">{t('concentrationValue')}</th>
+                        <th className="px-6 py-4">{t('motility')}</th>
                         <th className="px-6 py-4">Verification</th>
                         <th className="px-6 py-4 text-right">CASA Launch</th>
                       </tr>
@@ -985,7 +1016,7 @@ export default function App() {
                                 row.interpretation?.status === 'normal' 
                                   ? "bg-emerald-500/5 text-emerald-500 border-emerald-500/10" 
                                   : "bg-red-500/5 text-red-500 border-red-500/10"
-                              )}>
+                                )}>
                                 <span className={cn("w-1.5 h-1.5 rounded-full", row.interpretation?.status === 'normal' ? 'bg-emerald-400' : 'bg-red-400')} />
                                 {row.interpretation?.status || 'Completed'}
                               </span>
@@ -1001,7 +1032,7 @@ export default function App() {
                                   });
                                   setAppState('analysis');
                                 }}
-                                className={cn("p-2 rounded-xl transition-all border border-transparent hover:border-emerald-500/20", theme === 'dark' ? "bg-white/[0.02] text-white/40 hover:bg-white/10 group-hover:text-emerald-400" : "bg-slate-50 text-slate-400 hover:bg-slate-100 group-hover:text-emerald-700")}
+                                className={cn("p-2 rounded-xl transition-all border border-transparent hover:border-emerald-500/20 cursor-pointer", theme === 'dark' ? "bg-white/[0.02] text-white/40 hover:bg-white/10 group-hover:text-emerald-400" : "bg-slate-50 text-slate-400 hover:bg-slate-100 group-hover:text-emerald-700")}
                                 title="Open CASA analysis viewport"
                               >
                                 <ArrowUpRight className="w-4 h-4" />
@@ -1014,7 +1045,7 @@ export default function App() {
                           <td colSpan={7} className="px-6 py-16 text-center text-white/20 font-medium">
                             <div className="flex flex-col items-center justify-center gap-3">
                               <ClipboardList className="w-8 h-8 opacity-25 text-emerald-500" />
-                              <span className={cn("text-xs", theme === 'dark' ? "text-white/30" : "text-slate-400")}>No records found in current laboratory sector.</span>
+                              <span className={cn("text-xs", theme === 'dark' ? "text-white/30" : "text-slate-400")}>{t('noAnalysesFound')}</span>
                             </div>
                           </td>
                         </tr>
@@ -1038,15 +1069,15 @@ export default function App() {
               <div className={cn("w-20 h-20 rounded-full flex items-center justify-center mb-6", theme === 'dark' ? "bg-white/5" : "bg-slate-100")}>
                 <Microscope className={cn("w-10 h-10", theme === 'dark' ? "text-white/10" : "text-slate-200")} />
               </div>
-              <h3 className={cn("text-xl font-bold mb-2", theme === 'dark' ? "text-white" : "text-slate-900")}>No Active Patient</h3>
+              <h3 className={cn("text-xl font-bold mb-2", theme === 'dark' ? "text-white" : "text-slate-900")}>{t('noActivePatient')}</h3>
               <p className={cn("max-w-sm mb-8", theme === 'dark' ? "text-white/40" : "text-slate-500")}>
-                Please register a sample or select a patient from the dashboard before launching the CASA Engine.
+                {t('pleaseRegisterSampleMessage')}
               </p>
               <button 
                 onClick={() => setIsRegModalOpen(true)}
-                className="px-8 py-4 bg-emerald-500 text-white font-bold rounded-2xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+                className="px-8 py-4 bg-emerald-500 text-white font-bold rounded-2xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
               >
-                Register New Sample
+                {t('registerNewSample')}
               </button>
             </div>
           )}

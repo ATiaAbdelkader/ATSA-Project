@@ -25,6 +25,7 @@ import {
 } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 import { cn } from '../utils';
+import { useLanguage } from '../context/LanguageContext';
 
 interface InventoryItem {
   id: string;
@@ -43,6 +44,7 @@ interface InventoryManagementProps {
 }
 
 export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack, theme }) => {
+  const { t, dir } = useLanguage();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -137,30 +139,30 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
   const lowStockItems = items.filter(item => item.quantity <= item.minThreshold);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500" dir={dir}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <button 
             onClick={onBack}
             className={cn(
-              "p-2 rounded-xl border transition-all",
+              "p-2 rounded-xl border transition-all cursor-pointer",
               theme === 'dark' ? "bg-white/5 border-white/10 text-white hover:bg-white/10" : "bg-white border-slate-200 text-slate-900 hover:bg-slate-50"
             )}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className={cn("text-2xl font-bold tracking-tight", theme === 'dark' ? "text-white" : "text-slate-900")}>Laboratory Inventory</h2>
-            <p className={cn("text-sm", theme === 'dark' ? "text-white/40" : "text-slate-500")}>Manage reagents, disposables, and equipment</p>
+            <h2 className={cn("text-2xl font-bold tracking-tight", theme === 'dark' ? "text-white" : "text-slate-900")}>{t('inventory')}</h2>
+            <p className={cn("text-sm", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('inventoryManagerTitle')}</p>
           </div>
         </div>
         <button 
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white font-bold rounded-2xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+          className="flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white font-bold rounded-2xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
         >
           <Plus className="w-5 h-5" />
-          Add New Item
+          {t('logNewItem')}
         </button>
       </div>
 
@@ -174,7 +176,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
             <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
               <Package className="w-5 h-5 text-blue-500" />
             </div>
-            <span className={cn("text-sm font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Total Items</span>
+            <span className={cn("text-sm font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('totalItems')}</span>
           </div>
           <p className={cn("text-3xl font-bold", theme === 'dark' ? "text-white" : "text-slate-900")}>{items.length}</p>
         </div>
@@ -187,7 +189,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
             <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-amber-500" />
             </div>
-            <span className={cn("text-sm font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Low Stock</span>
+            <span className={cn("text-sm font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('lowStock')}</span>
           </div>
           <p className={cn("text-3xl font-bold", theme === 'dark' ? "text-white" : "text-slate-900")}>{lowStockItems.length}</p>
         </div>
@@ -200,7 +202,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
             <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
               <TrendingDown className="w-5 h-5 text-purple-500" />
             </div>
-            <span className={cn("text-sm font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Reorder Alerts</span>
+            <span className={cn("text-sm font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('reorderAlerts')}</span>
           </div>
           <p className={cn("text-3xl font-bold", theme === 'dark' ? "text-white" : "text-slate-900")}>{lowStockItems.length > 0 ? "Active" : "None"}</p>
         </div>
@@ -212,7 +214,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
           <Search className={cn("absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5", theme === 'dark' ? "text-white/20" : "text-slate-400")} />
           <input 
             type="text"
-            placeholder="Search inventory..."
+            placeholder={t('searchInventoryPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={cn(
@@ -227,7 +229,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
               key={cat}
               onClick={() => setFilterCategory(cat)}
               className={cn(
-                "px-4 py-2 rounded-xl border text-xs font-bold uppercase tracking-widest transition-all",
+                "px-4 py-2 rounded-xl border text-xs font-bold uppercase tracking-widest transition-all cursor-pointer",
                 filterCategory === cat 
                   ? "bg-emerald-500 border-emerald-500 text-white" 
                   : (theme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-white border-slate-200 text-slate-400 hover:text-slate-900")
@@ -248,12 +250,12 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
           <table className="w-full text-left">
             <thead>
               <tr className={cn("text-[10px] font-bold uppercase tracking-widest border-b", theme === 'dark' ? "text-white/20 border-white/5" : "text-slate-400 border-slate-100")}>
-                <th className="px-6 py-4">Item Name</th>
-                <th className="px-6 py-4">Category</th>
-                <th className="px-6 py-4">Quantity</th>
-                <th className="px-6 py-4">Threshold</th>
-                <th className="px-6 py-4">Expiry</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4">{t('itemName')}</th>
+                <th className="px-6 py-4">{t('category')}</th>
+                <th className="px-6 py-4">{t('quantity')}</th>
+                <th className="px-6 py-4">{t('threshold')}</th>
+                <th className="px-6 py-4">{t('expiry')}</th>
+                <th className="px-6 py-4 text-right">{t('actions')}</th>
               </tr>
             </thead>
             <tbody className="text-sm">
@@ -280,7 +282,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
                     <div className="flex items-center gap-3">
                       <button 
                         onClick={() => handleUpdateQuantity(item.id, Math.max(0, item.quantity - 1))}
-                        className={cn("w-6 h-6 rounded-lg border flex items-center justify-center transition-colors", theme === 'dark' ? "border-white/10 hover:bg-white/10 text-white" : "border-slate-200 hover:bg-slate-100 text-slate-900")}
+                        className={cn("w-6 h-6 rounded-lg border flex items-center justify-center transition-colors cursor-pointer", theme === 'dark' ? "border-white/10 hover:bg-white/10 text-white" : "border-slate-200 hover:bg-slate-100 text-slate-900")}
                       >
                         -
                       </button>
@@ -289,7 +291,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
                       </span>
                       <button 
                         onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                        className={cn("w-6 h-6 rounded-lg border flex items-center justify-center transition-colors", theme === 'dark' ? "border-white/10 hover:bg-white/10 text-white" : "border-slate-200 hover:bg-slate-100 text-slate-900")}
+                        className={cn("w-6 h-6 rounded-lg border flex items-center justify-center transition-colors cursor-pointer", theme === 'dark' ? "border-white/10 hover:bg-white/10 text-white" : "border-slate-200 hover:bg-slate-100 text-slate-900")}
                       >
                         +
                       </button>
@@ -304,7 +306,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
                   <td className="px-6 py-4 text-right">
                     <button 
                       onClick={() => handleDeleteItem(item.id)}
-                      className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-colors"
+                      className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -313,7 +315,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
               ))}
               {filteredItems.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-white/20 italic">No items found matching your filters</td>
+                  <td colSpan={6} className="px-6 py-12 text-center text-white/20 italic">{t('noItemsMatchingFilter')}</td>
                 </tr>
               )}
             </tbody>
@@ -341,10 +343,10 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
                 theme === 'dark' ? "bg-[#0f0f0f] border-white/10" : "bg-white border-slate-200"
               )}
             >
-              <h3 className={cn("text-xl font-bold mb-6", theme === 'dark' ? "text-white" : "text-slate-900")}>Add Inventory Item</h3>
+              <h3 className={cn("text-xl font-bold mb-6", theme === 'dark' ? "text-white" : "text-slate-900")}>{t('logNewItem')}</h3>
               <form onSubmit={handleAddItem} className="space-y-4">
                 <div className="space-y-2">
-                  <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Item Name</label>
+                  <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('itemName')}</label>
                   <input 
                     required
                     type="text"
@@ -358,7 +360,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Category</label>
+                    <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('category')}</label>
                     <select 
                       value={formData.category}
                       onChange={(e) => setFormData({...formData, category: e.target.value as any})}
@@ -367,20 +369,20 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
                         theme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900"
                       )}
                     >
-                      <option value="reagent">Reagent</option>
-                      <option value="disposable">Disposable</option>
-                      <option value="equipment">Equipment</option>
-                      <option value="other">Other</option>
+                      <option value="reagent">{t('reagentOption')}</option>
+                      <option value="disposable">{t('disposableOption')}</option>
+                      <option value="equipment">{t('equipmentOption')}</option>
+                      <option value="other">{t('otherOption')}</option>
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Unit</label>
+                    <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('unit')}</label>
                     <input 
                       required
                       type="text"
                       value={formData.unit}
                       onChange={(e) => setFormData({...formData, unit: e.target.value})}
-                      placeholder="ml, pcs, boxes..."
+                      placeholder={t('unitPlaceholder')}
                       className={cn(
                         "w-full px-4 py-3 border rounded-xl outline-none transition-all",
                         theme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900"
@@ -390,7 +392,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Initial Quantity</label>
+                    <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('quantity')}</label>
                     <input 
                       required
                       type="number"
@@ -403,7 +405,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Min Threshold</label>
+                    <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('minThresholdLabel')}</label>
                     <input 
                       required
                       type="number"
@@ -417,7 +419,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Expiry Date (Optional)</label>
+                  <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('expiryDate')}</label>
                   <input 
                     type="date"
                     value={formData.expiryDate}
@@ -433,17 +435,17 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
                     type="button"
                     onClick={() => setIsAddModalOpen(false)}
                     className={cn(
-                      "flex-1 py-4 font-bold rounded-2xl transition-all",
+                      "flex-1 py-4 font-bold rounded-2xl transition-all cursor-pointer",
                       theme === 'dark' ? "bg-white/5 text-white hover:bg-white/10" : "bg-slate-100 text-slate-900 hover:bg-slate-200"
                     )}
                   >
-                    Cancel
+                    {t('cancel')}
                   </button>
                   <button 
                     type="submit"
-                    className="flex-1 py-4 bg-emerald-500 text-white font-bold rounded-2xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+                    className="flex-1 py-4 bg-emerald-500 text-white font-bold rounded-2xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
                   >
-                    Save Item
+                    {t('logItemButton')}
                   </button>
                 </div>
               </form>
