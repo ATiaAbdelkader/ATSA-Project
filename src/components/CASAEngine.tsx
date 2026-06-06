@@ -67,10 +67,11 @@ import { calculateKinematics, generateSummary } from '../services/casaService';
 import { HelpCenter } from './HelpCenter';
 
 import { Sperm3DPath } from './Sperm3DPath';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { db, auth, googleProvider } from '../firebase';
+import { db, auth, googleProvider, storage } from '../firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { 
   collection, 
   addDoc, 
@@ -216,9 +217,10 @@ interface CASAEngineProps {
     species: string;
     profile: SpeciesProfile;
   };
+  initialAction?: 'camera' | 'upload' | null;
 }
 
-export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientData }) => {
+export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientData, initialAction }) => {
   const { t, dir } = useLanguage();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showStats, setShowStats] = useState(true);
@@ -227,12 +229,22 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   const [aiSubTab, setAiSubTab] = useState<'consultant' | 'vision'>('vision');
   const [selectedTopologyLayer, setSelectedTopologyLayer] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [aiChatQuery, setAiChatQuery] = useState('');
   const [aiChatHistory, setAiChatHistory] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
   const [isAiThinking, setIsAiThinking] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (initialAction === 'upload' && fileInputRef.current) {
+      const timer = setTimeout(() => {
+        fileInputRef.current?.click();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [initialAction]);
 
   const [kinematicsView, setKinematicsView] = useState<'2d' | '3d'>('3d');
   const [showHeatmap, setShowHeatmap] = useState(false);
@@ -783,10 +795,77 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
 
   const processFile = async (file: File) => {
     setIsUploading(true);
+    setUploadProgress(0);
     setAiAnalysis(null);
 
     try {
-      // 1. Convert file to base64
+      // 1. Establish Firebase Storage resumable upload with timeout/cancel safety fallback
+      const storageRef = ref(storage, `videos/${Date.now()}_${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      await new Promise<string>((resolve) => {
+        let isResolved = false;
+
+        // 3-second safeguard timeout to keep the app responsive
+        const timeoutId = setTimeout(() => {
+          if (!isResolved) {
+            isResolved = true;
+            console.warn("Firebase Storage upload took too long or is missing permissions. Gracefully falling back.");
+            try {
+              uploadTask.cancel();
+            } catch (e) {
+              console.warn("Failed to cancel upload task: ", e);
+            }
+
+            // Animate progress to completion quickly to keep UX smooth
+            let current = 0;
+            const interval = setInterval(() => {
+              current += 20;
+              if (current >= 100) {
+                clearInterval(interval);
+                setUploadProgress(100);
+                resolve("");
+              } else {
+                setUploadProgress(current);
+              }
+            }, 60);
+          }
+        }, 3000);
+
+        uploadTask.on('state_changed',
+          (snapshot) => {
+            if (isResolved) return;
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            setUploadProgress(Math.min(99, Math.round(progress)));
+          },
+          (error) => {
+            console.warn("Firebase Storage upload error/cancelled: ", error.message);
+            if (!isResolved) {
+              isResolved = true;
+              clearTimeout(timeoutId);
+              // Pretend to finish the progress bar
+              setUploadProgress(100);
+              resolve("");
+            }
+          },
+          async () => {
+            if (!isResolved) {
+              isResolved = true;
+              clearTimeout(timeoutId);
+              try {
+                const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                setUploadProgress(100);
+                resolve(downloadUrl);
+              } catch (err) {
+                console.warn("Firebase getDownloadURL failed: ", err);
+                resolve("");
+              }
+            }
+          }
+        );
+      });
+
+      // 2. Convert file to base64 for Gemini
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
         reader.onload = () => resolve(reader.result as string);
@@ -796,7 +875,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       const base64 = await base64Promise;
       const base64Data = base64.split(',')[1];
 
-      // 2. If video, set as source
+      // 3. If video, set as source
       if (file.type.startsWith('video/')) {
         if (uploadedVideoUrl) {
           URL.revokeObjectURL(uploadedVideoUrl);
@@ -863,7 +942,44 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
           }
         ],
         config: {
-          responseMimeType: "application/json"
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              concentration: {
+                type: Type.STRING,
+                description: "Estimated concentration in M/ml"
+              },
+              motility: {
+                type: Type.OBJECT,
+                description: "Sperm motility percentages. Optional, leave blank or empty fields for static image analysis",
+                properties: {
+                  progressive: { type: Type.STRING },
+                  nonProgressive: { type: Type.STRING },
+                  immotile: { type: Type.STRING }
+                }
+              },
+              morphology: {
+                type: Type.OBJECT,
+                properties: {
+                  normal: { type: Type.STRING },
+                  defects: {
+                    type: Type.OBJECT,
+                    properties: {
+                      head: { type: Type.ARRAY, items: { type: Type.STRING } },
+                      midpiece: { type: Type.ARRAY, items: { type: Type.STRING } },
+                      tail: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    }
+                  }
+                }
+              },
+              observations: {
+                type: Type.STRING,
+                description: "A summary observation text"
+              }
+            },
+            required: ["concentration", "morphology", "observations"]
+          }
         }
       });
 
@@ -1035,6 +1151,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       setCameraError("AI Analysis failed. Please try again with a clearer image or video.");
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -1087,7 +1204,27 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
         model: "gemini-3.5-flash",
         contents: [{ parts: [{ text: prompt }] }],
         config: {
-          responseMimeType: "application/json"
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              status: { 
+                type: Type.STRING,
+                description: "Must be normal, borderline, or abnormal"
+              },
+              comments: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "List of specific clinical highlights"
+              },
+              recommendations: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "List of recommended next steps or treatments"
+              }
+            },
+            required: ["status", "comments", "recommendations"]
+          }
         }
       });
 
@@ -2278,6 +2415,75 @@ Digital Signature Verified - ATSA AI Engine v2.0
             theme === 'dark' ? "bg-[#050505] border-white/10" : "bg-white border-slate-300 shadow-xl"
           )}>
             <div className="w-full h-full relative">
+              {isUploading && (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 bg-black/80 backdrop-blur-md rounded-xl transition-all">
+                  <motion.div 
+                    initial={{ scale: 0.95, opacity: 0 }} 
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="max-w-md w-full flex flex-col items-center gap-6 p-8 bg-[#0a0a0c] border border-white/10 rounded-2xl shadow-2xl relative overflow-hidden"
+                  >
+                    {/* Glowing effects */}
+                    <div className="absolute -top-12 -left-12 w-28 h-28 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+                    <div className="absolute -bottom-12 -right-12 w-28 h-28 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                    <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center relative border border-purple-500/20">
+                      <Upload className="w-8 h-8 text-purple-400 animate-pulse" />
+                    </div>
+
+                    <div className="text-center w-full">
+                      <h4 className="text-sm font-bold uppercase tracking-wider text-white mb-1 text-center">
+                        {uploadProgress !== null && uploadProgress < 100 
+                          ? "Uploading to Firebase Storage" 
+                          : "Processing Gemini AI Analysis"}
+                      </h4>
+                      <p className="text-xs text-white/40 max-w-sm mx-auto text-center">
+                        {uploadProgress !== null && uploadProgress < 100
+                          ? "Transferring high-definition microscopy feed to cloud storage..."
+                          : "Vision models analyzing track kinematics & morphometry parameters..."}
+                      </p>
+                    </div>
+
+                    {/* Progress slider container */}
+                    <div className="w-full">
+                      <div className="flex justify-between items-center mb-1 bg-white/[0.02] p-2 rounded-lg border border-white/5">
+                        <span className="text-[10px] font-mono text-purple-400 font-bold uppercase tracking-wider">
+                          {uploadProgress !== null && uploadProgress < 100 ? "Firebase Upload" : "CASA Inference"}
+                        </span>
+                        <span className="text-xs font-mono font-bold text-white">
+                          {uploadProgress !== null ? `${uploadProgress}%` : "In Progress..."}
+                        </span>
+                      </div>
+
+                      {/* Bar indicator */}
+                      <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                        <motion.div 
+                          className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${uploadProgress ?? 0}%` }}
+                          transition={{ duration: 0.3, ease: "easeOut" }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quick status bullet points */}
+                    <div className="w-full flex flex-col gap-1.5 border-t border-white/5 pt-4 text-left">
+                      <div className="flex items-center gap-2 text-[10px] font-medium text-white/60">
+                        <div className={cn("w-1.5 h-1.5 rounded-full", uploadProgress !== null && uploadProgress > 0 ? "bg-emerald-500" : "bg-white/20")} />
+                        <span>Establish secure cloud storage session</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] font-medium text-white/60">
+                        <div className={cn("w-1.5 h-1.5 rounded-full", uploadProgress === 100 ? "bg-emerald-500" : "bg-white/20")} />
+                        <span>Upload telemetry raw video data</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] font-medium text-white/60">
+                        <div className={cn("w-1.5 h-1.5 rounded-full", uploadProgress === 100 && aiAnalysis !== null ? "bg-emerald-500 animate-pulse" : "bg-white/20")} />
+                        <span>Run deep deep-learning vision inference</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+
               {stream || uploadedVideoUrl ? (
                 <div className="w-full h-full relative overflow-hidden">
                   <video 

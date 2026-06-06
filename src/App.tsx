@@ -18,7 +18,8 @@ import {
   LogIn,
   Package,
   Check,
-  Award
+  Award,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, SPECIES_PROFILES } from './utils';
@@ -63,6 +64,7 @@ export default function App() {
   const [isRegModalOpen, setIsRegModalOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [activePatient, setActivePatient] = useState<{ id: string; species: string; profile: SpeciesProfile } | null>(null);
+  const [analysisInitialAction, setAnalysisInitialAction] = useState<'camera' | 'upload' | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('theme');
     return (saved === 'light' || saved === 'dark') ? saved : 'dark';
@@ -453,7 +455,17 @@ export default function App() {
   }
 
   if (appState === 'analysis' && activePatient) {
-    return <CASAEngine onBack={() => setAppState('dashboard')} patientData={activePatient} theme={theme} />;
+    return (
+      <CASAEngine 
+        onBack={() => {
+          setAnalysisInitialAction(null);
+          setAppState('dashboard');
+        }} 
+        patientData={activePatient} 
+        theme={theme} 
+        initialAction={analysisInitialAction}
+      />
+    );
   }
 
   return (
@@ -491,15 +503,37 @@ export default function App() {
           {[
             { id: 'dashboard', icon: Activity, label: t('dashboard'), badge: t('active') },
             { id: 'analysis', icon: Microscope, label: t('casaEngine'), hot: true },
+            { id: 'upload_video', icon: Upload, label: t('uploadVideo') },
             { id: 'history', icon: Clock, label: t('patientHistory') },
             { id: 'inventory', icon: Package, label: t('inventory') },
             { id: 'help', icon: BookOpen, label: t('helpOverview') },
           ].map((item) => {
-            const isActive = appState === item.id;
+            const isActive = item.id === 'upload_video'
+              ? (appState === 'analysis' && analysisInitialAction === 'upload')
+              : (item.id === 'analysis'
+                ? (appState === 'analysis' && analysisInitialAction !== 'upload')
+                : appState === item.id);
+
+            const handleClick = () => {
+              if (item.id === 'upload_video') {
+                setAnalysisInitialAction('upload');
+                if (!activePatient) {
+                  setIsRegModalOpen(true);
+                } else {
+                  setAppState('analysis');
+                }
+              } else {
+                if (item.id === 'analysis') {
+                  setAnalysisInitialAction(null);
+                }
+                setAppState(item.id as AppState);
+              }
+            };
+
             return (
               <button
                 key={item.id}
-                onClick={() => setAppState(item.id as AppState)}
+                onClick={handleClick}
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 relative group overflow-hidden cursor-pointer",
                   isActive
@@ -819,10 +853,23 @@ export default function App() {
                   </h3>
                   <div className="h-px flex-1 bg-white/[0.04] dark:bg-white/[0.04] bg-slate-200" />
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   {[
-                    { title: 'Video Upload', desc: 'Process live & recorded sample clips', icon: Play, color: 'from-blue-500 to-indigo-600', badge: 'analyzer', action: () => setAppState('analysis') },
+                    { 
+                      title: 'Video Upload', 
+                      desc: 'Process live & recorded sample clips', 
+                      icon: Play, 
+                      color: 'from-blue-500 to-indigo-600', 
+                      badge: 'analyzer', 
+                      action: () => {
+                        setAnalysisInitialAction('upload');
+                        if (!activePatient) {
+                          setIsRegModalOpen(true);
+                        } else {
+                          setAppState('analysis');
+                        }
+                      } 
+                    },
                     { title: 'Morphometry', desc: 'Detailed length & curvature measurements', icon: Activity, color: 'from-purple-500 to-pink-600', badge: 'standard', action: () => setAppState('analysis') },
                     { title: 'Inventory', desc: 'Track reagents, slide lots & lab supplies', icon: Package, color: 'from-amber-500 to-orange-600', badge: 'lot-tracker', action: () => setAppState('inventory') },
                     { title: 'Help Center', desc: 'Access clinical protocols & WHO materials', icon: BookOpen, color: 'from-indigo-500 to-teal-600', badge: 'manual', action: () => setAppState('help') },

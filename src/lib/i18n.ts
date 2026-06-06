@@ -9,6 +9,11 @@ export interface TranslationDict {
 }
 
 export const translations: TranslationDict = {
+  uploadVideo: {
+    en: "Upload Video",
+    fr: "Télécharger une Vidéo",
+    ar: "تحميل فيديو"
+  },
   // Brand & Login
   brandTitle: {
     en: "ATSA",
