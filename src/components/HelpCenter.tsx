@@ -11,7 +11,15 @@ import {
   AlertCircle,
   ArrowLeft,
   ExternalLink,
-  PawPrint
+  PawPrint,
+  ChevronDown,
+  ChevronUp,
+  Thermometer,
+  Activity,
+  Sliders,
+  Shield,
+  Scale,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils';
@@ -149,6 +157,7 @@ export const HelpCenter: React.FC<HelpCenterProps> = ({ onBack, theme = 'dark' }
   const [activeCategory, setActiveCategory] = useState<'guides' | 'metrics' | 'videos' | 'faq' | 'species'>('guides');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGuideId, setSelectedGuideId] = useState<string | null>(null);
+  const [expandedSpecies, setExpandedSpecies] = useState<number | null>(null);
 
   const categories = [
     { id: 'guides', label: t('userGuides'), icon: BookOpen },
@@ -184,43 +193,241 @@ export const HelpCenter: React.FC<HelpCenterProps> = ({ onBack, theme = 'dark' }
   const speciesData = [
     {
       name: 'Human',
-      standard: 'WHO 2010 (5th Ed)',
-      concentration: '> 15 M/ml',
-      motility: '> 40% Total, > 32% Progressive',
-      morphology: '> 4% Normal Forms',
-      notes: 'Standardized global reference for clinical diagnostics.'
+      scientificName: 'Homo sapiens',
+      standard: 'WHO 2010 (5th Ed) / WHO 2021 (6th Ed)',
+      concentration: '≥ 15 M/ml',
+      motility: '≥ 40% (Total), ≥ 32% (Progressive)',
+      morphology: '≥ 4% (Kruger Strict Forms)',
+      notes: 'Standardized global reference for clinical diagnostics, determining assisted reproductive tech (IUI/IVF/ICSI) pathways.',
+      kinematics: {
+        vcl: '> 150 µm/s (High potency)',
+        vsl: '> 25 µm/s',
+        vap: '> 30 µm/s',
+        lin: '≥ 11%',
+        str: '≥ 50%',
+        alh: '2.0 - 5.0 µm',
+        bcf: '15.0 - 20.0 Hz'
+      },
+      morphologyDetails: {
+        head: 'Kruger strict classification (length 3-5µm, width 2-3µm, regular oval contour)',
+        acrosome: '40% - 70% of head area with clearly defined acrosomal cap',
+        midpiece: 'Straight, smoothly aligned, major droplets indicate immaturity',
+        tail: 'Approx 45µm long, thin, uniform, no coils'
+      },
+      sdf: {
+        normal: '< 15% DFI (Excellent integrity)',
+        borderline: '15% - 25% DFI (Clinically suspect)',
+        abnormal: '> 30% DFI (Critical; high risk of conception failure)'
+      },
+      setup: {
+        chamber: '10 µm Makler Grid or standard micro-disposable chambers (Leja / CellVision)',
+        temperature: '37.0 °C Phase Heated Stage',
+        volume: '1.5 - 5.0 mL (Liquefaction required, usually 15-30 minutes)'
+      }
     },
     {
       name: 'Bovine (Bull)',
-      standard: 'CASA Industry Standard',
-      concentration: '500 - 1200 M/ml (Raw)',
-      motility: '> 70% Progressive (Pre-freeze)',
-      morphology: '> 80% Normal',
-      notes: 'Focus on progressive motility for artificial insemination efficiency.'
+      scientificName: 'Bos taurus',
+      standard: 'Society for Theriogenology Sire Evaluation',
+      concentration: '800 - 1500 M/ml (Raw ejaculate)',
+      motility: '≥ 50% (Total), ≥ 40% (Progressive, Pre-freeze)',
+      morphology: '≥ 70% (Normal Forms)',
+      notes: 'Focus on cryopreservation indices. Post-thaw viability thresholds dictate commercial AI straw dosage formulations.',
+      kinematics: {
+        vcl: '> 180 µm/s (Highly rapid)',
+        vsl: '> 50 µm/s',
+        vap: '> 70 µm/s',
+        lin: '≥ 25%',
+        str: '≥ 70%',
+        alh: '3.0 - 6.5 µm',
+        bcf: '25.0 - 32.0 Hz'
+      },
+      morphologyDetails: {
+        head: 'Symmetric, smooth pear-shape profile (length 8-10µm, width 4-5µm)',
+        acrosome: 'Pronounced apical ridge covering anterior 50% of the head space',
+        midpiece: 'Evenly structured, tightly wrapped mitochondrial sheath',
+        tail: 'Straight tail, absence of abaxially-positioned connections'
+      },
+      sdf: {
+        normal: '< 10% DFI (Highly fertile sire)',
+        borderline: '10% - 15% DFI (Marginal recovery)',
+        abnormal: '> 15% DFI (De-certified from commercial distribution collections)'
+      },
+      setup: {
+        chamber: '20 µm Leja Bull Specimen Chambers',
+        temperature: '37.5 °C - 38.0 °C constant heated stage mapping',
+        volume: '4.0 - 8.0 mL average volume, highly concentrated stream'
+      }
     },
     {
       name: 'Equine (Stallion)',
-      standard: 'Veterinary Guidelines',
-      concentration: '150 - 300 M/ml',
-      motility: '> 60% Total Motility',
-      morphology: '> 50% Normal',
-      notes: 'High sensitivity to temperature fluctuations during transport.'
+      scientificName: 'Equus caballus',
+      standard: 'Theriogenology STG guidelines',
+      concentration: '100 - 300 M/ml',
+      motility: '≥ 60% (Total), ≥ 50% (Progressive)',
+      morphology: '≥ 50% (Normal Forms)',
+      notes: 'Stallion spermatozoal membranes are exceptionally sensitive to cold shock and mechanical agitation. Avoid centrifugation where possible.',
+      kinematics: {
+        vcl: '> 130 µm/s',
+        vsl: '> 45 µm/s',
+        vap: '> 55 µm/s',
+        lin: '≥ 30%',
+        str: '≥ 80%',
+        alh: '2.5 - 5.5 µm',
+        bcf: '22.0 - 28.0 Hz'
+      },
+      morphologyDetails: {
+        head: 'Elongated, slightly flattened oval (length 6-7µm, width 3-4µm)',
+        acrosome: 'Subtle cap boundary, covers apical 1/3 of head',
+        midpiece: 'Uniform connection, proximal and distal droplets are common path factors',
+        tail: 'Thin tail, normally free from double-stranded aberrations'
+      },
+      sdf: {
+        normal: '< 15% DFI (Ideal breed champion)',
+        borderline: '15% - 25% DFI (Decreased fertility index)',
+        abnormal: '> 25% DFI (Compromised embryo quality, high early loss rates)'
+      },
+      setup: {
+        chamber: '20 µm disposable chambers to allow unrestricted lateral movement',
+        temperature: '37.0 °C stage-incubator verification',
+        volume: '30 - 120 mL average volume (gel-free fraction evaluated)'
+      }
     },
     {
       name: 'Porcine (Boar)',
-      standard: 'Commercial Swine Standards',
-      concentration: '200 - 300 M/ml',
-      motility: '> 70% Total Motility',
-      morphology: '> 75% Normal',
-      notes: 'Analysis typically performed at 17°C - 20°C storage temperature.'
+      scientificName: 'Sus scrofa domesticus',
+      standard: 'Commercial Swine Stud Guidelines',
+      concentration: '200 - 350 M/ml',
+      motility: '≥ 70% (Total), ≥ 60% (Progressive)',
+      morphology: '≥ 70% (Normal Forms)',
+      notes: 'Highly voluminous ejaculate. Crucial to analyze soon after prep to gauge dilution doses (e.g. 2-3 billion sperm per extended dose).',
+      kinematics: {
+        vcl: '> 100 µm/s',
+        vsl: '> 35 µm/s',
+        vap: '> 45 µm/s',
+        lin: '≥ 35%',
+        str: '≥ 75%',
+        alh: '2.0 - 4.5 µm',
+        bcf: '20.0 - 25.0 Hz'
+      },
+      morphologyDetails: {
+        head: 'Broad, rounded spatulate head (length 8-9µm, width 4-5µm)',
+        acrosome: 'Extends over 60% of the anterior head surface',
+        midpiece: 'Long, well-defined, very sensitive to osmotic differences during dilution',
+        tail: 'Smooth, standard structure, susceptible to distal droplets'
+      },
+      sdf: {
+        normal: '< 15% DFI (High litter index capability)',
+        borderline: '15% - 20% DFI (Moderately compromised farrowing outcomes)',
+        abnormal: '> 20% DFI (Reduced farrowing rate and litter numbers)'
+      },
+      setup: {
+        chamber: '20 µm thick-chamber standard slide lines',
+        temperature: 'Stored/transported at 17 °C, but analyzed strictly on a warm stage at 37.0 °C',
+        volume: '150 - 300 mL (inclusive of gelatinous pre-sperm fraction)'
+      }
     },
     {
       name: 'Canine (Dog)',
-      standard: 'Theriogenology Standards',
-      concentration: '200 - 500 M/ml',
-      motility: '> 70% Progressive',
-      morphology: '> 60% Normal',
-      notes: 'Includes assessment of three distinct fractions during ejaculation.'
+      scientificName: 'Canis lupus familiaris',
+      standard: 'ACT Theriogenology Standards',
+      concentration: '200 - 600 M/ml',
+      motility: '≥ 75% (Total), ≥ 60% (Progressive)',
+      morphology: '≥ 60% (Normal Forms)',
+      notes: 'Isolate and evaluate the second fraction (sperm-rich, milky appearance). Clear first and third fractions contain no sperm cells.',
+      kinematics: {
+        vcl: '> 120 µm/s',
+        vsl: '> 40 µm/s',
+        vap: '> 50 µm/s',
+        lin: '≥ 33%',
+        str: '≥ 80%',
+        alh: '2.5 - 4.8 µm',
+        bcf: '18.0 - 24.0 Hz'
+      },
+      morphologyDetails: {
+        head: 'Perfectly symmetric, oval-shaped configuration (length 6-7µm, width 3.5-4µm)',
+        acrosome: 'Covers prior 40% of anterior head surface',
+        midpiece: 'Slightly shorter compared to feline or bovine counterparts',
+        tail: 'Uniform, normally clear, susceptible to coiled tail defects in cold shock'
+      },
+      sdf: {
+        normal: '< 20% DFI (Good stud prospective)',
+        borderline: '20% - 30% DFI (Suspect fertility rating)',
+        abnormal: '> 30% DFI (Significantly diminished conception rates, smaller litters)'
+      },
+      setup: {
+        chamber: '10 µm or 20 µm glass chambers are acceptable',
+        temperature: '37.0 °C stage-incubator verification',
+        volume: '1.0 - 5.0 mL (isolated sperm-rich second fraction)'
+      }
+    },
+    {
+      name: 'Ovine (Ram)',
+      scientificName: 'Ovis aries',
+      standard: 'Veterinary Breeding Standards',
+      concentration: '1500 - 4000 M/ml',
+      motility: '≥ 75% (Total), ≥ 65% (Progressive)',
+      morphology: '≥ 80% (Normal Forms)',
+      notes: 'Most concentrated mammalian ejaculate. Absolute dilution precision (1:150 - 1:300) is necessary to isolate cell paths in CASA tracker.',
+      kinematics: {
+        vcl: '> 220 µm/s (Extremely swift)',
+        vsl: '> 65 µm/s',
+        vap: '> 85 µm/s',
+        lin: '≥ 28%',
+        str: '≥ 76%',
+        alh: '3.5 - 7.0 µm',
+        bcf: '28.0 - 35.0 Hz'
+      },
+      morphologyDetails: {
+        head: 'Broad, rounded base tapering gently to apex (length 7-8µm, width 4-5µm)',
+        acrosome: 'Dense apical segment covering front 50% of the head',
+        midpiece: 'Stout, very robust mitochondrial alignment',
+        tail: 'Very long, uniform, prone to bent mid-piece/droplets under thermal stress'
+      },
+      sdf: {
+        normal: '< 10% DFI (Superior sire indexing)',
+        borderline: '10% - 15% DFI (Borderline field index)',
+        abnormal: '> 15% DFI (Unacceptable genetic index for artificial insemination sire)'
+      },
+      setup: {
+        chamber: '10 µm / 20 µm deep slide calibration profiles',
+        temperature: '38.0 °C heated phase monitoring',
+        volume: '0.5 - 2.0 mL average (extremely viscous, thick cream color)'
+      }
+    },
+    {
+      name: 'Caprine (Buck)',
+      scientificName: 'Capra hircus',
+      standard: 'Goat Breeding Association Guide',
+      concentration: '1500 - 4500 M/ml',
+      motility: '≥ 75% (Total), ≥ 65% (Progressive)',
+      morphology: '≥ 80% (Normal Forms)',
+      notes: 'Egg-yolk extenders must be avoided unless seminal plasma is washed first. Seminal plasma BUSP enzyme destroys egg-yolk lipids, producing toxic lysolecithin.',
+      kinematics: {
+        vcl: '> 200 µm/s',
+        vsl: '> 60 µm/s',
+        vap: '> 80 µm/s',
+        lin: '≥ 30%',
+        str: '≥ 75%',
+        alh: '3.2 - 6.5 µm',
+        bcf: '26.0 - 32.0 Hz'
+      },
+      morphologyDetails: {
+        head: 'Elongated spade profile (length 7.5-8.5µm, width 4-4.8µm)',
+        acrosome: 'Pronounced apical segment, covers front 45% of head',
+        midpiece: 'Well-aligned mitochondrial capsule',
+        tail: 'Clean, thin, symmetrical axial positioning'
+      },
+      sdf: {
+        normal: '< 12% DFI (Excellent quality)',
+        borderline: '12% - 18% DFI (Requires re-assay)',
+        abnormal: '> 18% DFI (Marked fertility reduction)'
+      },
+      setup: {
+        chamber: '10 µm / 20 µm chamber depth configuration',
+        temperature: '38.0 °C heated microscopic stage',
+        volume: '0.5 - 1.5 mL average volume range'
+      }
     }
   ];
 
@@ -541,84 +748,287 @@ export const HelpCenter: React.FC<HelpCenterProps> = ({ onBack, theme = 'dark' }
                 </div>
                 
                 <div className="grid grid-cols-1 gap-6">
-                  {speciesData.map((species, i) => (
-                    <div key={i} className={cn(
-                      "p-8 border rounded-[32px] transition-all group",
-                      theme === 'dark' ? "bg-[#0f0f0f] border-white/10 hover:border-blue-500/30" : "bg-slate-50 border-black/10 hover:border-blue-500/30"
-                    )}>
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                        <div>
-                          <h4 className={cn(
-                            "text-2xl font-bold transition-colors",
-                            theme === 'dark' ? "text-white group-hover:text-blue-400" : "text-slate-900 group-hover:text-blue-600"
-                          )}>{species.name}</h4>
-                          <p className={cn(
-                            "text-xs font-medium uppercase tracking-widest mt-1",
-                            theme === 'dark' ? "text-white/40" : "text-black/40"
-                          )}>{species.standard}</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <span className={cn(
-                            "px-3 py-1 rounded-lg text-[10px] font-bold",
-                            theme === 'dark' ? "bg-white/5 text-white/60" : "bg-black/5 text-black/60"
-                          )}>CASA OPTIMIZED</span>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className={cn(
-                          "p-4 rounded-2xl border",
-                          theme === 'dark' ? "bg-black/40 border-white/5" : "bg-white border-black/5"
-                        )}>
-                          <p className={cn(
-                            "text-[10px] font-bold uppercase mb-1",
-                            theme === 'dark' ? "text-white/20" : "text-black/20"
-                          )}>Concentration</p>
-                          <p className={cn(
-                            "text-sm font-mono",
-                            theme === 'dark' ? "text-white/80" : "text-slate-700"
-                          )}>{species.concentration}</p>
-                        </div>
-                        <div className={cn(
-                          "p-4 rounded-2xl border",
-                          theme === 'dark' ? "bg-black/40 border-white/5" : "bg-white border-black/5"
-                        )}>
-                          <p className={cn(
-                            "text-[10px] font-bold uppercase mb-1",
-                            theme === 'dark' ? "text-white/20" : "text-black/20"
-                          )}>Motility</p>
-                          <p className={cn(
-                            "text-sm font-mono",
-                            theme === 'dark' ? "text-white/80" : "text-slate-700"
-                          )}>{species.motility}</p>
-                        </div>
-                        <div className={cn(
-                          "p-4 rounded-2xl border",
-                          theme === 'dark' ? "bg-black/40 border-white/5" : "bg-white border-black/5"
-                        )}>
-                          <p className={cn(
-                            "text-[10px] font-bold uppercase mb-1",
-                            theme === 'dark' ? "text-white/20" : "text-black/20"
-                          )}>Morphology</p>
-                          <p className={cn(
-                            "text-sm font-mono",
-                            theme === 'dark' ? "text-white/80" : "text-slate-700"
-                          )}>{species.morphology}</p>
-                        </div>
-                      </div>
-                      
-                      <div className={cn(
-                        "mt-6 pt-6 border-t flex items-start gap-3",
-                        theme === 'dark' ? "border-white/5" : "border-black/5"
+                  {speciesData.map((species, i) => {
+                    const isExpanded = expandedSpecies === i;
+                    return (
+                      <div key={i} className={cn(
+                        "p-6 sm:p-8 border rounded-[32px] transition-all group duration-300",
+                        theme === 'dark' 
+                          ? "bg-[#0f0f0f] border-white/10 hover:border-blue-500/30" 
+                          : "bg-slate-50 border-black/10 hover:border-blue-500/30",
+                        isExpanded && (theme === 'dark' ? "border-blue-500/40 bg-[#0c0c0e]" : "border-blue-500/40 bg-white shadow-lg")
                       )}>
-                        <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                        <p className={cn(
-                          "text-xs leading-relaxed italic",
-                          theme === 'dark' ? "text-white/40" : "text-slate-500"
-                        )}>{species.notes}</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className={cn(
+                                "text-2xl font-bold transition-colors",
+                                theme === 'dark' ? "text-white group-hover:text-blue-400" : "text-slate-900 group-hover:text-blue-600"
+                              )}>{species.name}</h4>
+                              <span className={cn(
+                                "text-[10px] font-mono italic px-2 py-0.5 rounded",
+                                theme === 'dark' ? "bg-white/5 text-white/50" : "bg-black/5 text-slate-500"
+                              )}>
+                                {species.scientificName}
+                              </span>
+                            </div>
+                            <p className={cn(
+                              "text-xs font-medium uppercase tracking-widest mt-1",
+                              theme === 'dark' ? "text-white/40" : "text-black/40"
+                            )}>{species.standard}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider",
+                              theme === 'dark' ? "bg-white/5 text-white/60" : "bg-black/5 text-black/60"
+                            )}>CASA OPTIMIZED</span>
+                            <button
+                              id={`toggle-species-${i}`}
+                              onClick={() => setExpandedSpecies(isExpanded ? null : i)}
+                              className={cn(
+                                "px-3 py-1.5 rounded-xl border transition-colors flex items-center gap-1.5 text-[10px] font-bold cursor-pointer",
+                                theme === 'dark'
+                                  ? "bg-white/5 border-white/10 hover:bg-white/10 text-white"
+                                  : "bg-black/5 border-black/10 hover:bg-black/10 text-slate-900"
+                              )}
+                            >
+                              {isExpanded ? (
+                                <>
+                                  <span>Collapse</span>
+                                  <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
+                                </>
+                              ) : (
+                                <>
+                                  <span>Enrich Details</span>
+                                  <ChevronDown className="w-3.5 h-3.5 text-blue-500 animate-bounce" />
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div className={cn(
+                            "p-4 rounded-2xl border",
+                            theme === 'dark' ? "bg-black/40 border-white/5" : "bg-white border-black/5"
+                          )}>
+                            <p className={cn(
+                              "text-[10px] font-bold uppercase mb-1",
+                              theme === 'dark' ? "text-white/20" : "text-black/20"
+                            )}>Concentration</p>
+                            <p className={cn(
+                              "text-sm font-mono",
+                              theme === 'dark' ? "text-white/80" : "text-slate-700"
+                            )}>{species.concentration}</p>
+                          </div>
+                          <div className={cn(
+                            "p-4 rounded-2xl border",
+                            theme === 'dark' ? "bg-black/40 border-white/5" : "bg-white border-black/5"
+                          )}>
+                            <p className={cn(
+                              "text-[10px] font-bold uppercase mb-1",
+                              theme === 'dark' ? "text-white/20" : "text-black/20"
+                            )}>Motility</p>
+                            <p className={cn(
+                              "text-sm font-mono",
+                              theme === 'dark' ? "text-white/80" : "text-slate-700"
+                            )}>{species.motility}</p>
+                          </div>
+                          <div className={cn(
+                            "p-4 rounded-2xl border",
+                            theme === 'dark' ? "bg-black/40 border-white/5" : "bg-white border-black/5"
+                          )}>
+                            <p className={cn(
+                              "text-[10px] font-bold uppercase mb-1",
+                              theme === 'dark' ? "text-white/20" : "text-black/20"
+                            )}>Morphology</p>
+                            <p className={cn(
+                              "text-sm font-mono",
+                              theme === 'dark' ? "text-white/80" : "text-slate-700"
+                            )}>{species.morphology}</p>
+                          </div>
+                        </div>
+                        
+                        <div className={cn(
+                          "mt-6 pt-6 border-t flex items-start gap-3",
+                          theme === 'dark' ? "border-white/5" : "border-black/5"
+                        )}>
+                          <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                          <p className={cn(
+                            "text-xs leading-relaxed italic",
+                            theme === 'dark' ? "text-white/40" : "text-slate-500"
+                          )}>{species.notes}</p>
+                        </div>
+
+                        {/* Expandable Deep Theriogenology Details */}
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.3 }}
+                              className="mt-6 pt-6 border-t border-dashed border-blue-500/20 overflow-hidden space-y-6"
+                            >
+                              {/* 1. Kinematics benchmarks grid */}
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <Activity className="w-4 h-4 text-emerald-500 animate-pulse" />
+                                  <h5 className={cn(
+                                    "text-xs font-bold uppercase tracking-wider",
+                                    theme === 'dark' ? "text-white/60" : "text-slate-700"
+                                  )}>CASA Kinematic Benchmarks (Physiological Thresholds)</h5>
+                                </div>
+                                <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3">
+                                  {Object.entries(species.kinematics).map(([key, val]) => (
+                                    <div key={key} className={cn(
+                                      "p-3 rounded-xl border flex flex-col justify-between",
+                                      theme === 'dark' ? "bg-black/60 border-white/5" : "bg-white border-black/5"
+                                    )}>
+                                      <span className={cn(
+                                        "text-[9px] font-bold uppercase",
+                                        theme === 'dark' ? "text-white/30" : "text-black/30"
+                                      )}>{key}</span>
+                                      <span className={cn(
+                                        "text-xs font-mono font-semibold mt-1",
+                                        theme === 'dark' ? "text-white/80" : "text-slate-800"
+                                      )}>{val}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* 2. Strict Morphology & SDF limits */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-2">
+                                    <Sliders className="w-4 h-4 text-sky-500" />
+                                    <h5 className={cn(
+                                      "text-xs font-bold uppercase tracking-wider",
+                                      theme === 'dark' ? "text-white/60" : "text-slate-700"
+                                    )}>Sperm Morphology Strictures</h5>
+                                  </div>
+                                  <div className={cn(
+                                    "p-4 rounded-2xl border space-y-2.5",
+                                    theme === 'dark' ? "bg-black/60 border-white/5" : "bg-white border-black/5"
+                                  )}>
+                                    {Object.entries(species.morphologyDetails).map(([defectKey, desc]) => (
+                                      <div key={defectKey} className="flex flex-col text-xs">
+                                        <span className={cn(
+                                          "text-[10px] font-bold uppercase flex items-center gap-1.5",
+                                          theme === 'dark' ? "text-white/40" : "text-black/40"
+                                        )}>
+                                          <div className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                                          {defectKey} Criteria
+                                        </span>
+                                        <span className={cn(
+                                          "mt-0.5 pl-3 leading-relaxed",
+                                          theme === 'dark' ? "text-white/60" : "text-slate-600"
+                                        )}>{desc}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-2">
+                                    <Shield className="w-4 h-4 text-purple-500" />
+                                    <h5 className={cn(
+                                      "text-xs font-bold uppercase tracking-wider",
+                                      theme === 'dark' ? "text-white/60" : "text-slate-700"
+                                    )}>Sperm DNA Fragmentation Index (SDF/DFI) Limits</h5>
+                                  </div>
+                                  <div className={cn(
+                                    "p-4 rounded-2xl border space-y-2.5",
+                                    theme === 'dark' ? "bg-black/60 border-white/5" : "bg-white border-black/5"
+                                  )}>
+                                    {Object.entries(species.sdf).map(([level, desc]) => (
+                                      <div key={level} className="flex flex-col text-xs">
+                                        <span className={cn(
+                                          "text-[10px] font-bold uppercase flex items-center gap-1.5",
+                                          level === 'normal' ? "text-emerald-500" : level === 'borderline' ? "text-amber-500" : "text-rose-500"
+                                        )}>
+                                          <div className={cn(
+                                            "w-1.5 h-1.5 rounded-full",
+                                            level === 'normal' ? "bg-emerald-500" : level === 'borderline' ? "bg-amber-500" : "bg-rose-500 animate-pulse"
+                                          )} />
+                                          DFI {level} threshold
+                                        </span>
+                                        <span className={cn(
+                                          "mt-0.5 pl-3 leading-relaxed",
+                                          theme === 'dark' ? "text-white/60" : "text-slate-600"
+                                        )}>{desc}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 3. Lab Configuration Recommendations */}
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <Scale className="w-4 h-4 text-amber-500" />
+                                  <h5 className={cn(
+                                    "text-xs font-bold uppercase tracking-wider",
+                                    theme === 'dark' ? "text-white/60" : "text-slate-700"
+                                  )}>Theriogenology Laboratory & Hardware Configuration</h5>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                  <div className={cn(
+                                    "p-4 rounded-xl border flex items-start gap-3",
+                                    theme === 'dark' ? "bg-black/60 border-white/5" : "bg-white border-black/5"
+                                  )}>
+                                    <Sliders className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                    <div>
+                                      <p className={cn(
+                                        "text-[10px] font-bold uppercase",
+                                        theme === 'dark' ? "text-white/30" : "text-black/30"
+                                      )}>Optimal Micro-Chamber Setup</p>
+                                      <p className={cn(
+                                        "text-xs mt-1 leading-relaxed",
+                                        theme === 'dark' ? "text-white/80" : "text-slate-700"
+                                      )}>{species.setup.chamber}</p>
+                                    </div>
+                                  </div>
+                                  <div className={cn(
+                                    "p-4 rounded-xl border flex items-start gap-3",
+                                    theme === 'dark' ? "bg-black/60 border-white/5" : "bg-white border-black/5"
+                                  )}>
+                                    <Thermometer className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                                    <div>
+                                      <p className={cn(
+                                        "text-[10px] font-bold uppercase",
+                                        theme === 'dark' ? "text-white/30" : "text-black/30"
+                                      )}>Heating Stage Temperature</p>
+                                      <p className="text-xs mt-1 leading-relaxed font-semibold text-orange-500">
+                                        {species.setup.temperature}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className={cn(
+                                    "p-4 rounded-xl border flex items-start gap-3",
+                                    theme === 'dark' ? "bg-black/60 border-white/5" : "bg-white border-black/5"
+                                  )}>
+                                    <Sparkles className="w-4 h-4 text-purple-500 shrink-0 mt-0.5" />
+                                    <div>
+                                      <p className={cn(
+                                        "text-[10px] font-bold uppercase",
+                                        theme === 'dark' ? "text-white/30" : "text-black/30"
+                                      )}>Avg Ejaculate Volumetric Range</p>
+                                      <p className={cn(
+                                        "text-xs mt-1 leading-relaxed",
+                                        theme === 'dark' ? "text-white/80" : "text-slate-700"
+                                      )}>{species.setup.volume}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </motion.div>
             )}

@@ -798,6 +798,21 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     setUploadProgress(0);
     setAiAnalysis(null);
 
+    // Immediately preview the video/file in the player so the user can see it playing while upload or processing finishes
+    if (file.type.startsWith('video/')) {
+      if (uploadedVideoUrl) {
+        URL.revokeObjectURL(uploadedVideoUrl);
+      }
+      const url = URL.createObjectURL(file);
+      setUploadedVideoUrl(url);
+      setStream(null); // Clear camera stream if video is loaded
+    } else {
+      if (uploadedVideoUrl) {
+        URL.revokeObjectURL(uploadedVideoUrl);
+      }
+      setUploadedVideoUrl(null);
+    }
+
     try {
       // 1. Establish Firebase Storage resumable upload with timeout/cancel safety fallback
       const storageRef = ref(storage, `videos/${Date.now()}_${file.name}`);
@@ -874,21 +889,6 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       });
       const base64 = await base64Promise;
       const base64Data = base64.split(',')[1];
-
-      // 3. If video, set as source
-      if (file.type.startsWith('video/')) {
-        if (uploadedVideoUrl) {
-          URL.revokeObjectURL(uploadedVideoUrl);
-        }
-        const url = URL.createObjectURL(file);
-        setUploadedVideoUrl(url);
-        setStream(null); // Clear camera stream if video is uploaded
-      } else {
-        if (uploadedVideoUrl) {
-          URL.revokeObjectURL(uploadedVideoUrl);
-        }
-        setUploadedVideoUrl(null);
-      }
 
       // 3. Call Gemini for AI Analysis
       const apiKey = process.env.GEMINI_API_KEY;
@@ -1603,6 +1603,14 @@ Digital Signature Verified - ATSA AI Engine v2.0
         videoRef.current.srcObject = stream;
       } else if (uploadedVideoUrl) {
         videoRef.current.srcObject = null;
+        try {
+          videoRef.current.load();
+          videoRef.current.play().catch(err => {
+            console.warn("Autoplay was delayed or blocked, but video element is loaded and ready:", err);
+          });
+        } catch (e) {
+          console.error("Video player load failed:", e);
+        }
       }
     }
   }, [stream, uploadedVideoUrl]);
@@ -2416,37 +2424,50 @@ Digital Signature Verified - ATSA AI Engine v2.0
           )}>
             <div className="w-full h-full relative">
               {isUploading && (
-                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 bg-black/80 backdrop-blur-md rounded-xl transition-all">
+                <div className={cn(
+                  "absolute z-50 transition-all duration-300",
+                  (stream || uploadedVideoUrl)
+                    ? "bottom-4 right-4 max-w-[340px] w-full p-0"
+                    : "inset-0 flex flex-col items-center justify-center p-8 bg-black/80 backdrop-blur-md rounded-xl"
+                )}>
                   <motion.div 
                     initial={{ scale: 0.95, opacity: 0 }} 
                     animate={{ scale: 1, opacity: 1 }}
-                    className="max-w-md w-full flex flex-col items-center gap-6 p-8 bg-[#0a0a0c] border border-white/10 rounded-2xl shadow-2xl relative overflow-hidden"
+                    className={cn(
+                      "w-full flex flex-col items-center relative overflow-hidden transition-all duration-300",
+                      (stream || uploadedVideoUrl)
+                        ? "gap-4 p-4 bg-[#0a0a0c]/95 backdrop-blur-md border border-purple-500/40 rounded-2xl shadow-2xl"
+                        : "max-w-md gap-6 p-8 bg-[#0a0a0c] border border-white/10 rounded-2xl shadow-2xl"
+                    )}
                   >
                     {/* Glowing effects */}
                     <div className="absolute -top-12 -left-12 w-28 h-28 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
                     <div className="absolute -bottom-12 -right-12 w-28 h-28 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-                    <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center relative border border-purple-500/20">
-                      <Upload className="w-8 h-8 text-purple-400 animate-pulse" />
+                    <div className={cn(
+                      "rounded-full bg-purple-500/10 flex items-center justify-center relative border border-purple-500/20",
+                      (stream || uploadedVideoUrl) ? "w-12 h-12" : "w-16 h-16"
+                    )}>
+                      <Upload className={cn("text-purple-400 animate-pulse", (stream || uploadedVideoUrl) ? "w-6 h-6" : "w-8 h-8")} />
                     </div>
 
                     <div className="text-center w-full">
-                      <h4 className="text-sm font-bold uppercase tracking-wider text-white mb-1 text-center">
+                      <h4 className={cn("font-bold uppercase tracking-wider text-white mb-1 text-center", (stream || uploadedVideoUrl) ? "text-xs" : "text-sm")}>
                         {uploadProgress !== null && uploadProgress < 100 
                           ? "Uploading to Firebase Storage" 
                           : "Processing Gemini AI Analysis"}
                       </h4>
-                      <p className="text-xs text-white/40 max-w-sm mx-auto text-center">
+                      <p className={cn("text-white/40 max-w-sm mx-auto text-center animate-pulse", (stream || uploadedVideoUrl) ? "text-[10px]" : "text-xs")}>
                         {uploadProgress !== null && uploadProgress < 100
-                          ? "Transferring high-definition microscopy feed to cloud storage..."
-                          : "Vision models analyzing track kinematics & morphometry parameters..."}
+                          ? "Transferring high-definition microscopy feed..."
+                          : "Vision models analyzing track kinematics & morphometry..."}
                       </p>
                     </div>
 
                     {/* Progress slider container */}
                     <div className="w-full">
-                      <div className="flex justify-between items-center mb-1 bg-white/[0.02] p-2 rounded-lg border border-white/5">
-                        <span className="text-[10px] font-mono text-purple-400 font-bold uppercase tracking-wider">
+                      <div className="flex justify-between items-center mb-1 bg-white/[0.02] p-1.5 rounded-lg border border-white/5">
+                        <span className="text-[9px] font-mono text-purple-400 font-bold uppercase tracking-wider">
                           {uploadProgress !== null && uploadProgress < 100 ? "Firebase Upload" : "CASA Inference"}
                         </span>
                         <span className="text-xs font-mono font-bold text-white">
@@ -2455,7 +2476,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                       </div>
 
                       {/* Bar indicator */}
-                      <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                      <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
                         <motion.div 
                           className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
                           initial={{ width: 0 }}
@@ -2465,21 +2486,23 @@ Digital Signature Verified - ATSA AI Engine v2.0
                       </div>
                     </div>
 
-                    {/* Quick status bullet points */}
-                    <div className="w-full flex flex-col gap-1.5 border-t border-white/5 pt-4 text-left">
-                      <div className="flex items-center gap-2 text-[10px] font-medium text-white/60">
-                        <div className={cn("w-1.5 h-1.5 rounded-full", uploadProgress !== null && uploadProgress > 0 ? "bg-emerald-500" : "bg-white/20")} />
-                        <span>Establish secure cloud storage session</span>
+                    {/* Quick status bullet points (Render only on full view) */}
+                    {!(stream || uploadedVideoUrl) && (
+                      <div className="w-full flex flex-col gap-1.5 border-t border-white/5 pt-4 text-left">
+                        <div className="flex items-center gap-2 text-[10px] font-medium text-white/60">
+                          <div className={cn("w-1.5 h-1.5 rounded-full", uploadProgress !== null && uploadProgress > 0 ? "bg-emerald-500" : "bg-white/20")} />
+                          <span>Establish secure cloud storage session</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-medium text-white/60">
+                          <div className={cn("w-1.5 h-1.5 rounded-full", uploadProgress === 100 ? "bg-emerald-500" : "bg-white/20")} />
+                          <span>Upload telemetry raw video data</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-medium text-white/60">
+                          <div className={cn("w-1.5 h-1.5 rounded-full", uploadProgress === 100 && aiAnalysis !== null ? "bg-emerald-500 animate-pulse" : "bg-white/20")} />
+                          <span>Run deep deep-learning vision inference</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-[10px] font-medium text-white/60">
-                        <div className={cn("w-1.5 h-1.5 rounded-full", uploadProgress === 100 ? "bg-emerald-500" : "bg-white/20")} />
-                        <span>Upload telemetry raw video data</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-[10px] font-medium text-white/60">
-                        <div className={cn("w-1.5 h-1.5 rounded-full", uploadProgress === 100 && aiAnalysis !== null ? "bg-emerald-500 animate-pulse" : "bg-white/20")} />
-                        <span>Run deep deep-learning vision inference</span>
-                      </div>
-                    </div>
+                    )}
                   </motion.div>
                 </div>
               )}
