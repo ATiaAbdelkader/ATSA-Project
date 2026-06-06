@@ -659,6 +659,11 @@ export const translations: TranslationDict = {
     fr: "Validation",
     ar: "الاعتماد"
   },
+  tabAbout: {
+    en: "About",
+    fr: "À propos",
+    ar: "عن التطبيق"
+  },
   neuralNetworkActive: {
     en: "Neural Network Active",
     fr: "Réseau de Neurones Actif",

@@ -42,7 +42,10 @@ import {
   Clock,
   Calculator,
   Tv,
-  TrendingUp
+  TrendingUp,
+  User as UserIcon,
+  BookOpen,
+  Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -225,7 +228,31 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showStats, setShowStats] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
-  const [activeTab, setActiveTab] = useState<'live' | 'kinematics' | 'morphology' | 'vitality' | 'sdf' | 'ai' | 'report' | 'validation' | 'history' | 'calculator'>('live');
+  const [activeTab, setActiveTab] = useState<'live' | 'kinematics' | 'morphology' | 'vitality' | 'sdf' | 'ai' | 'report' | 'validation' | 'history' | 'calculator' | 'about'>('live');
+  const [designerInfo, setDesignerInfo] = useState(() => {
+    const saved = localStorage.getItem('atsa_designer_info');
+    return saved ? JSON.parse(saved) : {
+      name: "Abdelkader Atia",
+      title: "Lead Systems Architect & App Designer",
+      email: "atia.abdelkader@gmail.com",
+      bio: "An innovator in computer-aided diagnostics, theriogenology hardware-software integration, and real-time computer vision pipelines. Leading the development of ATSA CAS high-fidelity clinical simulation engines.",
+      organization: "ATSA CAS (Automated Theriogenology Sperm Analyzer)",
+      philosophies: [
+        "Pristine visual balance: Clean dark cosmic slate styling engineered to mitigate clinician optical fatigue.",
+        "Zero tech-larping: Objective, physical metrics devoid of unrequested system background logs or telemetry slop.",
+        "Absolute clinical trust: High-integrity datasets validated cross-border with global theriogenology labs."
+      ],
+      technicalHighlights: [
+        { key: "Computer Vision", val: "Microscopy path-fitting & morphology segmentation via Gemini Vision" },
+        { key: "Stack Composition", val: "React 18, Vite Engine, Tailwind CSS utilities" },
+        { key: "Persistence Engine", val: "Firebase Storage, Firestore cloud tables, LocalStorage cache" },
+        { key: "Analytical Visuals", val: "D3.js trace curves, interactive Recharts kinematic histograms" }
+      ],
+      credentials: "MS. Veterinary Instrumentation & Advanced Software Ergonomics"
+    };
+  });
+  const [isEditingDesigner, setIsEditingDesigner] = useState(false);
+  const [editDesignerForm, setEditDesignerForm] = useState(designerInfo);
   const [aiSubTab, setAiSubTab] = useState<'consultant' | 'vision'>('vision');
   const [selectedTopologyLayer, setSelectedTopologyLayer] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -2303,6 +2330,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
             {activeTab === 'history' && <Clock className="w-3.5 h-3.5" />}
             {activeTab === 'calculator' && <Calculator className="w-3.5 h-3.5" />}
             {activeTab === 'validation' && <CheckCircle2 className="w-3.5 h-3.5" />}
+            {activeTab === 'about' && <UserIcon className="w-3.5 h-3.5 text-pink-400" />}
           </div>
           <div>
             <div className={cn("text-[8px] uppercase tracking-widest font-black leading-none", theme === 'dark' ? "text-white/30" : "text-slate-400")}>
@@ -2318,7 +2346,8 @@ Digital Signature Verified - ATSA AI Engine v2.0
                activeTab === 'report' ? t('tabReport') :
                activeTab === 'history' ? t('tabHistory') :
                activeTab === 'calculator' ? t('tabCalculator') :
-               activeTab === 'validation' ? t('tabValidation') : activeTab}
+               activeTab === 'validation' ? t('tabValidation') :
+               activeTab === 'about' ? t('tabAbout') : activeTab}
             </div>
           </div>
         </div>
@@ -2339,6 +2368,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
             { id: 'history', labelKey: 'tabHistory', icon: Clock, color: 'text-amber-500', pulsing: false, glowing: false },
             { id: 'calculator', labelKey: 'tabCalculator', icon: Calculator, color: 'text-indigo-500', pulsing: false, glowing: false },
             { id: 'validation', labelKey: 'tabValidation', icon: CheckCircle2, color: 'text-teal-500', pulsing: false, glowing: false },
+            { id: 'about', labelKey: 'tabAbout', icon: UserIcon, color: 'text-pink-500', pulsing: false, glowing: false },
           ] as const).map(({ id, labelKey, icon: TabIcon, color, pulsing, glowing }) => {
             const isActive = activeTab === id;
             return (
@@ -2418,10 +2448,140 @@ Digital Signature Verified - ATSA AI Engine v2.0
       <div className="flex flex-1 overflow-hidden">
         {/* Main Workspace */}
         <main className={cn("flex-1 relative flex items-center justify-center overflow-hidden transition-colors", theme === 'dark' ? "bg-black" : "bg-slate-200")}>
-          <div className={cn(
-            "relative w-full max-w-6xl aspect-video rounded-xl border shadow-2xl overflow-hidden transition-all",
-            theme === 'dark' ? "bg-[#050505] border-white/10" : "bg-white border-slate-300 shadow-xl"
-          )}>
+          {activeTab === 'about' ? (
+            <div className="w-full h-full overflow-y-auto p-4 md:p-8 flex items-center justify-center">
+              <div className={cn(
+                "w-full max-w-4xl rounded-2xl border shadow-2xl overflow-hidden p-6 md:p-8 space-y-8 animate-in fade-in zoom-in-95 duration-500",
+                theme === 'dark' ? "bg-[#0b0b0d] border-white/10 text-white" : "bg-white border-slate-200 text-slate-800"
+              )}>
+                {/* Header Profile Badge */}
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b border-pink-500/10">
+                  <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-pink-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-pink-500/20 text-white font-mono text-xl font-black">
+                      {designerInfo.name.split(' ').map((n: string) => n[0]).join('')}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h1 className="text-xl font-bold tracking-tight font-sans">
+                          {designerInfo.name}
+                        </h1>
+                        <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-pink-500/20 text-pink-500 border border-pink-500/30">
+                          Lead Architect
+                        </span>
+                      </div>
+                      <p className="text-xs text-pink-500 font-mono font-medium mt-1 uppercase tracking-wider">{designerInfo.title}</p>
+                      <p className={cn("text-[10px] mt-0.5", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{designerInfo.organization}</p>
+                    </div>
+                  </div>
+
+                  <div className={cn(
+                    "p-3 rounded-xl border font-mono text-[10px] flex flex-col gap-1 w-full md:w-auto",
+                    theme === 'dark' ? "bg-white/5 border-white/5" : "bg-slate-50 border-black/5"
+                  )}>
+                    <div className="flex justify-between md:gap-8 gap-2">
+                      <span className={theme === 'dark' ? "text-white/30" : "text-slate-400"}>CREDENTIALS:</span>
+                      <span className="font-bold text-pink-500">{designerInfo.credentials}</span>
+                    </div>
+                    <div className="flex justify-between md:gap-8 gap-2">
+                      <span className={theme === 'dark' ? "text-white/30" : "text-slate-400"}>SYSTEM_REF:</span>
+                      <span className="font-bold">ATSA_CAS_V2_PRO</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Grid Content */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Left Column: Vision & Philosophies */}
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-pink-500 flex items-center gap-2">
+                        <BookOpen className="w-4 h-4" />
+                        Executive Vision & Bio
+                      </h3>
+                      <p className={cn(
+                        "text-xs leading-relaxed font-sans",
+                        theme === 'dark' ? "text-white/70" : "text-slate-600"
+                      )}>
+                        {designerInfo.bio}
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-[#888] block">
+                        Core Engineering Manifesto
+                      </h3>
+                      <div className="space-y-2.5">
+                        {designerInfo.philosophies.map((phil: string, i: number) => (
+                          <div key={i} className={cn(
+                            "p-3 rounded-xl border text-xs leading-relaxed",
+                            theme === 'dark' ? "bg-[#141416]/70 border-white/5 text-white/80" : "bg-slate-50/70 border-black/5 text-slate-700"
+                          )}>
+                            {phil}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Stack & Technical Highlights */}
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-pink-500 flex items-center gap-2">
+                        <Microscope className="w-4 h-4" />
+                        Technical Architecture Stack
+                      </h3>
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {designerInfo.technicalHighlights.map((tech: { key: string; val: string }, i: number) => (
+                          <div key={i} className={cn(
+                            "p-3.5 rounded-xl border flex flex-col gap-1 transition-all hover:translate-x-1 duration-200",
+                            theme === 'dark' ? "bg-[#141416] border-white/5 hover:border-pink-500/10" : "bg-slate-50 border-black/5 hover:border-pink-500/20"
+                          )}>
+                            <span className="text-[9px] font-black uppercase tracking-wider text-pink-500">{tech.key}</span>
+                            <span className="text-xs font-mono font-bold">{tech.val}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Quick Stats Banner */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className={cn(
+                        "p-3 rounded-xl border text-center space-y-0.5",
+                        theme === 'dark' ? "bg-white/5 border-white/5" : "bg-slate-50 border-black/5"
+                      )}>
+                        <div className="text-[14px] font-black font-mono text-pink-500">95%+</div>
+                        <div className="text-[8px] font-black uppercase text-[#888]">Accuracy</div>
+                      </div>
+                      <div className={cn(
+                        "p-3 rounded-xl border text-center space-y-0.5",
+                        theme === 'dark' ? "bg-white/5 border-white/5" : "bg-slate-50 border-black/5"
+                      )}>
+                        <div className="text-[14px] font-black font-mono text-pink-500">&lt;3s</div>
+                        <div className="text-[8px] font-black uppercase text-[#888]">Latency</div>
+                      </div>
+                      <div className={cn(
+                        "p-3 rounded-xl border text-center space-y-0.5",
+                        theme === 'dark' ? "bg-white/5 border-white/5" : "bg-slate-50 border-black/5"
+                      )}>
+                        <div className="text-[14px] font-black font-mono text-pink-500">15+</div>
+                        <div className="text-[8px] font-black uppercase text-[#888]">Globally</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Credits */}
+                <div className="pt-6 border-t border-pink-500/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-[9px] text-[#888] font-mono">
+                  <div>Designed & conceptualized for theriogenology clinic specialists.</div>
+                  <div className="text-pink-500 font-bold">{designerInfo.email}</div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className={cn(
+              "relative w-full max-w-6xl aspect-video rounded-xl border shadow-2xl overflow-hidden transition-all",
+              theme === 'dark' ? "bg-[#050505] border-white/10" : "bg-white border-slate-300 shadow-xl"
+            )}>
             <div className="w-full h-full relative">
               {isUploading && (
                 <div className={cn(
@@ -2899,6 +3059,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
               </button>
             </div>
           </div>
+        )}
         </main>
 
         {/* Sidebar Stats */}
@@ -2927,6 +3088,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                     {activeTab === 'history' && <Clock className="w-3.5 h-3.5 text-amber-500" />}
                     {activeTab === 'calculator' && <Calculator className="w-3.5 h-3.5 text-indigo-500" />}
                     {activeTab === 'validation' && <CheckCircle2 className="w-3.5 h-3.5 text-teal-500" />}
+                    {activeTab === 'about' && <UserIcon className="w-3.5 h-3.5 text-pink-500 animate-pulse" />}
                   </div>
                   <div>
                     <h2 className={cn("text-xs font-bold leading-none capitalize", theme === 'dark' ? "text-white" : "text-slate-900")}>
@@ -2939,7 +3101,8 @@ Digital Signature Verified - ATSA AI Engine v2.0
                        activeTab === 'report' ? t('tabReport') :
                        activeTab === 'history' ? t('tabHistory') :
                        activeTab === 'calculator' ? t('tabCalculator') :
-                       activeTab === 'validation' ? t('tabValidation') : activeTab}
+                       activeTab === 'validation' ? t('tabValidation') :
+                       activeTab === 'about' ? t('tabAbout') : activeTab}
                     </h2>
                     <p className={cn("text-[9px] font-medium uppercase tracking-wider mt-1", theme === 'dark' ? "text-white/30" : "text-slate-400")}>
                       Analysis Module Panel
@@ -2955,6 +3118,176 @@ Digital Signature Verified - ATSA AI Engine v2.0
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                {activeTab === 'about' && (
+                  <div className="space-y-6 animate-in fade-in duration-300">
+                    <div className="p-4 bg-pink-500/10 border border-pink-500/20 rounded-2xl">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Award className="w-5 h-5 text-pink-500" />
+                        <h3 className="text-xs font-bold text-pink-500 uppercase tracking-wider">Designer Cockpit</h3>
+                      </div>
+                      <p className={cn(
+                        "text-[10px] leading-relaxed",
+                        theme === 'dark' ? "text-white/60" : "text-slate-600"
+                      )}>
+                        Customize the visual profile and engineering manifesto. Any edits made here are instantly cached to LocalStorage and update the main presentation deck.
+                      </p>
+                    </div>
+
+                    {isEditingDesigner ? (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-[#888] block mb-1">Architect Name</label>
+                          <input 
+                            type="text"
+                            value={editDesignerForm.name}
+                            onChange={(e) => setEditDesignerForm({ ...editDesignerForm, name: e.target.value })}
+                            className={cn(
+                              "w-full px-3 py-2 rounded-xl text-xs font-mono font-bold border focus:outline-none focus:border-pink-500",
+                              theme === 'dark' ? "bg-black/60 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                            )}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-[#888] block mb-1">Professional Title</label>
+                          <input 
+                            type="text"
+                            value={editDesignerForm.title}
+                            onChange={(e) => setEditDesignerForm({ ...editDesignerForm, title: e.target.value })}
+                            className={cn(
+                              "w-full px-3 py-2 rounded-xl text-xs font-mono font-bold border focus:outline-none focus:border-pink-500",
+                              theme === 'dark' ? "bg-black/60 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                            )}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-[#888] block mb-1">Affiliation / Organization</label>
+                          <input 
+                            type="text"
+                            value={editDesignerForm.organization}
+                            onChange={(e) => setEditDesignerForm({ ...editDesignerForm, organization: e.target.value })}
+                            className={cn(
+                              "w-full px-3 py-2 rounded-xl text-xs font-mono font-bold border focus:outline-none focus:border-pink-500",
+                              theme === 'dark' ? "bg-black/60 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                            )}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-[#888] block mb-1">Credentials</label>
+                          <input 
+                            type="text"
+                            value={editDesignerForm.credentials}
+                            onChange={(e) => setEditDesignerForm({ ...editDesignerForm, credentials: e.target.value })}
+                            className={cn(
+                              "w-full px-3 py-2 rounded-xl text-xs font-mono font-bold border focus:outline-none focus:border-pink-500",
+                              theme === 'dark' ? "bg-black/60 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                            )}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-[#888] block mb-1">Contact Email</label>
+                          <input 
+                            type="email"
+                            value={editDesignerForm.email}
+                            onChange={(e) => setEditDesignerForm({ ...editDesignerForm, email: e.target.value })}
+                            className={cn(
+                              "w-full px-3 py-2 rounded-xl text-xs font-mono font-bold border focus:outline-none focus:border-pink-500",
+                              theme === 'dark' ? "bg-black/60 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                            )}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-[#888] block mb-1">Core Biography</label>
+                          <textarea 
+                            rows={4}
+                            value={editDesignerForm.bio}
+                            onChange={(e) => setEditDesignerForm({ ...editDesignerForm, bio: e.target.value })}
+                            className={cn(
+                              "w-full px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-pink-500 leading-relaxed",
+                              theme === 'dark' ? "bg-black/60 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                            )}
+                          />
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditingDesigner(false);
+                              setEditDesignerForm(designerInfo);
+                            }}
+                            className={cn(
+                              "flex-1 py-2 text-center rounded-xl text-[10px] font-bold uppercase border cursor-pointer",
+                              theme === 'dark' ? "border-white/10 text-white/60 hover:bg-white/5" : "border-black/10 text-slate-600 hover:bg-slate-50"
+                            )}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDesignerInfo(editDesignerForm);
+                              localStorage.setItem('atsa_designer_info', JSON.stringify(editDesignerForm));
+                              setIsEditingDesigner(false);
+                            }}
+                            className="flex-1 py-2 text-center rounded-xl text-[10px] font-bold uppercase bg-pink-500 hover:bg-pink-600 text-white shadow-lg shadow-pink-500/20 cursor-pointer"
+                          >
+                            Save Deck
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-5">
+                        <div className="space-y-3">
+                          <div className={cn(
+                            "p-3 rounded-xl border space-y-1",
+                            theme === 'dark' ? "bg-[#141416] border-white/5" : "bg-slate-50 border-black/5"
+                          )}>
+                            <p className={cn("text-[8px] font-black uppercase tracking-wider", theme === 'dark' ? "text-white/20" : "text-black/30")}>NAME & ORGANIZATION</p>
+                            <p className={cn("text-xs font-bold font-mono", theme === 'dark' ? "text-white" : "text-slate-900")}>{designerInfo.name}</p>
+                            <p className={cn("text-[10px]", theme === 'dark' ? "text-white/50" : "text-slate-500")}>{designerInfo.organization}</p>
+                          </div>
+
+                          <div className={cn(
+                            "p-3 rounded-xl border space-y-1",
+                            theme === 'dark' ? "bg-[#141416] border-white/5" : "bg-slate-50 border-black/5"
+                          )}>
+                            <p className={cn("text-[8px] font-black uppercase tracking-wider", theme === 'dark' ? "text-white/20" : "text-black/30")}>OFFICIAL BIO</p>
+                            <p className={cn("text-[10px] leading-relaxed", theme === 'dark' ? "text-white/70" : "text-slate-600")}>{designerInfo.bio}</p>
+                          </div>
+
+                          <div className={cn(
+                            "p-3 rounded-xl border space-y-1",
+                            theme === 'dark' ? "bg-[#141416] border-white/5" : "bg-slate-50 border-black/5"
+                          )}>
+                            <p className={cn("text-[8px] font-black uppercase tracking-wider", theme === 'dark' ? "text-white/20" : "text-black/30")}>CONTACT REFERENCE</p>
+                            <p className={cn("text-[10px] font-mono", theme === 'dark' ? "text-pink-400" : "text-pink-600")}>{designerInfo.email}</p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditDesignerForm(designerInfo);
+                            setIsEditingDesigner(true);
+                          }}
+                          className={cn(
+                            "w-full py-2.5 rounded-xl text-[10px] font-bold uppercase cursor-pointer text-center border font-sans transition-all",
+                            theme === 'dark' 
+                              ? "bg-white/5 hover:bg-white/10 border-white/10 text-white" 
+                              : "bg-black/5 hover:bg-black/10 border-black/10 text-slate-800"
+                          )}
+                        >
+                          Modify Designer Details
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {activeTab === 'history' && (
                   <div className="space-y-6">
                     <section>
