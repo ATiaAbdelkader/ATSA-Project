@@ -164,6 +164,36 @@ export interface AnalysisResult {
 
 export type AppState = 'login' | 'dashboard' | 'analysis' | 'help' | 'history' | 'inventory';
 
+export interface CategoricalValidationPair {
+  id: string;
+  referenceLabel: string;
+  predictedLabel: string;
+}
+
+export interface NumericValidationPair {
+  id: string;
+  referenceValue: number;
+  predictedValue: number;
+}
+
+export interface ValidationReport {
+  categorical: {
+    total: number;
+    exactAgreement: number;
+    agreementRate: number | null;
+    labels: string[];
+    confusionMatrix: Record<string, Record<string, number>>;
+  };
+  numeric: {
+    total: number;
+    valid: number;
+    meanAbsoluteError: number | null;
+    medianAbsoluteError: number | null;
+    maxAbsoluteError: number | null;
+  };
+  notes: string[];
+}
+
 export interface HistoricalDataPoint {
   date: string;
   concentration: number;

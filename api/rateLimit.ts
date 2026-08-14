@@ -75,7 +75,9 @@ function keyPart(value: string) {
   return encodeURIComponent(value).slice(0, 160);
 }
 
-function getClientIp(req: IncomingMessage) {
+type RequestWithHeaders = Pick<IncomingMessage, 'headers'>;
+
+function getClientIp(req: RequestWithHeaders) {
   const forwarded = req.headers['x-forwarded-for'];
   const firstForwarded = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0];
   return (firstForwarded || req.headers['x-real-ip'] || 'unknown').toString().trim() || 'unknown';
@@ -93,7 +95,7 @@ export function rateLimitConfigEnabled() {
   return Boolean(getRedisConfig());
 }
 
-export async function enforceGeminiLimits(req: IncomingMessage, uid: string, mode: GeminiRateLimitMode) {
+export async function enforceGeminiLimits(req: RequestWithHeaders, uid: string, mode: GeminiRateLimitMode) {
   const config = getRedisConfig();
   if (!config) {
     if (process.env.NODE_ENV === 'production') {

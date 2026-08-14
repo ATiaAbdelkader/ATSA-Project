@@ -59,3 +59,13 @@ npm run lint     # Run TypeScript type checking
 npm run build    # Build the production frontend
 npm run preview  # Preview the Vite production build
 ```
+
+## Validation workflow foundation
+
+The repository now includes a deterministic validation service at `src/services/validationService.ts`. It compares authorized human reference labels and numeric measurements with AI outputs, producing exact categorical agreement, a confusion matrix, and numeric absolute-error metrics. These metrics describe agreement with the supplied reference annotations; they do not establish clinical validity or diagnostic performance.
+
+The validation service is intentionally data-agnostic. A future research interface can supply consented, human-reviewed annotation pairs without introducing simulated datasets into the application.
+
+## Local quality gates
+
+Run `npm test` for the security, provenance, and validation regression suites. Run `npm run verify:deployment` to check Firebase/Vercel metadata and server-only environment boundaries, then run `npm run typecheck` and `npm run build` before deployment. The same checks run in `.github/workflows/ci.yml` for pushes and pull requests targeting `main`.
