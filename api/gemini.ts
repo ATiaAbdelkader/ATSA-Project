@@ -2,6 +2,7 @@ import { getApp, getApps, initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { GoogleGenAI, Type } from '@google/genai';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { enforceGeminiLimits, GEMINI_LIMITS, getRateLimitErrorHeaders } from './rateLimit';
 
 type GeminiMode = 'media-analysis' | 'interpretation' | 'history-summary' | 'chat';
 
@@ -15,8 +16,8 @@ type GeminiRequest = {
   summary?: unknown;
 };
 
-const MAX_JSON_BYTES = 1_000_000;
-const MAX_MEDIA_BYTES = 15 * 1024 * 1024;
+const MAX_JSON_BYTES = GEMINI_LIMITS.maxRequestBytes;
+const MAX_MEDIA_BYTES = GEMINI_LIMITS.maxMediaBytes;
 const STORAGE_BUCKET = 'ai-studio-applet-webapp-5a3d7.firebasestorage.app';
 
 function sendJson(res: ServerResponse, status: number, payload: unknown) {
@@ -29,6 +30,9 @@ function sendJson(res: ServerResponse, status: number, payload: unknown) {
 async function readBody(req: IncomingMessage): Promise<GeminiRequest> {
   const providedBody = (req as IncomingMessage & { body?: unknown }).body;
   if (providedBody && typeof providedBody === 'object') {
+    if (JSON.stringify(providedBody).length > MAX_JSON_BYTES) {
+      throw new Error('Request body is too large.');
+    }
     return providedBody as GeminiRequest;
   }
 
@@ -195,6 +199,9 @@ async function generateGeminiResponse(body: GeminiRequest, uid: string) {
   if (body.mode === 'media-analysis') {
     const fileUrl = requireText(body.fileUrl, 'fileUrl', 2_000);
     const mimeType = requireText(body.mimeType, 'mimeType', 100);
+    if (body.isVideo !== undefined && typeof body.isVideo !== 'boolean') {
+      throw Object.assign(new Error('Invalid isVideo flag.'), { statusCode: 400 });
+    }
     if (!/^(video|image)\/[a-z0-9.+-]+$/i.test(mimeType)) {
       throw Object.assign(new Error('Unsupported media type.'), { statusCode: 400 });
     }
@@ -231,8 +238,11 @@ async function generateGeminiResponse(body: GeminiRequest, uid: string) {
     return response.text || '';
   }
 
-  const message = requireText(body.message, 'message', 4_000);
+  const message = requireText(body.message, 'message', GEMINI_LIMITS.maxChatMessageCharacters);
   const summary = JSON.stringify(body.summary ?? null);
+  if (summary.length > GEMINI_LIMITS.maxSummaryCharacters) {
+    throw Object.assign(new Error('Analysis summary is too large.'), { statusCode: 413 });
+  }
   const chat = ai.chats.create({
     model: 'gemini-3.5-flash',
     config: {
@@ -260,7 +270,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   try {
     const user = await requireAuthenticatedUser(req);
     const body = await readBody(req);
-    requireMode(body);
+    const mode = requireMode(body);
+    await enforceGeminiLimits(req, user.uid, mode);
     const text = await generateGeminiResponse(body, user.uid);
     sendJson(res, 200, { text });
   } catch (error) {
@@ -273,6 +284,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         ? error.message
         : 'Gemini request failed.';
     console.error('Gemini API error:', error);
+    const retryHeaders = getRateLimitErrorHeaders(error);
+    Object.entries(retryHeaders).forEach(([name, value]) => res.setHeader(name, value));
     sendJson(res, statusCode >= 400 && statusCode < 600 ? statusCode : 500, { error: message });
   }
 }

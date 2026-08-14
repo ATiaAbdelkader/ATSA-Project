@@ -30,6 +30,8 @@ Configure the following variables in the Vercel project settings for Preview and
 | `FIREBASE_PROJECT_ID` | Firebase project ID used by Firebase Admin token verification. |
 | `FIREBASE_CLIENT_EMAIL` | Service-account client email used by Firebase Admin. |
 | `FIREBASE_PRIVATE_KEY` | Service-account private key. Preserve newline escapes when entering it in Vercel. |
+| `UPSTASH_REDIS_REST_URL` | Shared Redis REST endpoint used for cross-invocation Gemini rate limits and quotas. |
+| `UPSTASH_REDIS_REST_TOKEN` | Server-only Redis REST token. Never expose it to the browser. |
 
 The Firebase web configuration in `firebase-applet-config.json` contains public browser bootstrap values and is separate from the Firebase Admin service-account credentials.
 
@@ -45,7 +47,9 @@ firebase deploy --only firestore:rules,storage
 
 Do not use the old flat `videos/{timestamp}_{filename}` path for new uploads. Existing files under the legacy path are intentionally not accepted by the server-side media-analysis endpoint.
 
-Do not place `GEMINI_API_KEY`, `FIREBASE_CLIENT_EMAIL`, or `FIREBASE_PRIVATE_KEY` in client-side source code, `VITE_*` variables, or committed files.
+Do not place `GEMINI_API_KEY`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, or `UPSTASH_REDIS_REST_TOKEN` in client-side source code, `VITE_*` variables, or committed files.
+
+The Gemini endpoint uses shared-store protection in production. Default limits are three media analyses per user per minute and 30 per user per day, with higher limits for interpretation, history summaries, and chat. The operation-specific values can be overridden with `ATSA_GEMINI_<MODE>_USER_PER_MINUTE`, `ATSA_GEMINI_<MODE>_IP_PER_MINUTE`, and `ATSA_GEMINI_<MODE>_DAILY_QUOTA`. If the Upstash variables are absent, local development continues without distributed limits; production deployments must configure both variables. A Redis outage fails closed with HTTP 503 rather than calling Gemini without protection.
 
 ## Available scripts
 

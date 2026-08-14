@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { calculateKinematics, generateSummary, buildAiEstimatedSummary } from '../src/services/casaService';
 import handler, { storageUrlBelongsToUser } from '../api/gemini';
+import { enforceGeminiLimits, getGeminiLimitRule } from '../api/rateLimit';
 
 type MockRequest = {
   method?: string;
@@ -106,6 +107,35 @@ async function run() {
   await handler(request('POST') as any, authRes as any);
   assert.equal(authRes.statusCode, 401, 'requests without a Firebase ID token must be rejected');
   assert.match(authRes.body, /Authentication is required/);
+
+  const originalFetch = globalThis.fetch;
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalRedisUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const originalRedisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  process.env.NODE_ENV = 'production';
+  await assert.rejects(
+    () => enforceGeminiLimits(request('POST'), 'user-123', 'media-analysis'),
+    (error: any) => error?.statusCode === 503 && error?.code === 'rate_limit_store_not_configured'
+  );
+
+  process.env.NODE_ENV = 'test';
+  process.env.UPSTASH_REDIS_REST_URL = 'https://redis.example.test';
+  process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token';
+  globalThis.fetch = (async () => new Response(JSON.stringify([
+    { result: 4 }, { result: 1 }, { result: 1 }, { result: 1 }, { result: 1 }, { result: 1 }
+  ]), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+  await assert.rejects(
+    () => enforceGeminiLimits(request('POST', { 'x-forwarded-for': '203.0.113.10' }), 'user-123', 'media-analysis'),
+    (error: any) => error?.statusCode === 429 && error?.retryAfterSeconds > 0
+  );
+  assert.equal(getGeminiLimitRule('media-analysis').dailyQuota, 30);
+
+  globalThis.fetch = originalFetch;
+  if (originalNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = originalNodeEnv;
+  if (originalRedisUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL; else process.env.UPSTASH_REDIS_REST_URL = originalRedisUrl;
+  if (originalRedisToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN; else process.env.UPSTASH_REDIS_REST_TOKEN = originalRedisToken;
 
   const ownedMediaUrl = 'https://firebasestorage.googleapis.com/v0/b/ai-studio-applet-webapp-5a3d7.firebasestorage.app/o/videos%2Fuser-123%2Fsample-abc%2Fvideo.mp4?alt=media&token=test-token';
   assert.equal(storageUrlBelongsToUser(ownedMediaUrl, 'user-123'), true, 'a user-owned Storage URL should be accepted');
