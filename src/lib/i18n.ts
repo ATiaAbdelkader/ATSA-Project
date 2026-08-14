@@ -179,6 +179,21 @@ export const translations: TranslationDict = {
     fr: "Accéder au Moteur CASA",
     ar: "أدخل محرك CASA"
   },
+  researchPrototypeNoticeTitle: {
+    en: "Research prototype — not clinically validated",
+    fr: "Prototype de recherche — non validé cliniquement",
+    ar: "نموذج بحثي — غير مُعتمد سريرياً"
+  },
+  researchPrototypeNoticeBody: {
+    en: "Results are exploratory computer-assisted estimates and may include unavailable or AI-estimated fields. Do not use them alone for clinical, treatment, breeding, or reproductive decisions.",
+    fr: "Les résultats sont des estimations exploratoires assistées par ordinateur et peuvent inclure des champs indisponibles ou estimés par IA. Ne les utilisez pas seuls pour prendre des décisions cliniques, thérapeutiques, d'élevage ou de reproduction.",
+    ar: "النتائج تقديرات استكشافية بمساعدة الحاسوب وقد تتضمن حقولاً غير مقاسة أو مقدّرة بالذكاء الاصطناعي. لا تستخدمها وحدها لاتخاذ قرارات سريرية أو علاجية أو تناسلية أو متعلقة بالتربية."
+  },
+  researchPrototypeReportLabel: {
+    en: "Research prototype report — not a validated clinical measurement",
+    fr: "Rapport de prototype de recherche — mesure clinique non validée",
+    ar: "تقرير نموذج بحثي — ليس قياساً سريرياً معتمداً"
+  },
 
   // Feature features in Login
   feature1Title: {

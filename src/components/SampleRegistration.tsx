@@ -90,6 +90,20 @@ export const SampleRegistration: React.FC<SampleRegistrationProps> = ({ isOpen, 
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              <div className={cn(
+                "rounded-2xl border p-3",
+                theme === 'dark' ? "border-amber-400/30 bg-amber-400/10" : "border-amber-500/30 bg-amber-50"
+              )} role="note">
+                <p className={cn(
+                  "text-[10px] font-black uppercase tracking-widest",
+                  theme === 'dark' ? "text-amber-300" : "text-amber-800"
+                )}>{t('researchPrototypeNoticeTitle')}</p>
+                <p className={cn(
+                  "mt-1 text-[11px] leading-relaxed",
+                  theme === 'dark' ? "text-white/65" : "text-slate-700"
+                )}>{t('researchPrototypeNoticeBody')}</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className={cn(
