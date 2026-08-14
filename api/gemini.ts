@@ -145,20 +145,27 @@ function interpretationSchema() {
   };
 }
 
-function storageUrlBelongsToProject(fileUrl: string) {
+export function storageUrlBelongsToUser(fileUrl: string, uid: string) {
   try {
     const url = new URL(fileUrl);
-    return url.protocol === 'https:' &&
-      url.hostname === 'firebasestorage.googleapis.com' &&
-      url.pathname.startsWith(`/v0/b/${STORAGE_BUCKET}/o/`);
+    const prefix = `/v0/b/${STORAGE_BUCKET}/o/`;
+    if (url.protocol !== 'https:' ||
+      url.hostname !== 'firebasestorage.googleapis.com' ||
+      !url.pathname.startsWith(prefix) ||
+      !url.searchParams.has('token')) {
+      return false;
+    }
+
+    const objectPath = decodeURIComponent(url.pathname.slice(prefix.length));
+    return objectPath.startsWith(`videos/${uid}/`);
   } catch {
     return false;
   }
 }
 
-async function loadMedia(fileUrl: string, mimeType: string) {
-  if (!storageUrlBelongsToProject(fileUrl)) {
-    throw Object.assign(new Error('Media URL is not a valid ATSA Storage URL.'), { statusCode: 400 });
+async function loadMedia(fileUrl: string, mimeType: string, uid: string) {
+  if (!storageUrlBelongsToUser(fileUrl, uid)) {
+    throw Object.assign(new Error('Media URL is not a valid user-owned ATSA Storage URL.'), { statusCode: 403 });
   }
 
   const response = await fetch(fileUrl);
@@ -179,7 +186,7 @@ async function loadMedia(fileUrl: string, mimeType: string) {
   return { mimeType, data: buffer.toString('base64') };
 }
 
-async function generateGeminiResponse(body: GeminiRequest) {
+async function generateGeminiResponse(body: GeminiRequest, uid: string) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw Object.assign(new Error('Gemini server configuration is incomplete.'), { statusCode: 503 });
 
@@ -192,7 +199,7 @@ async function generateGeminiResponse(body: GeminiRequest) {
       throw Object.assign(new Error('Unsupported media type.'), { statusCode: 400 });
     }
 
-    const media = await loadMedia(fileUrl, mimeType);
+    const media = await loadMedia(fileUrl, mimeType, uid);
     const prompt = body.isVideo
       ? `Analyze this microscopy video of sperm. Provide a detailed assessment in JSON format with concentration, motility percentages (progressive, nonProgressive, immotile), morphology normal percentage and head/midpiece/tail defects, and overall observations. This is a research prototype; clearly state uncertainty and do not present the output as a validated clinical diagnosis.`
       : `Analyze this microscopy image of sperm. Provide a detailed assessment in JSON format with concentration, morphology normal percentage and head/midpiece/tail defects, and overall observations. This is a research prototype; clearly state uncertainty and do not present the output as a validated clinical diagnosis.`;
@@ -251,10 +258,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   }
 
   try {
-    await requireAuthenticatedUser(req);
+    const user = await requireAuthenticatedUser(req);
     const body = await readBody(req);
     requireMode(body);
-    const text = await generateGeminiResponse(body);
+    const text = await generateGeminiResponse(body, user.uid);
     sendJson(res, 200, { text });
   } catch (error) {
     const statusCode = typeof error === 'object' && error !== null && 'statusCode' in error

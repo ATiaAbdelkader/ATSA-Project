@@ -830,8 +830,14 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     }
 
     try {
-      // 1. Establish Firebase Storage resumable upload with timeout/cancel safety fallback
-      const storageRef = ref(storage, `videos/${Date.now()}_${file.name}`);
+      // 1. Establish a UID-scoped Firebase Storage upload with timeout/cancel safety fallback.
+      const uid = auth.currentUser?.uid;
+      if (!uid) {
+        throw new Error('You must be signed in before uploading media.');
+      }
+      const sampleId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120) || 'upload';
+      const storageRef = ref(storage, `videos/${uid}/${sampleId}/${safeFileName}`);
       const uploadTask = uploadBytesResumable(storageRef, file);
 
       const downloadUrl = await new Promise<string>((resolve) => {

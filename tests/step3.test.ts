@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { calculateKinematics, generateSummary, buildAiEstimatedSummary } from '../src/services/casaService';
-import handler from '../api/gemini';
+import handler, { storageUrlBelongsToUser } from '../api/gemini';
 
 type MockRequest = {
   method?: string;
@@ -107,10 +107,21 @@ async function run() {
   assert.equal(authRes.statusCode, 401, 'requests without a Firebase ID token must be rejected');
   assert.match(authRes.body, /Authentication is required/);
 
+  const ownedMediaUrl = 'https://firebasestorage.googleapis.com/v0/b/ai-studio-applet-webapp-5a3d7.firebasestorage.app/o/videos%2Fuser-123%2Fsample-abc%2Fvideo.mp4?alt=media&token=test-token';
+  assert.equal(storageUrlBelongsToUser(ownedMediaUrl, 'user-123'), true, 'a user-owned Storage URL should be accepted');
+  assert.equal(storageUrlBelongsToUser(ownedMediaUrl, 'user-456'), false, 'a different user must not use another user\'s Storage URL');
+  assert.equal(storageUrlBelongsToUser('https://firebasestorage.googleapis.com/v0/b/ai-studio-applet-webapp-5a3d7.firebasestorage.app/o/videos%2Fvideo.mp4?alt=media&token=test-token', 'user-123'), false, 'legacy flat Storage paths must be rejected');
+  assert.equal(storageUrlBelongsToUser(ownedMediaUrl.replace('&token=test-token', ''), 'user-123'), false, 'untokenized Storage URLs must be rejected');
+
   const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8');
   assert.match(rules, /isAuthenticated\(\)/, 'Firestore rules must require authentication');
   assert.match(rules, /data\.uid == request\.auth\.uid/, 'Firestore rules must enforce ownership');
   assert.doesNotMatch(rules, /guestUser|guest-session|jury/, 'legacy shared guest authorization must stay removed');
+  const storageRules = readFileSync(new URL('../storage.rules', import.meta.url), 'utf8');
+  assert.match(storageRules, /request\.auth\.uid == userId/, 'Storage Rules must enforce UID ownership');
+  assert.match(storageRules, /videos\/\{userId\}\/\{sampleId\}/, 'Storage Rules must require the UID-scoped path');
+  assert.match(storageRules, /request\.resource\.size <= 15 \* 1024 \* 1024/, 'Storage Rules must cap uploaded media size');
+  assert.match(storageRules, /\^\(image\|video\)\//, 'Storage Rules must restrict uploads to media content types');
 
   const viteConfig = readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(viteConfig, /GEMINI_API_KEY/, 'the Vite config must not inject the Gemini key');

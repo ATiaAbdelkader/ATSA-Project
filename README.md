@@ -35,7 +35,15 @@ The Firebase web configuration in `firebase-applet-config.json` contains public 
 
 ## Security requirements
 
-All requests to `/api/gemini` must include a Firebase ID token in the `Authorization: Bearer <token>` header. The endpoint validates the token before using Gemini. Media analysis accepts only HTTPS Firebase Storage download URLs belonging to the configured ATSA bucket and limits the downloaded media size.
+All requests to `/api/gemini` must include a Firebase ID token in the `Authorization: Bearer <token>` header. The endpoint validates the token before using Gemini. Media analysis accepts only HTTPS Firebase Storage download URLs belonging to the configured ATSA bucket, requires a tokenized URL under `videos/{uid}/...`, verifies that the path belongs to the authenticated UID, and limits the downloaded media size.
+
+Firebase Storage access is defined in `storage.rules` and media uploads use the path `videos/{uid}/{sampleId}/{filename}`. After authenticating with the Firebase CLI, deploy both database and Storage rules with:
+
+```bash
+firebase deploy --only firestore:rules,storage
+```
+
+Do not use the old flat `videos/{timestamp}_{filename}` path for new uploads. Existing files under the legacy path are intentionally not accepted by the server-side media-analysis endpoint.
 
 Do not place `GEMINI_API_KEY`, `FIREBASE_CLIENT_EMAIL`, or `FIREBASE_PRIVATE_KEY` in client-side source code, `VITE_*` variables, or committed files.
 
