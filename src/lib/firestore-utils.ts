@@ -29,15 +29,7 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  let activeUser: any = auth.currentUser;
-  if (!activeUser && typeof window !== 'undefined') {
-    const guest = localStorage.getItem('atsa_guest_session');
-    if (guest) {
-      try {
-        activeUser = JSON.parse(guest);
-      } catch (e) {}
-    }
-  }
+  const activeUser = auth.currentUser;
 
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),

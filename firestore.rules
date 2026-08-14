@@ -35,7 +35,7 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return userId == "jury_guest_pass" || (isAuthenticated() && request.auth.uid == userId);
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
     function isAdmin() {
@@ -46,7 +46,7 @@ service cloud.firestore {
     }
 
     function isAuthorized(uid) {
-      return uid == "jury_guest_pass" || (isAuthenticated() && (uid == request.auth.uid || isAdmin()));
+      return isAuthenticated() && (uid == request.auth.uid || isAdmin());
     }
 
     function isValidEmail(email) {
@@ -65,18 +65,18 @@ service cloud.firestore {
     function isValidAnalysis(data) {
       return data.patientId is string && data.patientId.size() > 0 &&
              isValidDateString(data.timestamp) &&
-             data.uid is string && (data.uid == "jury_guest_pass" || (isAuthenticated() && data.uid == request.auth.uid));
+             data.uid is string && isAuthenticated() && data.uid == request.auth.uid;
     }
 
     function isValidPatient(data) {
       return data.id is string && data.id.size() > 0 &&
              data.species is string && data.species.size() > 0 &&
-             data.uid is string && (data.uid == "jury_guest_pass" || (isAuthenticated() && data.uid == request.auth.uid));
+             data.uid is string && isAuthenticated() && data.uid == request.auth.uid;
     }
 
     function isValidSample(data) {
       return data.patientId is string && data.patientId.size() > 0 &&
-             data.uid is string && (data.uid == "jury_guest_pass" || (isAuthenticated() && data.uid == request.auth.uid));
+             data.uid is string && isAuthenticated() && data.uid == request.auth.uid;
     }
 
     // Rules
@@ -87,7 +87,7 @@ service cloud.firestore {
              data.message is string && data.message.size() > 0 && data.message.size() < 500 &&
              data.type in ['info', 'warning', 'error', 'success'] &&
              data.read is bool &&
-             (data.uid == "jury_guest_pass" || (isAuthenticated() && data.uid == request.auth.uid));
+             isAuthenticated() && data.uid == request.auth.uid;
     }
 
     // Inventory validation
@@ -97,28 +97,28 @@ service cloud.firestore {
              data.category in ['reagent', 'disposable', 'equipment', 'other'] &&
              data.quantity is number &&
              data.unit is string &&
-             (data.uid == "jury_guest_pass" || (isAuthenticated() && data.uid == request.auth.uid));
+             isAuthenticated() && data.uid == request.auth.uid;
     }
 
     match /analyses/{analysisId} {
       allow read: if isAuthorized(resource.data.uid);
       allow create: if isAuthorized(request.resource.data.uid) && isValidAnalysis(request.resource.data);
       allow update: if isAuthorized(resource.data.uid) && isAuthorized(request.resource.data.uid) && isValidAnalysis(request.resource.data) && request.resource.data.uid == resource.data.uid;
-      allow delete: if isAdmin() || (resource.data.uid == "jury_guest_pass");
+      allow delete: if isAdmin();
     }
 
     match /patients/{patientId} {
       allow read: if isAuthorized(resource.data.uid);
       allow create: if isAuthorized(request.resource.data.uid) && isValidPatient(request.resource.data);
       allow update: if isAuthorized(resource.data.uid) && isAuthorized(request.resource.data.uid) && isValidPatient(request.resource.data) && request.resource.data.uid == resource.data.uid;
-      allow delete: if isAdmin() || (resource.data.uid == "jury_guest_pass");
+      allow delete: if isAdmin();
     }
 
     match /samples/{sampleId} {
       allow read: if isAuthorized(resource.data.uid);
       allow create: if isAuthorized(request.resource.data.uid) && isValidSample(request.resource.data);
       allow update: if isAuthorized(resource.data.uid) && isAuthorized(request.resource.data.uid) && isValidSample(request.resource.data) && request.resource.data.uid == resource.data.uid;
-      allow delete: if isAdmin() || (resource.data.uid == "jury_guest_pass");
+      allow delete: if isAdmin();
     }
 
     match /notifications/{notificationId} {
@@ -138,7 +138,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create, update: if isAdmin() || userId == "jury_guest_pass";
+      allow create, update: if isAdmin();
     }
   }
 }

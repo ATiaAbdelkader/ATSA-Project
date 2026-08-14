@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { 
   Microscope, 
   ClipboardList, 
@@ -18,16 +18,15 @@ import {
   LogIn,
   Package,
   Check,
-  Award,
   Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, SPECIES_PROFILES } from './utils';
-import { SampleRegistration } from './components/SampleRegistration';
-import { CASAEngine } from './components/CASAEngine';
-import { HelpCenter } from './components/HelpCenter';
-import { PatientHistoryView } from './components/PatientHistory';
-import { InventoryManagement } from './components/InventoryManagement';
+const SampleRegistration = lazy(() => import('./components/SampleRegistration').then(module => ({ default: module.SampleRegistration })));
+const CASAEngine = lazy(() => import('./components/CASAEngine').then(module => ({ default: module.CASAEngine })));
+const HelpCenter = lazy(() => import('./components/HelpCenter').then(module => ({ default: module.HelpCenter })));
+const PatientHistoryView = lazy(() => import('./components/PatientHistory').then(module => ({ default: module.PatientHistoryView })));
+const InventoryManagement = lazy(() => import('./components/InventoryManagement').then(module => ({ default: module.InventoryManagement })));
 import type { AppState, SpeciesProfile } from './types';
 import { auth, db, googleProvider } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -86,18 +85,8 @@ export default function App() {
         setUser(currentUser);
         setAppState('dashboard');
       } else {
-        const savedGuest = localStorage.getItem('atsa_guest_session');
-        if (savedGuest) {
-          try {
-            const parsed = JSON.parse(savedGuest);
-            setUser(parsed);
-            setAppState('dashboard');
-          } catch (e) {
-            setAppState('login');
-          }
-        } else {
-          setAppState('login');
-        }
+        setUser(null);
+        setAppState('login');
       }
     });
     return () => unsubscribe();
@@ -219,27 +208,13 @@ export default function App() {
     }
   };
 
-  const handleGuestLogin = () => {
-    const mockUser = {
-      uid: "jury_guest_pass",
-      email: "jury@atsa-conference.org",
-      displayName: "Conference Jury Member",
-      photoURL: null
-    } as User;
-    setUser(mockUser);
-    localStorage.setItem('atsa_guest_session', JSON.stringify(mockUser));
-    setAppState('dashboard');
-  };
-
   const handleLogout = async () => {
     try {
-      localStorage.removeItem('atsa_guest_session');
       await signOut(auth);
       setUser(null);
       setAppState('login');
     } catch (error) {
       console.error("Logout failed:", error);
-      localStorage.removeItem('atsa_guest_session');
       setUser(null);
       setAppState('login');
     }
@@ -411,25 +386,7 @@ export default function App() {
                 <ChevronRight className="w-4 h-4" />
               </button>
 
-              <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-black/10 dark:border-white/5"></div>
-                <span className="flex-shrink mx-4 text-[8px] font-bold text-black/30 dark:text-white/25 uppercase tracking-widest font-mono">{t('reviewerBypass')}</span>
-                <div className="flex-grow border-t border-black/10 dark:border-white/5"></div>
-              </div>
 
-              <button 
-                type="button"
-                onClick={handleGuestLogin}
-                className={cn(
-                  "w-full font-bold py-4 rounded-2xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 border cursor-pointer text-xs uppercase tracking-wider",
-                  theme === 'dark' 
-                    ? "bg-[#111] hover:bg-white/5 text-amber-400 border-amber-500/30" 
-                    : "bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200"
-                )}
-              >
-                <Award className="w-4 h-4 text-amber-500" />
-                {t('instantJuryAccess')}
-              </button>
             </form>
 
             <div className={cn("mt-12 p-6 rounded-3xl border border-dashed text-center", theme === 'dark' ? "border-white/10 bg-white/5" : "border-slate-200 bg-slate-50")}>
@@ -456,7 +413,8 @@ export default function App() {
 
   if (appState === 'analysis' && activePatient) {
     return (
-      <CASAEngine 
+      <Suspense fallback={<div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center text-xs uppercase tracking-widest text-white/50">Loading analysis workspace…</div>}>
+        <CASAEngine
         onBack={() => {
           setAnalysisInitialAction(null);
           setAppState('dashboard');
@@ -464,7 +422,8 @@ export default function App() {
         patientData={activePatient} 
         theme={theme} 
         initialAction={analysisInitialAction}
-      />
+        />
+      </Suspense>
     );
   }
 
@@ -1104,13 +1063,15 @@ export default function App() {
             </div>
           )}
 
-          {appState === 'help' && <HelpCenter onBack={() => setAppState('dashboard')} theme={theme} />}
-          {appState === 'history' && <PatientHistoryView onBack={() => setAppState('dashboard')} theme={theme} />}
-          {appState === 'inventory' && (
-            <div className="p-8 max-w-7xl mx-auto">
-              <InventoryManagement onBack={() => setAppState('dashboard')} theme={theme} />
-            </div>
-          )}
+          <Suspense fallback={<div className="p-8 text-xs uppercase tracking-widest text-white/50">Loading module…</div>}>
+            {appState === 'help' && <HelpCenter onBack={() => setAppState('dashboard')} theme={theme} />}
+            {appState === 'history' && <PatientHistoryView onBack={() => setAppState('dashboard')} theme={theme} />}
+            {appState === 'inventory' && (
+              <div className="p-8 max-w-7xl mx-auto">
+                <InventoryManagement onBack={() => setAppState('dashboard')} theme={theme} />
+              </div>
+            )}
+          </Suspense>
           {appState === 'analysis' && !activePatient && (
             <div className="h-full flex flex-col items-center justify-center text-center p-12">
               <div className={cn("w-20 h-20 rounded-full flex items-center justify-center mb-6", theme === 'dark' ? "bg-white/5" : "bg-slate-100")}>
@@ -1131,12 +1092,14 @@ export default function App() {
         </div>
       </main>
 
-      <SampleRegistration 
-        isOpen={isRegModalOpen} 
-        onClose={() => setIsRegModalOpen(false)} 
-        onRegister={handleRegisterSample}
-        theme={theme}
-      />
+      <Suspense fallback={null}>
+        <SampleRegistration
+          isOpen={isRegModalOpen}
+          onClose={() => setIsRegModalOpen(false)}
+          onRegister={handleRegisterSample}
+          theme={theme}
+        />
+      </Suspense>
     </div>
   );
 }

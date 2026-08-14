@@ -54,6 +54,14 @@ export interface SpeciesProfile {
   maxLeukocytes: number;
 }
 
+export type MeasurementProvenance = 'measured' | 'derived' | 'ai-estimated' | 'unavailable' | 'visualization-only';
+
+export interface AnalysisProvenance {
+  overall: MeasurementProvenance;
+  fields: Record<string, MeasurementProvenance>;
+  notes: string[];
+}
+
 export interface AnalysisResult {
   timestamp: string;
   patientId: string;
@@ -128,10 +136,11 @@ export interface AnalysisResult {
       totalCount: number;
     };
     interpretation?: {
-      status: 'normal' | 'borderline' | 'abnormal';
+      status: 'normal' | 'borderline' | 'abnormal' | 'not-validated';
       comments: string[];
       recommendations: string[];
     };
+    provenance?: AnalysisProvenance;
     visionInsights?: {
       concentration?: string;
       motility?: {

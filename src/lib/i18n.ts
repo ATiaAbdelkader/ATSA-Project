@@ -96,14 +96,14 @@ export const translations: TranslationDict = {
     ar: "تسجيل الدخول عبر Google"
   },
   reviewerBypass: {
-    en: "reviewer bypass portal",
-    fr: "portail de contournement pour jury",
-    ar: "بوابة الالتفاف والتقييم للجنة التحكيم"
+    en: "demo session portal",
+    fr: "portail de session de démonstration",
+    ar: "بوابة جلسة العرض التجريبي"
   },
   instantJuryAccess: {
-    en: "Instant Jury Access (By-Pass)",
-    fr: "Accès Instantané Jury (Contourner)",
-    ar: "دخول فوري للجنة التحكيم (تخطي)"
+    en: "Start Demo Session",
+    fr: "Démarrer la session de démonstration",
+    ar: "بدء جلسة العرض التجريبي"
   },
 
   // Navigation Items

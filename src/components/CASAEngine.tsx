@@ -66,13 +66,11 @@ import {
 import { cn, SPECIES_PROFILES } from '../utils';
 import { useLanguage } from '../context/LanguageContext';
 import type { SpermData, AnalysisResult, SpeciesProfile } from '../types';
-import { calculateKinematics, generateSummary } from '../services/casaService';
+import { calculateKinematics, generateSummary, buildAiEstimatedSummary } from '../services/casaService';
 import { HelpCenter } from './HelpCenter';
 
 import { Sperm3DPath } from './Sperm3DPath';
-import { GoogleGenAI, Type } from "@google/genai";
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { callGemini } from '../services/geminiService';
 import { db, auth, googleProvider, storage } from '../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { 
@@ -656,16 +654,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       if (currentUser) {
         setUser(currentUser);
       } else {
-        const guest = localStorage.getItem('atsa_guest_session');
-        if (guest) {
-          try {
-            setUser(JSON.parse(guest));
-          } catch (e) {
-            setUser(null);
-          }
-        } else {
-          setUser(null);
-        }
+        setUser(null);
       }
     });
     return () => unsubscribe();
@@ -845,7 +834,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       const storageRef = ref(storage, `videos/${Date.now()}_${file.name}`);
       const uploadTask = uploadBytesResumable(storageRef, file);
 
-      await new Promise<string>((resolve) => {
+      const downloadUrl = await new Promise<string>((resolve) => {
         let isResolved = false;
 
         // 3-second safeguard timeout to keep the app responsive
@@ -907,107 +896,16 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
         );
       });
 
-      // 2. Convert file to base64 for Gemini
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const base64 = await base64Promise;
-      const base64Data = base64.split(',')[1];
-
-      // 3. Call Gemini for AI Analysis
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is not configured. Please add it to your environment variables.");
+      // Send only the Firebase Storage URL and media metadata to the trusted server endpoint.
+      if (!downloadUrl) {
+        throw new Error('The media upload did not produce a usable download URL.');
       }
-      const ai = new GoogleGenAI({ apiKey });
       const isVideo = file.type.startsWith('video/');
-      
-      const prompt = isVideo 
-        ? `Analyze this microscopy video of sperm. Provide a detailed assessment in JSON format:
-          {
-            "concentration": "estimate in M/ml (e.g., 75.4)",
-            "motility": {
-              "progressive": "percentage (e.g., 55)",
-              "nonProgressive": "percentage (e.g., 25)",
-              "immotile": "percentage (e.g., 20)"
-            },
-            "morphology": {
-              "normal": "percentage (e.g., 75)",
-              "defects": {
-                "head": ["list of specific defects observed"],
-                "midpiece": ["list of specific defects observed"],
-                "tail": ["list of specific defects observed"]
-              }
-            },
-            "observations": "overall summary"
-          }`
-        : `Analyze this microscopy image of sperm. Provide a detailed assessment in JSON format:
-          {
-            "concentration": "estimate in M/ml (e.g., 75.4)",
-            "morphology": {
-              "normal": "percentage (e.g., 75)",
-              "defects": {
-                "head": ["list of specific defects observed"],
-                "midpiece": ["list of specific defects observed"],
-                "tail": ["list of specific defects observed"]
-              }
-            },
-            "observations": "overall summary"
-          }`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: [
-          {
-            parts: [
-              { text: prompt },
-              { inlineData: { mimeType: file.type, data: base64Data } }
-            ]
-          }
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              concentration: {
-                type: Type.STRING,
-                description: "Estimated concentration in M/ml"
-              },
-              motility: {
-                type: Type.OBJECT,
-                description: "Sperm motility percentages. Optional, leave blank or empty fields for static image analysis",
-                properties: {
-                  progressive: { type: Type.STRING },
-                  nonProgressive: { type: Type.STRING },
-                  immotile: { type: Type.STRING }
-                }
-              },
-              morphology: {
-                type: Type.OBJECT,
-                properties: {
-                  normal: { type: Type.STRING },
-                  defects: {
-                    type: Type.OBJECT,
-                    properties: {
-                      head: { type: Type.ARRAY, items: { type: Type.STRING } },
-                      midpiece: { type: Type.ARRAY, items: { type: Type.STRING } },
-                      tail: { type: Type.ARRAY, items: { type: Type.STRING } }
-                    }
-                  }
-                }
-              },
-              observations: {
-                type: Type.STRING,
-                description: "A summary observation text"
-              }
-            },
-            required: ["concentration", "morphology", "observations"]
-          }
-        }
+      const response = await callGemini({
+        mode: 'media-analysis',
+        fileUrl: downloadUrl,
+        mimeType: file.type,
+        isVideo
       });
 
       const aiResult = JSON.parse(response.text);
@@ -1029,9 +927,8 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       const prog = parseNumber(aiResult.motility?.progressive || aiResult.progressive, 55);
       const nonProg = parseNumber(aiResult.motility?.nonProgressive || aiResult.nonProgressive, 25);
       const immot = parseNumber(aiResult.motility?.immotile || aiResult.immotile, 20);
-      const normMorph = parseNumber(aiResult.morphology?.normal || aiResult.normal, 75);
 
-      // Create realistic virtual tracking particles in the background
+      // Create synthetic visualization particles only. These are not measured cells and are not persisted in the result.
       const totalCount = Math.min(120, Math.max(20, Math.round(conc / 0.5)));
       const sumMot = prog + nonProg + immot || 100;
       const progCount = Math.round((prog / sumMot) * totalCount);
@@ -1108,67 +1005,21 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
 
       particles.current = generatedParticles;
 
-      // Map generated particles to complete SpermData diagnostics list
-      const spermatozoa = generatedParticles.map(p => {
-        const pathClone = [...p.path];
-        const kinematics = calculateKinematics(pathClone, settings.fps, settings.micronsPerPixel);
-        
-        let headDefect = 'normal';
-        let tailDefect = 'normal';
-        let midpieceDefect = 'normal';
-        
-        if (Math.random() * 100 > normMorph) {
-          if (aiResult.morphology?.defects?.head?.length > 0 && Math.random() > 0.4) {
-            headDefect = aiResult.morphology.defects.head[Math.floor(Math.random() * aiResult.morphology.defects.head.length)];
-          } else {
-            headDefect = ['amorphous', 'pyriform', 'tapered', 'round'][Math.floor(Math.random() * 4)];
-          }
-          if (aiResult.morphology?.defects?.midpiece?.length > 0 && Math.random() > 0.5) {
-            midpieceDefect = aiResult.morphology.defects.midpiece[Math.floor(Math.random() * aiResult.morphology.defects.midpiece.length)];
-          } else {
-            midpieceDefect = ['thick', 'bent', 'asymmetric'][Math.floor(Math.random() * 3)];
-          }
-          if (aiResult.morphology?.defects?.tail?.length > 0 && Math.random() > 0.5) {
-            tailDefect = aiResult.morphology.defects.tail[Math.floor(Math.random() * aiResult.morphology.defects.tail.length)];
-          } else {
-            tailDefect = ['coiled', 'bent', 'short'][Math.floor(Math.random() * 3)];
-          }
-        }
-
-        return {
-          id: p.id,
-          path: pathClone,
-          ...kinematics,
-          classification: p.type,
-          morphology: {
-            ...kinematics.morphology,
-            head: headDefect,
-            midpiece: midpieceDefect,
-            tail: tailDefect
-          }
-        } as SpermData;
-      });
-
-      const summary = generateSummary(spermatozoa, settings);
+      // Do not convert synthetic visualization particles into clinical SpermData records.
+      // Aggregate values remain explicitly AI-estimated until a validated tracker is available.
+      const spermatozoa: SpermData[] = [];
+      const summary = buildAiEstimatedSummary(aiResult, settings);
 
       setResults({
         timestamp: new Date().toISOString(),
         patientId: patientData.id,
         species: patientData.species,
         settings,
-        summary: {
-          ...summary,
-          visionInsights: aiResult,
-          interpretation: {
-            status: aiResult.observations?.toLowerCase().includes('abnormal') ? 'abnormal' : 'normal',
-            comments: [aiResult.observations],
-            recommendations: ["Follow-up with manual verification if necessary."]
-          }
-        },
+        summary,
         spermatozoa
       });
 
-      if (spermatozoa.length > 0) setSelectedSperm(spermatozoa[0]);
+      setSelectedSperm(null);
       
       // Auto-switch to live screen and trigger animation tracks immediately
       setActiveTab('live');
@@ -1192,11 +1043,6 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     if (!results) return;
     setIsGeneratingInterpretation(true);
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is not configured.");
-      }
-      const ai = new GoogleGenAI({ apiKey });
       const profile = SPECIES_PROFILES[results.species] || SPECIES_PROFILES['Bovine'];
       
       const prompt = `As a senior veterinary/human embryologist specializing in CASA (Computer-Aided Sperm Analysis), interpret the following results for a ${results.species} sample.
@@ -1227,33 +1073,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
         "recommendations": string[]
       }`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: [{ parts: [{ text: prompt }] }],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              status: { 
-                type: Type.STRING,
-                description: "Must be normal, borderline, or abnormal"
-              },
-              comments: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: "List of specific clinical highlights"
-              },
-              recommendations: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: "List of recommended next steps or treatments"
-              }
-            },
-            required: ["status", "comments", "recommendations"]
-          }
-        }
-      });
+      const response = await callGemini({ mode: 'interpretation', prompt });
 
       const interpretation = JSON.parse(response.text);
 
@@ -1367,6 +1187,10 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     if (!element) return;
 
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf')
+      ]);
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
@@ -1570,22 +1394,11 @@ Digital Signature Verified - ATSA AI Engine v2.0
     setIsAiThinking(true);
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is not configured.");
-      }
-      const ai = new GoogleGenAI({ apiKey });
-      const chat = ai.chats.create({
-        model: "gemini-3.5-flash",
-        config: {
-          systemInstruction: `You are ATSA AI, a senior laboratory consultant for semen analysis. 
-          You have access to the current analysis results: ${JSON.stringify(results?.summary)}.
-          Answer the user's questions concisely and professionally based on these results. 
-          If the user asks about something not in the results, provide general laboratory guidance.`
-        }
+      const response = await callGemini({
+        mode: 'chat',
+        message: userMessage,
+        summary: results?.summary ?? null
       });
-
-      const response = await chat.sendMessage({ message: userMessage });
       setAiChatHistory(prev => [...prev, { role: 'model', text: response.text }]);
     } catch (err) {
       console.error("AI Chat failed:", err);
@@ -3844,6 +3657,24 @@ Digital Signature Verified - ATSA AI Engine v2.0
 
                 {results ? (
                   <>
+                    {results.summary.provenance && (
+                      <div className={cn(
+                        "mb-4 rounded-2xl border px-4 py-3 text-left",
+                        results.summary.provenance.overall === 'ai-estimated'
+                          ? "border-amber-400/30 bg-amber-400/10"
+                          : "border-sky-400/30 bg-sky-400/10"
+                      )}>
+                        <p className={cn(
+                          "text-[10px] font-black uppercase tracking-widest",
+                          results.summary.provenance.overall === 'ai-estimated' ? "text-amber-300" : "text-sky-300"
+                        )}>
+                          {results.summary.provenance.overall === 'ai-estimated' ? 'AI-estimated aggregate results' : 'Visualization-only analysis'}
+                        </p>
+                        <p className="mt-1 text-[10px] leading-relaxed text-white/60">
+                          {results.summary.provenance.notes.join(' ')}
+                        </p>
+                      </div>
+                    )}
 
                     {activeTab === 'live' && (
                       <div className="space-y-6">

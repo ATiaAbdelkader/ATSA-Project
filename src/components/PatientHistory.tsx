@@ -37,7 +37,7 @@ import { cn, SPECIES_PROFILES } from '../utils';
 import type { PatientHistory, HistoricalDataPoint } from '../types';
 import { db, auth } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-import { GoogleGenAI } from "@google/genai";
+import { callGemini } from '../services/geminiService';
 import { useLanguage } from '../context/LanguageContext';
 
 interface PatientHistoryProps {
@@ -55,15 +55,7 @@ enum OperationType {
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  let activeUser: any = auth.currentUser;
-  if (!activeUser && typeof window !== 'undefined') {
-    const guest = localStorage.getItem('atsa_guest_session');
-    if (guest) {
-      try {
-        activeUser = JSON.parse(guest);
-      } catch (e) {}
-    }
-  }
+  const activeUser = auth.currentUser;
 
   const errInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -100,11 +92,6 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
     
     setIsGeneratingAI(true);
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
-
-      const ai = new GoogleGenAI({ apiKey });
-
       const dataStr = activeHistory.data.map(d => 
         `Date: ${d.date}, Conc: ${d.concentration}M/ml, Motility: ${d.motility}%, Normal Morph: ${d.normalMorphology}%, Vitality: ${d.vitality}%, DFI: ${d.dfi}%`
       ).join('\n');
@@ -122,21 +109,12 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
       
       Keep the tone professional, scientific, and concise. Use bullet points. Include a medical disclaimer at the end.`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          {
-            parts: [
-              { text: prompt }
-            ]
-          }
-        ]
-      });
+      const response = await callGemini({ mode: 'history-summary', prompt });
 
       setAiSummary(response.text);
     } catch (err) {
       console.error("AI Generation Error:", err);
-      setError("Failed to generate AI summary. Please check your API key.");
+      setError("Failed to generate AI summary. Please verify your signed-in session and try again.");
     } finally {
       setIsGeneratingAI(false);
     }
@@ -157,18 +135,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
     }));
   };
 
-  const getActiveUser = () => {
-    if (auth.currentUser) return auth.currentUser;
-    const guest = localStorage.getItem('atsa_guest_session');
-    if (guest) {
-      try {
-        return JSON.parse(guest);
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
-  };
+  const getActiveUser = () => auth.currentUser;
 
   useEffect(() => {
     const currentUser = getActiveUser();

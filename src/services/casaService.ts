@@ -1,4 +1,4 @@
-import type { SpermData, AnalysisResult } from '../types';
+import type { SpermData, AnalysisResult, AnalysisProvenance } from '../types';
 
 /**
  * OpenCASA Kinematic Algorithms
@@ -117,29 +117,17 @@ export const calculateKinematics = (
     vcl, vsl, vap, lin, str, wob, alh: maxAlh,
     classification,
     isHyperactivated,
-    bcf: 15 + Math.random() * 10, // Simulated
-    mad: 20 + Math.random() * 10, // Simulated
-    morphometry: {
-      area: 15 + Math.random() * 5,
-      perimeter: 14 + Math.random() * 4,
-      length: 5 + Math.random() * 1,
-      width: 3 + Math.random() * 1,
-      circularity: 0.8 + Math.random() * 0.1,
-      elongation: 1.5 + Math.random() * 0.5
-    },
-    morphology: {
-      head: Math.random() > 0.85 ? 'normal' : (['large', 'small', 'amorphous', 'pyriform', 'tapered', 'round'][Math.floor(Math.random() * 6)] as any),
-      vacuoles: Math.random() > 0.9 ? 'present' : 'absent',
-      acrosome: Math.random() > 0.1 ? 'normal' : 'abnormal',
-      midpiece: Math.random() > 0.8 ? 'normal' : (['thick', 'bent', 'asymmetric'][Math.floor(Math.random() * 3)] as any),
-      tail: Math.random() > 0.75 ? 'normal' : (['short', 'coiled', 'multiple', 'bent'][Math.floor(Math.random() * 4)] as any),
-      droplet: Math.random() > 0.9 ? 'none' : (['proximal', 'distal'][Math.floor(Math.random() * 2)] as any)
-    },
-    vitality: Math.random() > 0.2 ? 'live' : 'dead',
+    // These measurements require dedicated validated vision algorithms and are not inferred from a 2D path.
+    // Keep explicit neutral values for backwards-compatible rendering; provenance marks them unavailable.
+    bcf: 0,
+    mad: 0,
+    morphometry: defaultMorphometry,
+    morphology: defaultMorphology,
+    vitality: 'dead',
     sdf: {
-      fragmented: Math.random() > 0.85,
-      haloSized: 10 + Math.random() * 15,
-      dfi: Math.random() * 100
+      fragmented: false,
+      haloSized: 0,
+      dfi: 0
     }
   };
 };
@@ -158,158 +146,47 @@ export const generateSummary = (spermatozoa: SpermData[], settings: AnalysisResu
   const avgWob = spermatozoa.reduce((acc, s) => acc + s.wob, 0) / (totalCount || 1);
   const avgAlh = spermatozoa.reduce((acc, s) => acc + s.alh, 0) / (totalCount || 1);
   const avgBcf = spermatozoa.reduce((acc, s) => acc + s.bcf, 0) / (totalCount || 1);
-  const avgArea = spermatozoa.reduce((acc, s) => acc + s.morphometry.area, 0) / (totalCount || 1);
+  const avgArea = 0;
 
   const totalMotility = totalCount > 0 ? ((progressive + nonProgressive) / totalCount) * 100 : 0;
   const progressiveMotility = totalCount > 0 ? (progressive / totalCount) * 100 : 0;
   const hyperactivatedCount = spermatozoa.filter(s => s.isHyperactivated).length;
   const hyperactivatedPercentage = totalCount > 0 ? (hyperactivatedCount / totalCount) * 100 : 0;
-  const normalCount = spermatozoa.filter(s => 
-    s.morphology.head === 'normal' && 
-    s.morphology.midpiece === 'normal' && 
-    s.morphology.tail === 'normal' &&
-    s.morphology.acrosome === 'normal' &&
-    s.morphology.droplet === 'none'
-  ).length;
-  const normalMorphology = totalCount > 0 ? (normalCount / totalCount) * 100 : 0;
+  // Morphology is not measured by this visualization-only tracker.
+  const normalMorphology = 0;
 
-  // Morphology Defect Counts
-  const headDefects = { large: 0, small: 0, amorphous: 0, pyriform: 0, tapered: 0, round: 0 };
-  const midpieceDefects = { thick: 0, bent: 0, asymmetric: 0 };
-  const tailDefects = { short: 0, coiled: 0, multiple: 0, bent: 0 };
-  let acrosomeDefects = 0;
-  let cytoplasmicDroplets = 0;
+  // Morphology and DNA-fragmentation fields require dedicated validated assays.
+  const fragmentedCount = 0;
+  const dfi = 0;
 
-  spermatozoa.forEach(s => {
-    if (s.morphology.head !== 'normal') {
-      const type = s.morphology.head as keyof typeof headDefects;
-      if (headDefects[type] !== undefined) headDefects[type]++;
-    }
-    if (s.morphology.midpiece !== 'normal') {
-      const type = s.morphology.midpiece as keyof typeof midpieceDefects;
-      if (midpieceDefects[type] !== undefined) midpieceDefects[type]++;
-    }
-    if (s.morphology.tail !== 'normal') {
-      const type = s.morphology.tail as keyof typeof tailDefects;
-      if (tailDefects[type] !== undefined) tailDefects[type]++;
-    }
-    if (s.morphology.acrosome !== 'normal') acrosomeDefects++;
-    if (s.morphology.droplet !== 'none') cytoplasmicDroplets++;
-  });
+  const tzi = 0;
+  const mai = 0;
 
-  const getPercent = (count: number) => totalCount > 0 ? (count / totalCount) * 100 : 0;
+  // Vitality requires a validated live/dead assay and is not inferred from motion.
+  // Leukocyte count requires a validated stain or dedicated cell classifier; it is not inferred here.
+  const leukocytes = 0;
 
-  // SDF Summary
-  const fragmentedCount = spermatozoa.filter(s => s.sdf.fragmented).length;
-  const dfi = totalCount > 0 ? (fragmentedCount / totalCount) * 100 : 0;
+  // Concentration requires a calibrated chamber and a validated cell count; it is not inferred from visualization particles.
+  const concentration = 0;
 
-  // Morphology Indices
-  const abnormalSperm = spermatozoa.filter(s => 
-    s.morphology.head !== 'normal' || 
-    s.morphology.midpiece !== 'normal' || 
-    s.morphology.tail !== 'normal' ||
-    s.morphology.acrosome !== 'normal' ||
-    s.morphology.droplet !== 'none'
-  );
-  
-  const totalDefects = spermatozoa.reduce((acc, s) => {
-    let defects = 0;
-    if (s.morphology.head !== 'normal') defects++;
-    if (s.morphology.midpiece !== 'normal') defects++;
-    if (s.morphology.tail !== 'normal') defects++;
-    if (s.morphology.acrosome !== 'normal') defects++;
-    if (s.morphology.droplet !== 'none') defects++;
-    return acc + defects;
-  }, 0);
-
-  const tzi = abnormalSperm.length > 0 ? totalDefects / abnormalSperm.length : 1.0;
-  const mai = totalCount > 0 ? totalDefects / totalCount : 0;
-
-  const liveCount = spermatozoa.filter(s => s.vitality === 'live').length;
-  const deadCount = spermatozoa.filter(s => s.vitality === 'dead').length;
-  const vitalityTotal = totalCount > 0 ? (liveCount / totalCount) * 100 : 0;
-  const leukocytes = Math.random() > 0.8 ? 1.5 : 0.2; // Simulated million/ml
-
-  // High-fidelity concentration calculation incorporating camera resolution,
-  // microns-per-pixel visual scale, and medical counting chamber depth (microns).
-  const depthMicrons = (settings as any).chamberDepth ?? 20;
-  const mpp = settings.micronsPerPixel ?? 0.65;
-  const fieldWidthMm = (1280 * mpp) / 1000;
-  const fieldHeightMm = (720 * mpp) / 1000;
-  const fieldAreaMm2 = fieldWidthMm * fieldHeightMm;
-  const chamberDepthMm = depthMicrons / 1000;
-  const fieldVolumeMm3 = fieldAreaMm2 * chamberDepthMm;
-  const fieldVolumeML = fieldVolumeMm3 / 1000; // 1 mm^3 = 1 uL = 1e-3 mL
-  const concentration = totalCount > 0 ? (totalCount / fieldVolumeML) / 1000000 : 0;
-
-  const { profile } = settings;
-
-  // Interpretation Logic (Species Profile based)
-  const comments: string[] = [];
-  const recommendations: string[] = [];
-  let status: 'normal' | 'borderline' | 'abnormal' = 'normal';
-
-  if (totalMotility < profile.minTotalMotility) {
-    status = 'abnormal';
-    comments.push(`Reduced total motility: ${totalMotility.toFixed(1)}% (Ref: >${profile.minTotalMotility}%).`);
-    recommendations.push('Evaluate lifestyle factors and oxidative stress markers.');
-  } else if (totalMotility < profile.minTotalMotility + 5) {
-    status = 'borderline';
-    comments.push('Borderline motility: Values are near the lower limit of normal.');
-  }
-
-  if (progressiveMotility < profile.minProgressiveMotility) {
-    status = 'abnormal';
-    comments.push(`Reduced progressive motility: ${progressiveMotility.toFixed(1)}% (Ref: >${profile.minProgressiveMotility}%).`);
-  }
-
-  if (normalMorphology < profile.minNormalMorphology) {
-    status = 'abnormal';
-    comments.push(`Teratozoospermia: ${normalMorphology.toFixed(1)}% normal forms (Ref: >${profile.minNormalMorphology}%).`);
-    recommendations.push('Consider DNA fragmentation index (DFI) testing.');
-  }
-
-  if (concentration < profile.minConcentration) {
-    status = 'abnormal';
-    comments.push(`Oligozoospermia: ${concentration.toFixed(1)} M/ml (Ref: >${profile.minConcentration} M/ml).`);
-    recommendations.push('Hormonal profile assessment recommended (FSH, LH, Testosterone).');
-  }
-
-  if (vitalityTotal < profile.minVitality) {
-    status = 'abnormal';
-    comments.push(`Necrozoospermia: Low vitality detected (${vitalityTotal.toFixed(1)}% Ref: >${profile.minVitality}%).`);
-    recommendations.push('Evaluate for anti-sperm antibodies or prolonged abstinence.');
-  }
-
-  if (leukocytes > profile.maxLeukocytes) {
-    status = 'abnormal';
-    comments.push(`Leukocytospermia: High WBC count (${leukocytes.toFixed(1)} M/ml Ref: <${profile.maxLeukocytes} M/ml).`);
-    recommendations.push('Semen culture recommended to rule out infection.');
-  }
-
-  if (tzi > 1.6) {
-    status = 'abnormal';
-    comments.push(`High TZI (${tzi.toFixed(2)}): Multiple morphological defects per abnormal cell.`);
-  }
-
-  if (comments.length === 0) {
-    comments.push('Normozoospermia: All parameters within standard reference ranges.');
-    recommendations.push('Routine follow-up as per standard protocol.');
-  }
+  const comments: string[] = [
+    'This visualization-only result is not a diagnostic laboratory measurement.',
+    'Motility and kinematic values describe the available tracking paths only; concentration, morphology, vitality, DNA fragmentation, and leukocytes were not measured.'
+  ];
+  const recommendations: string[] = [
+    'Confirm findings with a validated laboratory CASA workflow before clinical or breeding decisions.'
+  ];
+  const status: 'not-validated' = 'not-validated';
 
   return {
     totalCount,
     concentration,
     leukocytes,
-    vitality: {
-      live: vitalityTotal,
-      dead: 100 - vitalityTotal,
-      total: vitalityTotal
-    },
+    vitality: { live: 0, dead: 0, total: 0 },
     motility: {
       progressive: progressiveMotility,
-      nonProgressive: (nonProgressive / totalCount) * 100,
-      immotile: (immotile / totalCount) * 100,
+      nonProgressive: totalCount > 0 ? (nonProgressive / totalCount) * 100 : 0,
+      immotile: totalCount > 0 ? (immotile / totalCount) * 100 : 0,
       total: totalMotility
     },
     kinematics: {
@@ -327,27 +204,11 @@ export const generateSummary = (spermatozoa: SpermData[], settings: AnalysisResu
       avgArea,
       tzi,
       mai,
-      headDefects: {
-        large: getPercent(headDefects.large),
-        small: getPercent(headDefects.small),
-        amorphous: getPercent(headDefects.amorphous),
-        pyriform: getPercent(headDefects.pyriform),
-        tapered: getPercent(headDefects.tapered),
-        round: getPercent(headDefects.round)
-      },
-      midpieceDefects: {
-        thick: getPercent(midpieceDefects.thick),
-        bent: getPercent(midpieceDefects.bent),
-        asymmetric: getPercent(midpieceDefects.asymmetric)
-      },
-      tailDefects: {
-        short: getPercent(tailDefects.short),
-        coiled: getPercent(tailDefects.coiled),
-        multiple: getPercent(tailDefects.multiple),
-        bent: getPercent(tailDefects.bent)
-      },
-      acrosomeDefects: getPercent(acrosomeDefects),
-      cytoplasmicDroplets: getPercent(cytoplasmicDroplets)
+      headDefects: { large: 0, small: 0, amorphous: 0, pyriform: 0, tapered: 0, round: 0 },
+      midpieceDefects: { thick: 0, bent: 0, asymmetric: 0 },
+      tailDefects: { short: 0, coiled: 0, multiple: 0, bent: 0 },
+      acrosomeDefects: 0,
+      cytoplasmicDroplets: 0
     },
     sdf: {
       dfi,
@@ -358,6 +219,114 @@ export const generateSummary = (spermatozoa: SpermData[], settings: AnalysisResu
       status,
       comments,
       recommendations
-    }
+    },
+    provenance: visualizationProvenance
+  };
+};
+
+const visualizationProvenance: AnalysisProvenance = {
+  overall: 'visualization-only',
+  fields: {
+    totalCount: 'derived',
+    concentration: 'visualization-only',
+    leukocytes: 'unavailable',
+    vitality: 'unavailable',
+    motility: 'visualization-only',
+    kinematics: 'visualization-only',
+    morphology: 'unavailable',
+    sdf: 'unavailable',
+    interpretation: 'visualization-only'
+  },
+  notes: [
+    'The current browser particle paths are visualization/training data, not a validated microscope-cell tracker.',
+    'Morphology, vitality, DNA fragmentation, and leukocyte measurements require dedicated validated assays or computer-vision models.'
+  ]
+};
+
+const parseMetric = (value: unknown, fallback = 0): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value !== 'string') return fallback;
+  const parsed = Number.parseFloat(value.replace(/[^0-9.]/g, ''));
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const clampPercentage = (value: unknown): number => Math.min(100, Math.max(0, parseMetric(value)));
+
+export const buildAiEstimatedSummary = (
+  aiResult: Record<string, any>,
+  settings: AnalysisResult['settings']
+): AnalysisResult['summary'] => {
+  const concentration = parseMetric(aiResult.concentration);
+  const progressive = clampPercentage(aiResult.motility?.progressive ?? aiResult.progressive);
+  const nonProgressive = clampPercentage(aiResult.motility?.nonProgressive ?? aiResult.nonProgressive);
+  const immotile = clampPercentage(aiResult.motility?.immotile ?? aiResult.immotile);
+  const normalMorphology = clampPercentage(aiResult.morphology?.normal ?? aiResult.normal);
+  const totalMotility = Math.min(100, progressive + nonProgressive);
+  const profile = settings.profile;
+  const comments: string[] = [];
+  const recommendations: string[] = [];
+
+  if (totalMotility < profile.minTotalMotility) {
+    comments.push(`AI-estimated total motility is ${totalMotility.toFixed(1)}% (reference threshold: >${profile.minTotalMotility}%).`);
+  }
+  if (progressive < profile.minProgressiveMotility) {
+    comments.push(`AI-estimated progressive motility is ${progressive.toFixed(1)}% (reference threshold: >${profile.minProgressiveMotility}%).`);
+  }
+  if (normalMorphology < profile.minNormalMorphology) {
+    comments.push(`AI-estimated normal morphology is ${normalMorphology.toFixed(1)}% (reference threshold: >${profile.minNormalMorphology}%).`);
+  }
+  if (concentration < profile.minConcentration) {
+    comments.push(`AI-estimated concentration is ${concentration.toFixed(1)} M/ml (reference threshold: >${profile.minConcentration} M/ml).`);
+  }
+  if (comments.length === 0) {
+    comments.push('AI-estimated aggregate values are within the configured reference thresholds.');
+  }
+  recommendations.push('Confirm all findings with a validated laboratory CASA workflow before clinical or breeding decisions.');
+
+  const status = comments.some(comment => comment.includes('threshold')) ? 'abnormal' : 'normal';
+
+  return {
+    totalCount: 0,
+    concentration,
+    leukocytes: 0,
+    vitality: { live: 0, dead: 0, total: 0 },
+    motility: { progressive, nonProgressive, immotile, total: totalMotility },
+    kinematics: {
+      avgVcl: 0, avgVsl: 0, avgVap: 0, avgLin: 0, avgStr: 0, avgWob: 0, avgAlh: 0, avgBcf: 0,
+      hyperactivation: { count: 0, percentage: 0 }
+    },
+    morphology: {
+      normal: normalMorphology,
+      abnormal: Math.max(0, 100 - normalMorphology),
+      avgArea: 0,
+      tzi: 0,
+      mai: 0,
+      headDefects: { large: 0, small: 0, amorphous: 0, pyriform: 0, tapered: 0, round: 0 },
+      midpieceDefects: { thick: 0, bent: 0, asymmetric: 0 },
+      tailDefects: { short: 0, coiled: 0, multiple: 0, bent: 0 },
+      acrosomeDefects: 0,
+      cytoplasmicDroplets: 0
+    },
+    sdf: { dfi: 0, fragmentedCount: 0, totalCount: 0 },
+    interpretation: { status, comments, recommendations },
+    provenance: {
+      overall: 'ai-estimated',
+      fields: {
+        totalCount: 'unavailable',
+        concentration: 'ai-estimated',
+        leukocytes: 'unavailable',
+        vitality: 'unavailable',
+        motility: 'ai-estimated',
+        kinematics: 'unavailable',
+        morphology: 'ai-estimated',
+        sdf: 'unavailable',
+        interpretation: 'ai-estimated'
+      },
+      notes: [
+        'Aggregate concentration, motility, morphology, and observations were estimated by Gemini from the uploaded media.',
+        'Per-cell tracks, vitality, DNA fragmentation, leukocyte count, and validated morphometry were not measured.'
+      ]
+    },
+    visionInsights: aiResult
   };
 };

@@ -58,18 +58,7 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
     expiryDate: ''
   });
 
-  const getActiveUser = () => {
-    if (auth.currentUser) return auth.currentUser;
-    const guest = localStorage.getItem('atsa_guest_session');
-    if (guest) {
-      try {
-        return JSON.parse(guest);
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
-  };
+  const getActiveUser = () => auth.currentUser;
 
   useEffect(() => {
     const user = getActiveUser();
