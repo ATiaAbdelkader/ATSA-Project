@@ -210,6 +210,11 @@ export const translations: TranslationDict = {
     fr: "L'authentification par e-mail/mot de passe n'est pas activée. Activez-la dans Firebase Console → Authentication → Méthode de connexion.",
     ar: "مصادقة البريد الإلكتروني/كلمة المرور غير مفعلة. فعّلها من Firebase Console ← Authentication ← Sign-in method."
   },
+  authErrorAnonymousProviderDisabled: {
+    en: "Temporary guest access is not enabled. Enable Anonymous authentication in Firebase Console → Authentication → Sign-in method.",
+    fr: "L'accès invité temporaire n'est pas activé. Activez l'authentification anonyme dans Firebase Console → Authentication → Méthode de connexion.",
+    ar: "الوصول المؤقت كضيف غير مفعل. فعّل المصادقة المجهولة من Firebase Console ← Authentication ← Sign-in method."
+  },
   authErrorNetwork: {
     en: "A network error interrupted authentication. Check your connection and try again.",
     fr: "Une erreur réseau a interrompu l'authentification. Vérifiez votre connexion et réessayez.",

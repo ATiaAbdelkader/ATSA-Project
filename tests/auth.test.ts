@@ -10,6 +10,8 @@ assert.match(appSource, /createUserWithEmailAndPassword\(auth, normalizedEmail, 
 assert.match(appSource, /signInWithEmailAndPassword\(auth, normalizedEmail, password\)/, 'login must use Firebase email/password auth');
 assert.match(appSource, /sendPasswordResetEmail\(auth, normalizedEmail\)/, 'password reset must use Firebase email/password auth');
 assert.match(appSource, /signInAnonymously\(auth\)/, 'temporary guest access must use Firebase Anonymous Authentication');
+assert.match(appSource, /authErrorAnonymousProviderDisabled/, 'anonymous provider failures must have explicit setup guidance');
+assert.match(appSource, /getAuthErrorMessage\(error, t, 'anonymous'\)/, 'guest failures must use the anonymous provider context');
 assert.match(appSource, /currentUser\.isAnonymous/, 'the UI must distinguish anonymous sessions');
 assert.match(appSource, /guestNotice/, 'temporary guest limitations must be visible');
 assert.match(appSource, /role="alert"/, 'authentication errors must be visible in the UI');

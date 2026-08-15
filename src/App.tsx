@@ -34,7 +34,7 @@ import { collection, addDoc, query, where, orderBy, limit, onSnapshot, Timestamp
 import { handleFirestoreError, OperationType } from './lib/firestore-utils';
 import { useLanguage } from './context/LanguageContext';
 
-function getAuthErrorMessage(error: unknown, translate: (key: string) => string): string {
+function getAuthErrorMessage(error: unknown, translate: (key: string) => string, provider: 'email' | 'anonymous' = 'email'): string {
   const code = (error as { code?: string })?.code;
   switch (code) {
     case 'auth/invalid-email':
@@ -52,7 +52,7 @@ function getAuthErrorMessage(error: unknown, translate: (key: string) => string)
     case 'auth/wrong-password':
       return translate('authErrorInvalidCredentials');
     case 'auth/operation-not-allowed':
-      return translate('authErrorEmailProviderDisabled');
+      return translate(provider === 'anonymous' ? 'authErrorAnonymousProviderDisabled' : 'authErrorEmailProviderDisabled');
     case 'auth/network-request-failed':
       return translate('authErrorNetwork');
     default:
@@ -265,7 +265,7 @@ export default function App() {
       }
     } catch (error: unknown) {
       console.error('Email authentication failed:', error);
-      setAuthError(getAuthErrorMessage(error, t));
+      setAuthError(getAuthErrorMessage(error, t, 'email'));
     } finally {
       setIsSigningIn(false);
     }
@@ -282,7 +282,7 @@ export default function App() {
       await signInAnonymously(auth);
     } catch (error: unknown) {
       console.error('Temporary guest authentication failed:', error);
-      setAuthError(getAuthErrorMessage(error, t));
+      setAuthError(getAuthErrorMessage(error, t, 'anonymous'));
     } finally {
       setIsSigningIn(false);
     }
