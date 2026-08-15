@@ -10,7 +10,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "tsx tests/step3.test.ts && tsx tests/validation.test.ts",
+    "test": "tsx tests/step3.test.ts && tsx tests/validation.test.ts && tsx tests/auth.test.ts",
     "verify:deployment": "node scripts/verify-deployment-config.mjs"
   },
   "dependencies": {

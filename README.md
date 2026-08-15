@@ -35,6 +35,12 @@ Configure the following variables in the Vercel project settings for Preview and
 
 The Firebase web configuration in `firebase-applet-config.json` contains public browser bootstrap values and is separate from the Firebase Admin service-account credentials.
 
+## Google Authentication setup
+
+The application uses Firebase Authentication with the Google provider; it no longer supports a shared guest or demo identity. In the Firebase Console for project `ai-studio-applet-webapp-5a3d7`, open **Authentication → Sign-in method** and enable **Google** with a support email. Under **Authentication → Settings → Authorized domains**, add `atsa-project.vercel.app`, the Vercel preview domain(s) used for testing, and `localhost` for local development. The production domain must exactly match the browser origin, without a path or trailing slash.
+
+The login screen uses a popup first and automatically falls back to redirect sign-in when the browser blocks popups. If Firebase rejects the request, the UI now displays a localized error describing whether the domain is unauthorized, the Google provider is disabled, the popup was blocked, or the network failed. These console settings are required; they cannot be safely enabled from browser code.
+
 ## Security requirements
 
 All requests to `/api/gemini` must include a Firebase ID token in the `Authorization: Bearer <token>` header. The endpoint validates the token before using Gemini. Media analysis accepts only HTTPS Firebase Storage download URLs belonging to the configured ATSA bucket, requires a tokenized URL under `videos/{uid}/...`, verifies that the path belongs to the authenticated UID, and limits the downloaded media size.

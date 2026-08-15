@@ -29,10 +29,28 @@ const PatientHistoryView = lazy(() => import('./components/PatientHistory').then
 const InventoryManagement = lazy(() => import('./components/InventoryManagement').then(module => ({ default: module.InventoryManagement })));
 import type { AppState, SpeciesProfile } from './types';
 import { auth, db, googleProvider } from './firebase';
-import { signInWithPopup, onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut, User } from 'firebase/auth';
 import { collection, addDoc, query, where, orderBy, limit, onSnapshot, Timestamp, doc, updateDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from './lib/firestore-utils';
 import { useLanguage } from './context/LanguageContext';
+
+function getAuthErrorMessage(error: unknown, translate: (key: string) => string): string {
+  const code = (error as { code?: string })?.code;
+  switch (code) {
+    case 'auth/unauthorized-domain':
+      return translate('authErrorUnauthorizedDomain');
+    case 'auth/operation-not-allowed':
+      return translate('authErrorProviderDisabled');
+    case 'auth/popup-blocked':
+      return translate('authErrorPopupBlocked');
+    case 'auth/popup-closed-by-user':
+      return translate('authErrorPopupClosed');
+    case 'auth/network-request-failed':
+      return translate('authErrorNetwork');
+    default:
+      return translate('authErrorGeneric');
+  }
+}
 
 export default function App() {
   const { language, setLanguage, t, dir } = useLanguage();
@@ -78,17 +96,28 @@ export default function App() {
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedAnalyses, setSelectedAnalyses] = useState<string[]>([]);
   const [stats, setStats] = useState({ samplesToday: 0, avgProcessing: '0m' });
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
+        setAuthError(null);
         setAppState('dashboard');
       } else {
         setUser(null);
         setAppState('login');
       }
     });
+
+    // Redirect sign-in completes after the browser returns from Google.
+    getRedirectResult(auth).catch((error: unknown) => {
+      console.error('Google redirect sign-in failed:', error);
+      setAuthError(getAuthErrorMessage(error, t));
+      setIsSigningIn(false);
+    });
+
     return () => unsubscribe();
   }, []);
 
@@ -201,10 +230,30 @@ export default function App() {
   };
 
   const handleLogin = async () => {
+    if (isSigningIn) return;
+
+    setAuthError(null);
+    setIsSigningIn(true);
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Login failed:", error);
+    } catch (error: unknown) {
+      const code = (error as { code?: string })?.code;
+      console.error('Google sign-in failed:', error);
+
+      // Popup blockers and some mobile browsers reject popups. Redirect is the
+      // supported fallback and completes through getRedirectResult above.
+      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectError: unknown) {
+          console.error('Google redirect sign-in failed:', redirectError);
+          setAuthError(getAuthErrorMessage(redirectError, t));
+        }
+      } else {
+        setAuthError(getAuthErrorMessage(error, t));
+      }
+      setIsSigningIn(false);
     }
   };
 
@@ -333,60 +382,40 @@ export default function App() {
               </div>
               <div>
                 <h3 className={cn("text-2xl font-bold mb-2", theme === 'dark' ? "text-white" : "text-slate-900")}>{t('labAccess')}</h3>
-                <p className={cn("text-sm", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('labAccessDesc')}</p>
+                <p className={cn("text-sm", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('authGoogleDesc')}</p>
               </div>
             </div>
 
-            <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-6">
-              <div className="space-y-2">
-                <div className="flex justify-between items-center px-1">
-                  <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('labId')}</label>
-                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">{t('required')}</span>
-                </div>
-                <div className="relative group">
-                  <input 
-                    type="text" 
-                    placeholder="LAB-SECTOR-A4"
-                    className={cn(
-                      "w-full border rounded-2xl px-5 py-4 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50",
-                      theme === 'dark' ? "bg-white/5 border-white/10 text-white placeholder:text-white/10" : "bg-white border-slate-200 text-slate-900 placeholder:text-slate-300"
-                    )}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center px-1">
-                  <label className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('accessKey')}</label>
-                  <button type="button" className="text-[10px] font-bold text-emerald-500/60 hover:text-emerald-500 uppercase tracking-widest transition-colors">{t('forgotKey')}</button>
-                </div>
-                <div className="relative group">
-                  <input 
-                    type="password" 
-                    placeholder="••••••••"
-                    className={cn(
-                      "w-full border rounded-2xl px-5 py-4 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50",
-                      theme === 'dark' ? "bg-white/5 border-white/10 text-white placeholder:text-white/10" : "bg-white border-slate-200 text-slate-900 placeholder:text-slate-300"
-                    )}
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 px-1">
-                <input type="checkbox" id="remember" className="w-4 h-4 rounded border-emerald-500/20 bg-emerald-500/10 text-emerald-500 focus:ring-emerald-500/50" />
-                <label htmlFor="remember" className={cn("text-xs font-medium", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('rememberWorkstation')}</label>
-              </div>
-
-              <button 
+            <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-4">
+              <button
                 type="submit"
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-5 rounded-2xl mt-4 transition-all shadow-xl shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                disabled={isSigningIn}
+                className={cn(
+                  "w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-5 rounded-2xl transition-all shadow-xl shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2",
+                  isSigningIn ? "cursor-wait opacity-70" : "cursor-pointer"
+                )}
               >
                 <LogIn className="w-5 h-5" />
-                {t('authGoogle')}
-                <ChevronRight className="w-4 h-4" />
+                {isSigningIn ? t('authRedirecting') : t('authGoogle')}
+                {!isSigningIn && <ChevronRight className="w-4 h-4" />}
               </button>
 
-
+              {authError && (
+                <div role="alert" className={cn(
+                  "rounded-2xl border p-4 text-xs leading-relaxed",
+                  theme === 'dark' ? "border-rose-400/30 bg-rose-400/10 text-rose-200" : "border-rose-200 bg-rose-50 text-rose-700"
+                )}>
+                  <p>{authError}</p>
+                  <button
+                    type="button"
+                    onClick={() => { setAuthError(null); handleLogin(); }}
+                    disabled={isSigningIn}
+                    className="mt-3 font-bold underline underline-offset-4 disabled:opacity-50"
+                  >
+                    {t('authTryAgain')}
+                  </button>
+                </div>
+              )}
             </form>
 
             <div className={cn("mt-12 p-6 rounded-3xl border border-dashed text-center", theme === 'dark' ? "border-white/10 bg-white/5" : "border-slate-200 bg-slate-50")}>

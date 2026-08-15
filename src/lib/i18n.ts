@@ -91,9 +91,54 @@ export const translations: TranslationDict = {
     ar: "تذكر محطة العمل هذه"
   },
   authGoogle: {
-    en: "Authenticate with Google",
-    fr: "S'authentifier avec Google",
-    ar: "تسجيل الدخول عبر Google"
+    en: "Continue with Google",
+    fr: "Continuer avec Google",
+    ar: "المتابعة باستخدام Google"
+  },
+  authGoogleDesc: {
+    en: "Use your authorized Google account to create a private laboratory session.",
+    fr: "Utilisez votre compte Google autorisé pour créer une session de laboratoire privée.",
+    ar: "استخدم حساب Google المصرح به لإنشاء جلسة مختبر خاصة."
+  },
+  authRedirecting: {
+    en: "Redirecting to Google…",
+    fr: "Redirection vers Google…",
+    ar: "جارٍ التحويل إلى Google…"
+  },
+  authTryAgain: {
+    en: "Try again",
+    fr: "Réessayer",
+    ar: "حاول مرة أخرى"
+  },
+  authErrorUnauthorizedDomain: {
+    en: "This website domain is not authorized in Firebase Authentication. Add atsa-project.vercel.app in Firebase Console → Authentication → Settings → Authorized domains.",
+    fr: "Le domaine de ce site n'est pas autorisé dans Firebase Authentication. Ajoutez atsa-project.vercel.app dans Firebase Console → Authentication → Paramètres → Domaines autorisés.",
+    ar: "نطاق هذا الموقع غير مصرح به في Firebase Authentication. أضف atsa-project.vercel.app من Firebase Console ← Authentication ← Settings ← Authorized domains."
+  },
+  authErrorProviderDisabled: {
+    en: "Google sign-in is not enabled for this Firebase project. Enable the Google provider in Firebase Console → Authentication → Sign-in method.",
+    fr: "La connexion Google n'est pas activée pour ce projet Firebase. Activez le fournisseur Google dans Firebase Console → Authentication → Méthode de connexion.",
+    ar: "تسجيل الدخول عبر Google غير مفعل لهذا المشروع في Firebase. فعّل مزود Google من Firebase Console ← Authentication ← Sign-in method."
+  },
+  authErrorPopupBlocked: {
+    en: "The Google popup was blocked. Your browser should redirect to Google; if it does not, allow popups for this site and try again.",
+    fr: "La fenêtre Google a été bloquée. Votre navigateur devrait vous rediriger vers Google ; sinon, autorisez les fenêtres pop-up pour ce site et réessayez.",
+    ar: "تم حظر نافذة Google المنبثقة. يجب أن يعيد المتصفح توجيهك إلى Google؛ إذا لم يحدث ذلك، اسمح بالنوافذ المنبثقة لهذا الموقع وحاول مرة أخرى."
+  },
+  authErrorPopupClosed: {
+    en: "The Google sign-in window was closed before authentication completed.",
+    fr: "La fenêtre de connexion Google a été fermée avant la fin de l'authentification.",
+    ar: "أُغلقت نافذة تسجيل الدخول إلى Google قبل اكتمال المصادقة."
+  },
+  authErrorNetwork: {
+    en: "A network error interrupted Google sign-in. Check your connection and try again.",
+    fr: "Une erreur réseau a interrompu la connexion Google. Vérifiez votre connexion et réessayez.",
+    ar: "أوقف خطأ في الشبكة تسجيل الدخول إلى Google. تحقق من الاتصال وحاول مرة أخرى."
+  },
+  authErrorGeneric: {
+    en: "Google sign-in could not be completed. Check the Firebase Authentication setup or try again.",
+    fr: "La connexion Google n'a pas pu être terminée. Vérifiez la configuration de Firebase Authentication ou réessayez.",
+    ar: "تعذر إكمال تسجيل الدخول عبر Google. تحقق من إعداد Firebase Authentication أو حاول مرة أخرى."
   },
   reviewerBypass: {
     en: "demo session portal",
