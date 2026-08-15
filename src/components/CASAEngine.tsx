@@ -71,7 +71,7 @@ import { HelpCenter } from './HelpCenter';
 
 import { Sperm3DPath } from './Sperm3DPath';
 import { callGemini } from '../services/geminiService';
-import { db, auth, googleProvider, storage } from '../firebase';
+import { db, auth, storage } from '../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { 
   collection, 
@@ -88,7 +88,7 @@ import {
 } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 import { formatMetric, formatMetricCsv, formatMetricWithUnit, isMetricUnavailable } from '../lib/formatMetric';
-import { onAuthStateChanged, User, signInWithPopup } from 'firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 const SpermZoom: React.FC<{ sperm: SpermData; isAnalyzing: boolean; highContrast?: boolean; theme?: 'light' | 'dark' }> = ({ sperm, isAnalyzing, highContrast, theme = 'dark' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -3131,12 +3131,9 @@ Digital Signature Verified - ATSA AI Engine v2.0
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{t('historyTrackerTitle')}</h3>
                         {!user && (
-                          <button 
-                            onClick={() => signInWithPopup(auth, googleProvider)}
-                            className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-[8px] font-bold uppercase tracking-widest text-white transition-all"
-                          >
+                          <span className="text-[8px] font-bold uppercase tracking-widest text-white/30">
                             {t('signInButton')}
-                          </button>
+                          </span>
                         )}
                       </div>
 

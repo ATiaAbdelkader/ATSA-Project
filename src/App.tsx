@@ -28,8 +28,8 @@ const HelpCenter = lazy(() => import('./components/HelpCenter').then(module => (
 const PatientHistoryView = lazy(() => import('./components/PatientHistory').then(module => ({ default: module.PatientHistoryView })));
 const InventoryManagement = lazy(() => import('./components/InventoryManagement').then(module => ({ default: module.InventoryManagement })));
 import type { AppState, SpeciesProfile } from './types';
-import { auth, db, googleProvider } from './firebase';
-import { getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut, User } from 'firebase/auth';
+import { auth, db } from './firebase';
+import { createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInAnonymously, signInWithEmailAndPassword, signOut, User } from 'firebase/auth';
 import { collection, addDoc, query, where, orderBy, limit, onSnapshot, Timestamp, doc, updateDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from './lib/firestore-utils';
 import { useLanguage } from './context/LanguageContext';
@@ -37,14 +37,22 @@ import { useLanguage } from './context/LanguageContext';
 function getAuthErrorMessage(error: unknown, translate: (key: string) => string): string {
   const code = (error as { code?: string })?.code;
   switch (code) {
-    case 'auth/unauthorized-domain':
-      return translate('authErrorUnauthorizedDomain');
+    case 'auth/invalid-email':
+      return translate('authErrorInvalidEmail');
+    case 'auth/missing-password':
+      return translate('authErrorMissingPassword');
+    case 'auth/weak-password':
+      return translate('authErrorWeakPassword');
+    case 'auth/password-does-not-meet-requirements':
+      return translate('authErrorWeakPassword');
+    case 'auth/email-already-in-use':
+      return translate('authErrorEmailInUse');
+    case 'auth/invalid-credential':
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+      return translate('authErrorInvalidCredentials');
     case 'auth/operation-not-allowed':
-      return translate('authErrorProviderDisabled');
-    case 'auth/popup-blocked':
-      return translate('authErrorPopupBlocked');
-    case 'auth/popup-closed-by-user':
-      return translate('authErrorPopupClosed');
+      return translate('authErrorEmailProviderDisabled');
     case 'auth/network-request-failed':
       return translate('authErrorNetwork');
     default:
@@ -98,24 +106,24 @@ export default function App() {
   const [stats, setStats] = useState({ samplesToday: 0, avgProcessing: '0m' });
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isGuest, setIsGuest] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
+        setIsGuest(currentUser.isAnonymous);
         setAuthError(null);
         setAppState('dashboard');
       } else {
         setUser(null);
+        setIsGuest(false);
         setAppState('login');
       }
-    });
-
-    // Redirect sign-in completes after the browser returns from Google.
-    getRedirectResult(auth).catch((error: unknown) => {
-      console.error('Google redirect sign-in failed:', error);
-      setAuthError(getAuthErrorMessage(error, t));
-      setIsSigningIn(false);
     });
 
     return () => unsubscribe();
@@ -229,31 +237,71 @@ export default function App() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
-  const handleLogin = async () => {
+  const handleAuthSubmit = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    if (isSigningIn) return;
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      setAuthError(t('authErrorInvalidEmail'));
+      return;
+    }
+    if (!password) {
+      setAuthError(t('authErrorMissingPassword'));
+      return;
+    }
+    if (authMode === 'signup' && password !== confirmPassword) {
+      setAuthError(t('authErrorPasswordMismatch'));
+      return;
+    }
+
+    setAuthError(null);
+    setIsSigningIn(true);
+    try {
+      if (authMode === 'signup') {
+        await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+      } else {
+        await signInWithEmailAndPassword(auth, normalizedEmail, password);
+      }
+    } catch (error: unknown) {
+      console.error('Email authentication failed:', error);
+      setAuthError(getAuthErrorMessage(error, t));
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  const handleGuestLogin = async () => {
     if (isSigningIn) return;
 
     setAuthError(null);
     setIsSigningIn(true);
     try {
-      await signInWithPopup(auth, googleProvider);
+      // Firebase creates a unique anonymous UID for every guest browser session.
+      // This is temporary access, not a shared account and not a bypass of rules.
+      await signInAnonymously(auth);
     } catch (error: unknown) {
-      const code = (error as { code?: string })?.code;
-      console.error('Google sign-in failed:', error);
-
-      // Popup blockers and some mobile browsers reject popups. Redirect is the
-      // supported fallback and completes through getRedirectResult above.
-      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
-        try {
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        } catch (redirectError: unknown) {
-          console.error('Google redirect sign-in failed:', redirectError);
-          setAuthError(getAuthErrorMessage(redirectError, t));
-        }
-      } else {
-        setAuthError(getAuthErrorMessage(error, t));
-      }
+      console.error('Temporary guest authentication failed:', error);
+      setAuthError(getAuthErrorMessage(error, t));
+    } finally {
       setIsSigningIn(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      setAuthError(t('authErrorResetEmail'));
+      return;
+    }
+
+    setAuthError(null);
+    try {
+      await sendPasswordResetEmail(auth, normalizedEmail);
+      setAuthError(t('authResetSent'));
+    } catch (error: unknown) {
+      console.error('Password reset failed:', error);
+      setAuthError(getAuthErrorMessage(error, t));
     }
   };
 
@@ -376,44 +424,110 @@ export default function App() {
             transition={{ delay: 0.2 }}
             className="w-full max-w-sm mx-auto"
           >
-            <div className="mb-10 flex flex-col gap-6">
+            <div className="mb-8 flex flex-col gap-6">
               <div className="flex justify-end">
                 <LanguageSelect />
               </div>
               <div>
-                <h3 className={cn("text-2xl font-bold mb-2", theme === 'dark' ? "text-white" : "text-slate-900")}>{t('labAccess')}</h3>
-                <p className={cn("text-sm", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('authGoogleDesc')}</p>
+                <h3 className={cn("text-2xl font-bold mb-2", theme === 'dark' ? "text-white" : "text-slate-900")}>{authMode === 'login' ? t('loginTitle') : t('signupTitle')}</h3>
+                <p className={cn("text-sm", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('authEmailDesc')}</p>
+              </div>
+              <div className={cn("grid grid-cols-2 gap-1 rounded-2xl p-1", theme === 'dark' ? "bg-white/5" : "bg-slate-100")}>
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('login'); setAuthError(null); }}
+                  className={cn("rounded-xl px-3 py-2 text-xs font-bold transition-all", authMode === 'login' ? "bg-emerald-500 text-white" : theme === 'dark' ? "text-white/40" : "text-slate-500")}
+                >
+                  {t('loginTab')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('signup'); setAuthError(null); }}
+                  className={cn("rounded-xl px-3 py-2 text-xs font-bold transition-all", authMode === 'signup' ? "bg-emerald-500 text-white" : theme === 'dark' ? "text-white/40" : "text-slate-500")}
+                >
+                  {t('signupTab')}
+                </button>
               </div>
             </div>
 
-            <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-4">
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="auth-email" className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('emailLabel')}</label>
+                <input
+                  id="auth-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  placeholder="name@laboratory.org"
+                  className={cn("w-full border rounded-2xl px-5 py-4 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50", theme === 'dark' ? "bg-white/5 border-white/10 text-white placeholder:text-white/10" : "bg-white border-slate-200 text-slate-900 placeholder:text-slate-300")}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="auth-password" className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('passwordLabel')}</label>
+                  {authMode === 'login' && (
+                    <button type="button" onClick={handlePasswordReset} className="text-[10px] font-bold text-emerald-500/70 hover:text-emerald-500 uppercase tracking-widest">
+                      {t('forgotPassword')}
+                    </button>
+                  )}
+                </div>
+                <input
+                  id="auth-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                  placeholder="••••••••"
+                  className={cn("w-full border rounded-2xl px-5 py-4 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50", theme === 'dark' ? "bg-white/5 border-white/10 text-white placeholder:text-white/10" : "bg-white border-slate-200 text-slate-900 placeholder:text-slate-300")}
+                />
+              </div>
+
+              {authMode === 'signup' && (
+                <div className="space-y-2">
+                  <label htmlFor="auth-confirm-password" className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('confirmPasswordLabel')}</label>
+                  <input
+                    id="auth-confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                    className={cn("w-full border rounded-2xl px-5 py-4 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50", theme === 'dark' ? "bg-white/5 border-white/10 text-white placeholder:text-white/10" : "bg-white border-slate-200 text-slate-900 placeholder:text-slate-300")}
+                  />
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isSigningIn}
-                className={cn(
-                  "w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-5 rounded-2xl transition-all shadow-xl shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2",
-                  isSigningIn ? "cursor-wait opacity-70" : "cursor-pointer"
-                )}
+                className={cn("w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-5 rounded-2xl transition-all shadow-xl shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2", isSigningIn ? "cursor-wait opacity-70" : "cursor-pointer")}
               >
                 <LogIn className="w-5 h-5" />
-                {isSigningIn ? t('authRedirecting') : t('authGoogle')}
+                {isSigningIn ? t('authWorking') : authMode === 'login' ? t('loginButton') : t('signupButton')}
                 {!isSigningIn && <ChevronRight className="w-4 h-4" />}
               </button>
 
+              <div className="flex items-center gap-3 py-2">
+                <div className={cn("h-px flex-1", theme === 'dark' ? "bg-white/10" : "bg-slate-200")} />
+                <span className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/30" : "text-slate-400")}>{t('or')}</span>
+                <div className={cn("h-px flex-1", theme === 'dark' ? "bg-white/10" : "bg-slate-200")} />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGuestLogin}
+                disabled={isSigningIn}
+                className={cn("w-full border font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2", theme === 'dark' ? "border-white/10 text-white/60 hover:bg-white/5 hover:text-white" : "border-slate-200 text-slate-500 hover:bg-white hover:text-slate-900", isSigningIn ? "cursor-wait opacity-70" : "cursor-pointer")}
+              >
+                {t('guestButton')}
+              </button>
+
               {authError && (
-                <div role="alert" className={cn(
-                  "rounded-2xl border p-4 text-xs leading-relaxed",
-                  theme === 'dark' ? "border-rose-400/30 bg-rose-400/10 text-rose-200" : "border-rose-200 bg-rose-50 text-rose-700"
-                )}>
+                <div role="alert" className={cn("rounded-2xl border p-4 text-xs leading-relaxed", theme === 'dark' ? "border-rose-400/30 bg-rose-400/10 text-rose-200" : "border-rose-200 bg-rose-50 text-rose-700")}>
                   <p>{authError}</p>
-                  <button
-                    type="button"
-                    onClick={() => { setAuthError(null); handleLogin(); }}
-                    disabled={isSigningIn}
-                    className="mt-3 font-bold underline underline-offset-4 disabled:opacity-50"
-                  >
-                    {t('authTryAgain')}
-                  </button>
+                  {authMode === 'login' && <button type="button" onClick={() => handleAuthSubmit()} disabled={isSigningIn} className="mt-3 font-bold underline underline-offset-4 disabled:opacity-50">{t('authTryAgain')}</button>}
                 </div>
               )}
             </form>
@@ -571,8 +685,13 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main Content */}
+        {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
+        {isGuest && (
+          <div className={cn("border-b px-8 py-3 text-xs", theme === 'dark' ? "border-amber-400/20 bg-amber-400/5 text-amber-200" : "border-amber-200 bg-amber-50 text-amber-800")}>
+            {t('guestNotice')}
+          </div>
+        )}
         {/* Top Header */}
         <header className={cn(
           "h-20 border-b flex items-center justify-between px-8 backdrop-blur-md sticky top-0 z-20 transition-all duration-300",
@@ -590,7 +709,10 @@ export default function App() {
             <div className="hidden md:block w-px h-8 bg-white/[0.04] dark:bg-white/[0.04] bg-slate-200" />
             <div>
               <h2 className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('welcomeBack')}</h2>
-              <p className={cn("text-base font-bold tracking-tight", theme === 'dark' ? "text-white" : "text-slate-900")}>{user?.displayName || user?.email}</p>
+              <div className="flex items-center gap-3">
+                <p className={cn("text-base font-bold tracking-tight", theme === 'dark' ? "text-white" : "text-slate-900")}>{isGuest ? t('guestBadge') : user?.displayName || user?.email}</p>
+                {isGuest && <span className="rounded-full bg-amber-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-amber-500">{t('guestBadge')}</span>}
+              </div>
             </div>
           </div>
 

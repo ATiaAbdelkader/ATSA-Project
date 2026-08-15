@@ -35,11 +35,13 @@ Configure the following variables in the Vercel project settings for Preview and
 
 The Firebase web configuration in `firebase-applet-config.json` contains public browser bootstrap values and is separate from the Firebase Admin service-account credentials.
 
-## Google Authentication setup
+## Authentication setup
 
-The application uses Firebase Authentication with the Google provider; it no longer supports a shared guest or demo identity. In the Firebase Console for project `ai-studio-applet-webapp-5a3d7`, open **Authentication → Sign-in method** and enable **Google** with a support email. Under **Authentication → Settings → Authorized domains**, add `atsa-project.vercel.app`, the Vercel preview domain(s) used for testing, and `localhost` for local development. The production domain must exactly match the browser origin, without a path or trailing slash.
+The application uses Firebase Authentication with **Email/Password** as the normal login and account-creation path. In the Firebase Console for project `ai-studio-applet-webapp-5a3d7`, open **Authentication → Sign-in method** and enable **Email/Password**. Enable **Anonymous** while temporary guest access is needed. The application does not use a shared guest credential: every guest session receives a unique Firebase anonymous UID and can access only records created under that UID.
 
-The login screen uses a popup first and automatically falls back to redirect sign-in when the browser blocks popups. If Firebase rejects the request, the UI now displays a localized error describing whether the domain is unauthorized, the Google provider is disabled, the popup was blocked, or the network failed. These console settings are required; they cannot be safely enabled from browser code.
+Temporary guest data is intentionally non-portable. It may be lost after sign-out, browser-data removal, or device changes. Users who need to retain work should create an email/password account. The login screen provides password reset by email and displays localized Firebase errors when a provider is disabled or credentials are invalid.
+
+Google sign-in is not required for the normal flow and has been removed from the application UI. Therefore, the Vercel domain does not need to be authorized for Google OAuth. Firebase still requires the normal web application domain configuration for its own authentication endpoints; keep `atsa-project.vercel.app` and `localhost` in **Authentication → Settings → Authorized domains**.
 
 ## Security requirements
 
