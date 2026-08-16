@@ -90,150 +90,20 @@ export const translations: TranslationDict = {
     fr: "Se souvenir de ce poste de travail",
     ar: "تذكر محطة العمل هذه"
   },
-  loginTitle: {
-    en: "Sign in",
-    fr: "Se connecter",
-    ar: "تسجيل الدخول"
+  authGoogle: {
+    en: "Authenticate with Google",
+    fr: "S'authentifier avec Google",
+    ar: "تسجيل الدخول عبر Google"
   },
-  signupTitle: {
-    en: "Create an account",
-    fr: "Créer un compte",
-    ar: "إنشاء حساب"
+  reviewerBypass: {
+    en: "reviewer bypass portal",
+    fr: "portail de contournement pour jury",
+    ar: "بوابة الالتفاف والتقييم للجنة التحكيم"
   },
-  authEmailDesc: {
-    en: "Use your email and password for a private laboratory session.",
-    fr: "Utilisez votre adresse e-mail et votre mot de passe pour une session de laboratoire privée.",
-    ar: "استخدم بريدك الإلكتروني وكلمة المرور لجلسة مختبر خاصة."
-  },
-  loginTab: {
-    en: "Sign in",
-    fr: "Connexion",
-    ar: "دخول"
-  },
-  signupTab: {
-    en: "Sign up",
-    fr: "Créer un compte",
-    ar: "تسجيل"
-  },
-  emailLabel: {
-    en: "Email",
-    fr: "E-mail",
-    ar: "البريد الإلكتروني"
-  },
-  passwordLabel: {
-    en: "Password",
-    fr: "Mot de passe",
-    ar: "كلمة المرور"
-  },
-  confirmPasswordLabel: {
-    en: "Confirm password",
-    fr: "Confirmer le mot de passe",
-    ar: "تأكيد كلمة المرور"
-  },
-  forgotPassword: {
-    en: "Forgot password?",
-    fr: "Mot de passe oublié ?",
-    ar: "هل نسيت كلمة المرور؟"
-  },
-  loginButton: {
-    en: "Sign in",
-    fr: "Se connecter",
-    ar: "تسجيل الدخول"
-  },
-  signupButton: {
-    en: "Create account",
-    fr: "Créer le compte",
-    ar: "إنشاء الحساب"
-  },
-  authWorking: {
-    en: "Please wait…",
-    fr: "Veuillez patienter…",
-    ar: "يرجى الانتظار…"
-  },
-  authTryAgain: {
-    en: "Try again",
-    fr: "Réessayer",
-    ar: "حاول مرة أخرى"
-  },
-  or: {
-    en: "or",
-    fr: "ou",
-    ar: "أو"
-  },
-  guestButton: {
-    en: "Continue as temporary guest",
-    fr: "Continuer comme invité temporaire",
-    ar: "المتابعة كضيف مؤقت"
-  },
-  guestBadge: {
-    en: "Temporary guest",
-    fr: "Invité temporaire",
-    ar: "ضيف مؤقت"
-  },
-  guestNotice: {
-    en: "Guest data belongs only to this temporary session and may be lost when you sign out or clear browser data. Create an account to keep your work.",
-    fr: "Les données invité appartiennent uniquement à cette session temporaire et peuvent être perdues après la déconnexion ou l'effacement des données du navigateur. Créez un compte pour conserver votre travail.",
-    ar: "بيانات الضيف تخص هذه الجلسة المؤقتة فقط وقد تضيع عند تسجيل الخروج أو مسح بيانات المتصفح. أنشئ حسابًا للاحتفاظ بعملك."
-  },
-  authErrorInvalidEmail: {
-    en: "Enter a valid email address.",
-    fr: "Saisissez une adresse e-mail valide.",
-    ar: "أدخل عنوان بريد إلكتروني صالحًا."
-  },
-  authErrorMissingPassword: {
-    en: "Enter your password.",
-    fr: "Saisissez votre mot de passe.",
-    ar: "أدخل كلمة المرور."
-  },
-  authErrorWeakPassword: {
-    en: "Choose a stronger password. Firebase requires at least six characters.",
-    fr: "Choisissez un mot de passe plus fort. Firebase exige au moins six caractères.",
-    ar: "اختر كلمة مرور أقوى. يتطلب Firebase ستة أحرف على الأقل."
-  },
-  authErrorPasswordMismatch: {
-    en: "The passwords do not match.",
-    fr: "Les mots de passe ne correspondent pas.",
-    ar: "كلمتا المرور غير متطابقتين."
-  },
-  authErrorEmailInUse: {
-    en: "An account already exists for this email. Sign in instead.",
-    fr: "Un compte existe déjà pour cet e-mail. Connectez-vous plutôt.",
-    ar: "يوجد حساب بهذا البريد الإلكتروني. سجّل الدخول بدلًا من ذلك."
-  },
-  authErrorInvalidCredentials: {
-    en: "The email or password is incorrect.",
-    fr: "L'e-mail ou le mot de passe est incorrect.",
-    ar: "البريد الإلكتروني أو كلمة المرور غير صحيحة."
-  },
-  authErrorEmailProviderDisabled: {
-    en: "Email/password authentication is not enabled. Enable it in Firebase Console → Authentication → Sign-in method.",
-    fr: "L'authentification par e-mail/mot de passe n'est pas activée. Activez-la dans Firebase Console → Authentication → Méthode de connexion.",
-    ar: "مصادقة البريد الإلكتروني/كلمة المرور غير مفعلة. فعّلها من Firebase Console ← Authentication ← Sign-in method."
-  },
-  authErrorAnonymousProviderDisabled: {
-    en: "Temporary guest access is not enabled. Enable Anonymous authentication in Firebase Console → Authentication → Sign-in method.",
-    fr: "L'accès invité temporaire n'est pas activé. Activez l'authentification anonyme dans Firebase Console → Authentication → Méthode de connexion.",
-    ar: "الوصول المؤقت كضيف غير مفعل. فعّل المصادقة المجهولة من Firebase Console ← Authentication ← Sign-in method."
-  },
-  authErrorNetwork: {
-    en: "A network error interrupted authentication. Check your connection and try again.",
-    fr: "Une erreur réseau a interrompu l'authentification. Vérifiez votre connexion et réessayez.",
-    ar: "أوقف خطأ في الشبكة المصادقة. تحقق من الاتصال وحاول مرة أخرى."
-  },
-  authErrorResetEmail: {
-    en: "Enter your email first to request a password reset.",
-    fr: "Saisissez d'abord votre e-mail pour demander une réinitialisation.",
-    ar: "أدخل بريدك الإلكتروني أولًا لطلب إعادة تعيين كلمة المرور."
-  },
-  authResetSent: {
-    en: "If an account exists for this email, a password-reset email has been sent.",
-    fr: "Si un compte existe pour cet e-mail, un e-mail de réinitialisation a été envoyé.",
-    ar: "إذا كان هناك حساب بهذا البريد، فقد أُرسلت رسالة لإعادة تعيين كلمة المرور."
-  },
-  authErrorGeneric: {
-    en: "Authentication could not be completed. Check your details and Firebase Authentication settings.",
-    fr: "L'authentification n'a pas pu être terminée. Vérifiez vos informations et les paramètres Firebase Authentication.",
-    ar: "تعذر إكمال المصادقة. تحقق من بياناتك وإعدادات Firebase Authentication."
+  instantJuryAccess: {
+    en: "Instant Jury Access (By-Pass)",
+    fr: "Accès Instantané Jury (Contourner)",
+    ar: "دخول فوري للجنة التحكيم (تخطي)"
   },
 
   // Navigation Items
@@ -308,21 +178,6 @@ export const translations: TranslationDict = {
     en: "Access CASA Engine",
     fr: "Accéder au Moteur CASA",
     ar: "أدخل محرك CASA"
-  },
-  researchPrototypeNoticeTitle: {
-    en: "Research prototype — not clinically validated",
-    fr: "Prototype de recherche — non validé cliniquement",
-    ar: "نموذج بحثي — غير مُعتمد سريرياً"
-  },
-  researchPrototypeNoticeBody: {
-    en: "Results are exploratory computer-assisted estimates and may include unavailable or AI-estimated fields. Do not use them alone for clinical, treatment, breeding, or reproductive decisions.",
-    fr: "Les résultats sont des estimations exploratoires assistées par ordinateur et peuvent inclure des champs indisponibles ou estimés par IA. Ne les utilisez pas seuls pour prendre des décisions cliniques, thérapeutiques, d'élevage ou de reproduction.",
-    ar: "النتائج تقديرات استكشافية بمساعدة الحاسوب وقد تتضمن حقولاً غير مقاسة أو مقدّرة بالذكاء الاصطناعي. لا تستخدمها وحدها لاتخاذ قرارات سريرية أو علاجية أو تناسلية أو متعلقة بالتربية."
-  },
-  researchPrototypeReportLabel: {
-    en: "Research prototype report — not a validated clinical measurement",
-    fr: "Rapport de prototype de recherche — mesure clinique non validée",
-    ar: "تقرير نموذج بحثي — ليس قياساً سريرياً معتمداً"
   },
 
   // Feature features in Login

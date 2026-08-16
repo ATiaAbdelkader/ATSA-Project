@@ -54,14 +54,6 @@ export interface SpeciesProfile {
   maxLeukocytes: number;
 }
 
-export type MeasurementProvenance = 'measured' | 'derived' | 'ai-estimated' | 'unavailable' | 'visualization-only';
-
-export interface AnalysisProvenance {
-  overall: MeasurementProvenance;
-  fields: Record<string, MeasurementProvenance>;
-  notes: string[];
-}
-
 export interface AnalysisResult {
   timestamp: string;
   patientId: string;
@@ -136,11 +128,10 @@ export interface AnalysisResult {
       totalCount: number;
     };
     interpretation?: {
-      status: 'normal' | 'borderline' | 'abnormal' | 'not-validated';
+      status: 'normal' | 'borderline' | 'abnormal';
       comments: string[];
       recommendations: string[];
     };
-    provenance?: AnalysisProvenance;
     visionInsights?: {
       concentration?: string;
       motility?: {
@@ -163,36 +154,6 @@ export interface AnalysisResult {
 }
 
 export type AppState = 'login' | 'dashboard' | 'analysis' | 'help' | 'history' | 'inventory';
-
-export interface CategoricalValidationPair {
-  id: string;
-  referenceLabel: string;
-  predictedLabel: string;
-}
-
-export interface NumericValidationPair {
-  id: string;
-  referenceValue: number;
-  predictedValue: number;
-}
-
-export interface ValidationReport {
-  categorical: {
-    total: number;
-    exactAgreement: number;
-    agreementRate: number | null;
-    labels: string[];
-    confusionMatrix: Record<string, Record<string, number>>;
-  };
-  numeric: {
-    total: number;
-    valid: number;
-    meanAbsoluteError: number | null;
-    medianAbsoluteError: number | null;
-    maxAbsoluteError: number | null;
-  };
-  notes: string[];
-}
 
 export interface HistoricalDataPoint {
   date: string;
