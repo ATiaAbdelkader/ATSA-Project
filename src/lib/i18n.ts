@@ -659,6 +659,31 @@ export const translations: TranslationDict = {
     fr: "Validation",
     ar: "الاعتماد"
   },
+  tabTaxis: {
+    en: "Taxis / Flow",
+    fr: "Taxie / Flux",
+    ar: "التوجيه والانجذاب"
+  },
+  tabFlagellar: {
+    en: "Flagellar (SpermQ)",
+    fr: "Flagellaire (SpermQ)",
+    ar: "حركة السوط"
+  },
+  tabSubpopulations: {
+    en: "Subpopulations (PCA)",
+    fr: "Sous-populations (PCA)",
+    ar: "المجموعات الفرعية"
+  },
+  tabVisem: {
+    en: "VISEM Benchmark",
+    fr: "Référence VISEM",
+    ar: "معيار VISEM"
+  },
+  tabQc: {
+    en: "IQC & QC",
+    fr: "CIQ & CQ",
+    ar: "مراقبة الجودة"
+  },
   tabAbout: {
     en: "About",
     fr: "À propos",

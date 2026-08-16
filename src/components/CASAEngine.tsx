@@ -45,7 +45,8 @@ import {
   TrendingUp,
   User as UserIcon,
   BookOpen,
-  Award
+  Award,
+  Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -65,9 +66,12 @@ import {
 } from 'recharts';
 import { cn, SPECIES_PROFILES } from '../utils';
 import { useLanguage } from '../context/LanguageContext';
-import type { SpermData, AnalysisResult, SpeciesProfile } from '../types';
+import type { SpermData, AnalysisResult, SpeciesProfile, FieldOfViewData, MultiFOVComposite } from '../types';
 import { calculateKinematics, generateSummary } from '../services/casaService';
 import { HelpCenter } from './HelpCenter';
+import { QualityControl } from './QualityControl';
+import { MultiFOVModal } from './MultiFOVModal';
+import { PDFDossier } from './PDFDossier';
 
 import { Sperm3DPath } from './Sperm3DPath';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -228,7 +232,41 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showStats, setShowStats] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
-  const [activeTab, setActiveTab] = useState<'live' | 'kinematics' | 'morphology' | 'vitality' | 'sdf' | 'ai' | 'report' | 'validation' | 'history' | 'calculator' | 'about'>('live');
+  const [activeTab, setActiveTab] = useState<'live' | 'kinematics' | 'morphology' | 'vitality' | 'sdf' | 'ai' | 'report' | 'validation' | 'history' | 'calculator' | 'about' | 'qc'>('live');
+  const [showMultiFOVModal, setShowMultiFOVModal] = useState(false);
+  const [showPDFDossier, setShowPDFDossier] = useState(false);
+  const [multiFOVFields, setMultiFOVFields] = useState<FieldOfViewData[]>([
+    {
+      fieldIndex: 1,
+      timestamp: new Date().toISOString(),
+      spermCount: 142,
+      concentration: 68.4,
+      totalMotility: 83.1,
+      progressiveMotility: 64.8,
+      normalMorphology: 5.8,
+      avgVcl: 84.5
+    },
+    {
+      fieldIndex: 2,
+      timestamp: new Date().toISOString(),
+      spermCount: 138,
+      concentration: 65.2,
+      totalMotility: 81.2,
+      progressiveMotility: 63.8,
+      normalMorphology: 5.4,
+      avgVcl: 82.1
+    },
+    {
+      fieldIndex: 3,
+      timestamp: new Date().toISOString(),
+      spermCount: 146,
+      concentration: 71.0,
+      totalMotility: 83.6,
+      progressiveMotility: 65.1,
+      normalMorphology: 5.9,
+      avgVcl: 86.2
+    }
+  ]);
   const [designerInfo, setDesignerInfo] = useState(() => {
     const saved = localStorage.getItem('atsa_designer_info');
     return saved ? JSON.parse(saved) : {
@@ -352,7 +390,9 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
           length: isBovine ? 8.4 : 7.6,
           width: isBovine ? 4.2 : 3.9,
           circularity: isBovine ? 0.82 : 0.80,
-          elongation: 1.25
+          elongation: 1.25,
+          lengthWidthRatio: isBovine ? 2.0 : 1.95,
+          acrosomeAreaPercent: 58.0
         },
         morphology: {
           head: 'normal',
@@ -360,7 +400,8 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
           acrosome: 'normal',
           midpiece: 'normal',
           tail: 'normal',
-          droplet: 'none'
+          droplet: 'none',
+          krugerStrict: 'strict_normal'
         },
         vitality: 'live',
         classification: 'progressive',
@@ -394,7 +435,9 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
           length: isBovine ? 9.2 : 8.1,
           width: isBovine ? 4.6 : 4.1,
           circularity: isBovine ? 0.74 : 0.72,
-          elongation: 1.38
+          elongation: 1.38,
+          lengthWidthRatio: 2.0,
+          acrosomeAreaPercent: 35.0
         },
         morphology: {
           head: 'pyriform',
@@ -402,7 +445,8 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
           acrosome: 'abnormal',
           midpiece: 'bent',
           tail: 'normal',
-          droplet: 'none'
+          droplet: 'none',
+          krugerStrict: 'abnormal'
         },
         vitality: 'live',
         classification: 'non-progressive',
@@ -436,7 +480,9 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
           length: isBovine ? 8.1 : 7.2,
           width: isBovine ? 4.0 : 3.6,
           circularity: isBovine ? 0.86 : 0.84,
-          elongation: 1.15
+          elongation: 1.15,
+          lengthWidthRatio: 2.02,
+          acrosomeAreaPercent: 20.0
         },
         morphology: {
           head: 'amorphous',
@@ -444,7 +490,8 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
           acrosome: 'abnormal',
           midpiece: 'asymmetric',
           tail: 'coiled',
-          droplet: 'proximal'
+          droplet: 'proximal',
+          krugerStrict: 'abnormal'
         },
         vitality: 'dead',
         classification: 'immotile',
@@ -2155,9 +2202,10 @@ Digital Signature Verified - ATSA AI Engine v2.0
             acrosome: 'normal',
             midpiece: 'normal',
             tail: 'normal',
-            droplet: 'none'
+            droplet: 'none',
+            krugerStrict: 'strict_normal'
           },
-          morphometry: { area: 18, perimeter: 15, length: 6, width: 3.2, circularity: 0.85, elongation: 0.45 },
+          morphometry: { area: 18, perimeter: 15, length: 6, width: 3.2, circularity: 0.85, elongation: 0.45, lengthWidthRatio: 1.875, acrosomeAreaPercent: 55.0 },
           vitality: 'live',
           sdf: { fragmented: false, haloSized: 18, dfi: 10 }
         };
@@ -2330,6 +2378,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
             {activeTab === 'history' && <Clock className="w-3.5 h-3.5" />}
             {activeTab === 'calculator' && <Calculator className="w-3.5 h-3.5" />}
             {activeTab === 'validation' && <CheckCircle2 className="w-3.5 h-3.5" />}
+            {activeTab === 'qc' && <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />}
             {activeTab === 'about' && <UserIcon className="w-3.5 h-3.5 text-pink-400" />}
           </div>
           <div>
@@ -2344,6 +2393,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                activeTab === 'sdf' ? t('tabSdf') :
                activeTab === 'ai' ? t('tabAi') :
                activeTab === 'report' ? t('tabReport') :
+               activeTab === 'qc' ? t('tabQc') :
                activeTab === 'history' ? t('tabHistory') :
                activeTab === 'calculator' ? t('tabCalculator') :
                activeTab === 'validation' ? t('tabValidation') :
@@ -2365,6 +2415,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
             { id: 'sdf', labelKey: 'tabSdf', icon: Dna, color: 'text-sky-500', pulsing: false, glowing: false },
             { id: 'ai', labelKey: 'tabAi', icon: Sparkles, color: 'text-purple-400', pulsing: false, glowing: true },
             { id: 'report', labelKey: 'tabReport', icon: FileText, color: 'text-blue-500', pulsing: false, glowing: false },
+            { id: 'qc', labelKey: 'tabQc', icon: ShieldCheck, color: 'text-teal-400', pulsing: false, glowing: false },
             { id: 'history', labelKey: 'tabHistory', icon: Clock, color: 'text-amber-500', pulsing: false, glowing: false },
             { id: 'calculator', labelKey: 'tabCalculator', icon: Calculator, color: 'text-indigo-500', pulsing: false, glowing: false },
             { id: 'validation', labelKey: 'tabValidation', icon: CheckCircle2, color: 'text-teal-500', pulsing: false, glowing: false },
@@ -2448,7 +2499,11 @@ Digital Signature Verified - ATSA AI Engine v2.0
       <div className="flex flex-1 overflow-hidden">
         {/* Main Workspace */}
         <main className={cn("flex-1 relative flex items-center justify-center overflow-hidden transition-colors", theme === 'dark' ? "bg-black" : "bg-slate-200")}>
-          {activeTab === 'about' ? (
+          {activeTab === 'qc' ? (
+            <div className="w-full h-full overflow-y-auto p-4 md:p-6 custom-scrollbar">
+              <QualityControl currentAnalysis={results} theme={theme} />
+            </div>
+          ) : activeTab === 'about' ? (
             <div className="w-full h-full overflow-y-auto p-4 md:p-8 flex items-center justify-center">
               <div className={cn(
                 "w-full max-w-4xl rounded-2xl border shadow-2xl overflow-hidden p-6 md:p-8 space-y-8 animate-in fade-in zoom-in-95 duration-500",
@@ -3031,6 +3086,16 @@ Digital Signature Verified - ATSA AI Engine v2.0
                 title="Dose & Dilution Calculator"
               >
                 <Zap className="w-5 h-5" />
+              </button>
+              <button 
+                onClick={() => setShowMultiFOVModal(true)}
+                className={cn(
+                  "p-3 rounded-xl transition-all cursor-pointer",
+                  showMultiFOVModal ? "bg-teal-500 text-white shadow-lg shadow-teal-500/20" : "bg-white/10 hover:bg-white/20 text-white"
+                )}
+                title="Multi-Field of View (FOV) Aggregator & Chamber Calibration"
+              >
+                <Layers className="w-5 h-5" />
               </button>
               <button 
                 onClick={() => setShowStats(!showStats)} 
@@ -4241,42 +4306,60 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                  </div>
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-2.5">
                               <div className={cn(
-                                "relative overflow-hidden p-3 rounded-xl border",
+                                "relative overflow-hidden p-2.5 rounded-xl border",
                                 theme === 'dark' ? "bg-white/5 border-white/5" : "bg-black/5 border-black/5"
                               )}>
                                 <p className={cn(
-                                  "text-[8px] font-bold uppercase mb-1",
-                                  theme === 'dark' ? "text-white/30" : "text-black/30"
-                                )}>TZI (Teratozoospermia Index)</p>
+                                  "text-[7.5px] font-bold uppercase mb-1 truncate",
+                                  theme === 'dark' ? "text-white/40" : "text-black/40"
+                                )}>TZI (Teratozoospermia)</p>
                                 <p className={cn(
-                                  "text-xl font-mono font-black",
+                                  "text-lg font-mono font-black",
                                   theme === 'dark' ? "text-white/90" : "text-slate-900"
                                 )}>{results.summary.morphology.tzi.toFixed(2)}</p>
                                 <p className={cn(
-                                  "text-[7px] mt-1",
-                                  theme === 'dark' ? "text-white/20" : "text-black/20"
-                                )}>Normal range: &lt; 1.6</p>
-                                <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 rounded-full -mr-8 -mt-8 blur-2xl" />
+                                  "text-[7px] mt-0.5",
+                                  theme === 'dark' ? "text-white/30" : "text-black/30"
+                                )}>Ref: &lt; 1.60</p>
+                                <div className="absolute top-0 right-0 w-12 h-12 bg-emerald-500/5 rounded-full -mr-6 -mt-6 blur-xl" />
                               </div>
                               <div className={cn(
-                                "relative overflow-hidden p-3 rounded-xl border",
+                                "relative overflow-hidden p-2.5 rounded-xl border",
                                 theme === 'dark' ? "bg-white/5 border-white/5" : "bg-black/5 border-black/5"
                               )}>
                                 <p className={cn(
-                                  "text-[8px] font-bold uppercase mb-1",
-                                  theme === 'dark' ? "text-white/30" : "text-black/30"
-                                )}>MAI (Multiple Anomalies Index)</p>
+                                  "text-[7.5px] font-bold uppercase mb-1 truncate",
+                                  theme === 'dark' ? "text-white/40" : "text-black/40"
+                                )}>MAI (Anomalies Index)</p>
                                 <p className={cn(
-                                  "text-xl font-mono font-black",
+                                  "text-lg font-mono font-black",
                                   theme === 'dark' ? "text-white/90" : "text-slate-900"
                                 )}>{results.summary.morphology.mai.toFixed(2)}</p>
                                 <p className={cn(
-                                  "text-[7px] mt-1",
-                                  theme === 'dark' ? "text-white/20" : "text-black/20"
-                                )}>Normal range: &lt; 1.5</p>
-                                <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 rounded-full -mr-8 -mt-8 blur-2xl" />
+                                  "text-[7px] mt-0.5",
+                                  theme === 'dark' ? "text-white/30" : "text-black/30"
+                                )}>Ref: &lt; 1.50</p>
+                                <div className="absolute top-0 right-0 w-12 h-12 bg-blue-500/5 rounded-full -mr-6 -mt-6 blur-xl" />
+                              </div>
+                              <div className={cn(
+                                "relative overflow-hidden p-2.5 rounded-xl border",
+                                theme === 'dark' ? "bg-white/5 border-white/5" : "bg-black/5 border-black/5"
+                              )}>
+                                <p className={cn(
+                                  "text-[7.5px] font-bold uppercase mb-1 truncate",
+                                  theme === 'dark' ? "text-white/40" : "text-black/40"
+                                )}>SDI (Deformity Index)</p>
+                                <p className={cn(
+                                  "text-lg font-mono font-black",
+                                  theme === 'dark' ? "text-white/90" : "text-slate-900"
+                                )}>{((results.summary.morphology.tzi * (100 - results.summary.morphology.normal)) / 100).toFixed(2)}</p>
+                                <p className={cn(
+                                  "text-[7px] mt-0.5",
+                                  theme === 'dark' ? "text-white/30" : "text-black/30"
+                                )}>Ref: &lt; 1.60</p>
+                                <div className="absolute top-0 right-0 w-12 h-12 bg-purple-500/5 rounded-full -mr-6 -mt-6 blur-xl" />
                               </div>
                             </div>
                           </section>
@@ -5808,8 +5891,18 @@ Digital Signature Verified - ATSA AI Engine v2.0
 
                             {/* DOCUMENT EXPORT & TRANSMISSION TOOLBAR */}
                             <div className="space-y-3">
-                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                              <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
                                 
+                                {/* 0. WHO 6th Clinical Dossier */}
+                                <button 
+                                  onClick={() => setShowPDFDossier(true)}
+                                  className="p-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl font-bold text-[10px] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20"
+                                  title="Open Multi-Page ISO 15189 / WHO 6th Clinical Dossier generator"
+                                >
+                                  <Award className="w-3.5 h-3.5" />
+                                  Clinical Dossier
+                                </button>
+
                                 {/* 1. Native Print Dialogue */}
                                 <button 
                                   onClick={printReport}
@@ -6546,6 +6639,55 @@ Digital Signature Verified - ATSA AI Engine v2.0
           </div>
         )}
       </AnimatePresence>
+
+      {/* Multi-Field OF View (FOV) Aggregator & Chamber Calibration Modal */}
+      {showMultiFOVModal && (
+        <MultiFOVModal
+          isOpen={showMultiFOVModal}
+          onClose={() => setShowMultiFOVModal(false)}
+          fields={multiFOVFields}
+          onFieldsChange={setMultiFOVFields}
+          onApplyComposite={(composite) => {
+            if (results) {
+              setResults({
+                ...results,
+                multiFov: composite,
+                summary: {
+                  ...results.summary,
+                  concentration: composite.meanConcentration,
+                  motility: {
+                    ...results.summary.motility,
+                    total: composite.meanTotalMotility,
+                    progressive: composite.meanProgressiveMotility
+                  },
+                  morphology: {
+                    ...results.summary.morphology,
+                    normal: composite.meanNormalMorphology
+                  }
+                }
+              });
+            }
+          }}
+          theme={theme}
+        />
+      )}
+
+      {/* WHO 6th Edition & Veterinary Multi-Page PDF Dossier Generator */}
+      {showPDFDossier && results && (
+        <PDFDossier
+          isOpen={showPDFDossier}
+          onClose={() => setShowPDFDossier(false)}
+          results={results}
+          clinicianName={clinicianName}
+          facilityName={facilityName}
+          collectionMethod={collectionMethod}
+          sampleVolume={sampleVolume}
+          samplePh={samplePh}
+          sampleAppearance={sampleAppearance}
+          clinicianRemarks={clinicianRemarks}
+          theme={theme}
+        />
+      )}
     </div>
   );
 };

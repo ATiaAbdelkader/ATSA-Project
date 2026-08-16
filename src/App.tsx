@@ -44,6 +44,7 @@ import { CASAEngine } from './components/CASAEngine';
 import { HelpCenter } from './components/HelpCenter';
 import { PatientHistoryView } from './components/PatientHistory';
 import { InventoryManagement } from './components/InventoryManagement';
+import { PerformanceTrendsChart } from './components/PerformanceTrendsChart';
 import type { AppState, SpeciesProfile } from './types';
 import { auth, db, googleProvider } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -1088,99 +1089,24 @@ export default function App() {
 
               {/* Performance Trends of Clinic */}
               <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Performance Trends Chart */}
-                <div className={cn(
-                  "lg:col-span-2 p-8 border rounded-[32px] flex flex-col justify-between transition-all duration-300 relative overflow-hidden",
-                  theme === 'dark' 
-                    ? "bg-[#09090b] border-white/[0.06] shadow-[0_10px_30px_rgba(0,0,0,0.2)]" 
-                    : "bg-white border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.02)]"
-                )}>
-                  {theme === 'dark' && (
-                    <div className="absolute top-0 right-0 w-[200px] h-[200px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-                  )}
-                  
-                  <div>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <TrendingUp className="w-4 h-4 text-emerald-500" />
-                          <h3 className={cn("text-[10px] font-black uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>
-                            Sperm Concentration Analytics
-                          </h3>
-                        </div>
-                        <h4 className={cn("text-lg font-black tracking-tight", theme === 'dark' ? "text-white" : "text-slate-800")}>
-                          Performance Trends (30 Days)
-                        </h4>
-                      </div>
-                      <div className="flex items-center gap-1.5 self-start sm:self-center font-mono text-[10px] uppercase font-bold text-slate-500 dark:text-white/45 bg-slate-500/[0.02] dark:bg-white/[0.02] border border-slate-100 dark:border-white/[0.04] px-2.5 py-1 rounded-lg">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        Avg: {trendData.filter(d => d.count > 0).length > 0 
-                          ? (trendData.reduce((acc, curr) => acc + curr.concentration, 0) / trendData.filter(d => d.count > 0).length).toFixed(1)
-                          : "0.0"
-                        } M/ml
-                      </div>
-                    </div>
-
-                    <div className="h-[240px] w-full">
-                      {trendData.every(d => d.concentration === 0) ? (
-                        <div className="h-full w-full flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-white/10 rounded-2xl p-6 text-center">
-                          <Activity className="w-8 h-8 text-slate-300 dark:text-white/10 mb-2 animate-pulse" />
-                          <p className="text-xs font-bold text-slate-500 dark:text-white/30 font-sans">No diagnostic data for the last 30 days</p>
-                          <p className="text-[10px] text-slate-400 dark:text-white/20 mt-1 max-w-xs leading-normal">Register a patient sample and run full motility analyses in the CASA Engine to visualize real trends.</p>
-                        </div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={trendData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="dashboardConc" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.25}/>
-                                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)"} vertical={false} />
-                            <XAxis 
-                              dataKey="date" 
-                              stroke={theme === 'dark' ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.3)"} 
-                              fontSize={9} 
-                              tickLine={false} 
-                              axisLine={false}
-                              dy={10}
-                            />
-                            <YAxis 
-                              stroke={theme === 'dark' ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.3)"} 
-                              fontSize={9} 
-                              tickLine={false} 
-                              axisLine={false} 
-                              domain={[0, 'auto']}
-                            />
-                            <Tooltip 
-                              content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                  return (
-                                    <div className={cn(
-                                      "p-3 rounded-xl border shadow-xl font-mono text-xs space-y-1",
-                                      theme === 'dark' ? "bg-[#0b0b0d]/95 border-emerald-500/30 text-white" : "bg-white/95 border-emerald-500/25 text-slate-800"
-                                    )}>
-                                      <p className="font-bold text-[10px] text-muted-foreground">{payload[0].payload.date}</p>
-                                      <p className="font-black text-emerald-500">
-                                        Conc: {payload[0].value} <span className="text-[10px] opacity-60">M/ml</span>
-                                      </p>
-                                      <p className="text-[9px] opacity-45">
-                                        Based on {payload[0].payload.count} {payload[0].payload.count === 1 ? 'sample' : 'samples'}
-                                      </p>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              }} 
-                              cursor={{ stroke: theme === 'dark' ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)", strokeWidth: 1 }} 
-                            />
-                            <Area type="monotone" dataKey="concentration" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#dashboardConc)" />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      )}
-                    </div>
-                  </div>
+                {/* Performance Trends Chart with Hover-To-Zoom & Detailed Tooltip */}
+                <div className="lg:col-span-2">
+                  <PerformanceTrendsChart 
+                    analyses={recent30DaysAnalyses} 
+                    theme={theme} 
+                    language={language}
+                    onSelectSample={(sample) => {
+                      if (sample.patientId) {
+                        const profileKey = (sample.species?.toLowerCase() || 'human') as keyof typeof SPECIES_PROFILES;
+                        setActivePatient({
+                          id: sample.patientId,
+                          species: sample.species || 'Human',
+                          profile: SPECIES_PROFILES[profileKey] || SPECIES_PROFILES.human
+                        });
+                      }
+                      setAppState('history');
+                    }}
+                  />
                 </div>
 
                 {/* WHO Reference Compliance Meter */}
