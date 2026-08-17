@@ -24,7 +24,9 @@ import {
   Download,
   X,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Globe,
+  ArrowLeft
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -45,6 +47,7 @@ import { HelpCenter } from './components/HelpCenter';
 import { PatientHistoryView } from './components/PatientHistory';
 import { InventoryManagement } from './components/InventoryManagement';
 import { PerformanceTrendsChart } from './components/PerformanceTrendsChart';
+import { LandingPage } from './components/LandingPage';
 import type { AppState, SpeciesProfile } from './types';
 import { auth, db, googleProvider } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -77,7 +80,7 @@ export default function App() {
     );
   };
 
-  const [appState, setAppState] = useState<AppState>('login');
+  const [appState, setAppState] = useState<AppState>('landing');
   const [isRegModalOpen, setIsRegModalOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [activePatient, setActivePatient] = useState<{ id: string; species: string; profile: SpeciesProfile } | null>(null);
@@ -174,10 +177,10 @@ export default function App() {
             setUser(parsed);
             setAppState('dashboard');
           } catch (e) {
-            setAppState('login');
+            setAppState('landing');
           }
         } else {
-          setAppState('login');
+          setAppState('landing');
         }
       }
     });
@@ -478,12 +481,12 @@ export default function App() {
       localStorage.removeItem('atsa_guest_session');
       await signOut(auth);
       setUser(null);
-      setAppState('login');
+      setAppState('landing');
     } catch (error) {
       console.error("Logout failed:", error);
       localStorage.removeItem('atsa_guest_session');
       setUser(null);
-      setAppState('login');
+      setAppState('landing');
     }
   };
 
@@ -511,9 +514,34 @@ export default function App() {
     }
   };
 
+  if (appState === 'landing') {
+    return (
+      <LandingPage
+        onEnterApp={() => setAppState('login')}
+        onGuestLogin={handleGuestLogin}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+      />
+    );
+  }
+
   if (appState === 'login') {
     return (
-      <div dir={dir} className={cn("min-h-screen flex flex-col lg:flex-row font-sans transition-colors duration-500", theme === 'dark' ? "bg-[#050505]" : "bg-slate-50")}>
+      <div dir={dir} className={cn("min-h-screen flex flex-col lg:flex-row font-sans transition-colors duration-500 relative", theme === 'dark' ? "bg-[#050505]" : "bg-slate-50")}>
+        {/* Top Left Return to Landing button */}
+        <button
+          onClick={() => setAppState('landing')}
+          className={cn(
+            "absolute top-6 left-6 z-30 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold border transition-all hover:scale-105 cursor-pointer backdrop-blur-md",
+            theme === 'dark'
+              ? "bg-white/5 border-white/10 text-white/80 hover:text-white hover:bg-white/10 shadow-lg"
+              : "bg-white/90 border-slate-200 text-slate-700 hover:text-slate-900 shadow-md"
+          )}
+        >
+          <ArrowLeft className="w-4 h-4 text-emerald-400" />
+          <span>Product Overview</span>
+        </button>
+
         {/* Left Side: Information & Branding */}
         <div className={cn(
           "flex-1 relative overflow-hidden flex flex-col justify-center p-12 lg:p-24",
@@ -808,6 +836,16 @@ export default function App() {
         </nav>
 
         <div className={cn("p-4 border-t space-y-1.5", theme === 'dark' ? "border-white/[0.04]" : "border-slate-100")}>
+          <button 
+            onClick={() => setAppState('landing')}
+            className={cn(
+              "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 cursor-pointer",
+              theme === 'dark' ? "text-emerald-400/80 hover:bg-emerald-500/10 hover:text-emerald-300" : "text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900"
+            )}
+          >
+            <Globe className="w-5 h-5" />
+            <span className="font-medium hidden lg:block text-sm">Product Overview</span>
+          </button>
           <button className={cn(
             "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 cursor-pointer",
             theme === 'dark' ? "text-white/40 hover:bg-white/5 hover:text-white" : "text-slate-400 hover:bg-slate-50 hover:text-slate-900"

@@ -270,7 +270,7 @@ export const FlagellarWaveformAnalyzer: React.FC<FlagellarWaveformAnalyzerProps>
               </div>
             </div>
             <p className={cn("text-xs max-w-2xl leading-relaxed", theme === 'dark' ? "text-white/60" : "text-slate-500")}>
-              Reconstructs the traveling wave propagation along the flagellum arc length ($s$). Quantifies flagellar curvature ($\kappa$), waveform symmetry, beat frequency ($f_{beat}$), and thrust efficiency.
+              Reconstructs the traveling wave propagation along the flagellum arc length (s). Quantifies flagellar curvature (κ), waveform symmetry, beat frequency (f_beat), and thrust efficiency.
             </p>
           </div>
 

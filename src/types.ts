@@ -232,7 +232,7 @@ export interface AnalysisResult {
   spermatozoa: SpermData[];
 }
 
-export type AppState = 'login' | 'dashboard' | 'analysis' | 'help' | 'history' | 'inventory' | 'qc';
+export type AppState = 'landing' | 'login' | 'dashboard' | 'analysis' | 'help' | 'history' | 'inventory' | 'qc';
 
 export interface HistoricalDataPoint {
   date: string;
