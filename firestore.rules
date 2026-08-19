@@ -104,7 +104,7 @@ service cloud.firestore {
       allow read: if isAuthorized(resource.data.uid);
       allow create: if isAuthorized(request.resource.data.uid) && isValidAnalysis(request.resource.data);
       allow update: if isAuthorized(resource.data.uid) && isAuthorized(request.resource.data.uid) && isValidAnalysis(request.resource.data) && request.resource.data.uid == resource.data.uid;
-      allow delete: if isAdmin() || (resource.data.uid == "jury_guest_pass");
+      allow delete: if isAuthorized(resource.data.uid);
     }
 
     match /patients/{patientId} {

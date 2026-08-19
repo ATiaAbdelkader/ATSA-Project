@@ -72,6 +72,7 @@ import { HelpCenter } from './HelpCenter';
 import { QualityControl } from './QualityControl';
 import { MultiFOVModal } from './MultiFOVModal';
 import { PDFDossier } from './PDFDossier';
+import { VIRTUAL_ANIMALS, VIRTUAL_ANIMAL_KEYS, type VirtualAnimalRecord } from '../data/virtualAnimalDatasets';
 
 import { Sperm3DPath } from './Sperm3DPath';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -357,270 +358,65 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [labelStorageLoc, setLabelStorageLoc] = useState('Dewar A / Canister 3 / Straw #12');
   const [labelWarning, setLabelWarning] = useState('Biohazard - Research Only');
+  const [engineToast, setEngineToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (engineToast) {
+      const timer = setTimeout(() => setEngineToast(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [engineToast]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [results, setResults] = useState<AnalysisResult | null>(null);
 
-  const loadDemoData = (speciesName: 'Bovine' | 'Equine') => {
-    const profile = SPECIES_PROFILES[speciesName] || SPECIES_PROFILES['Bovine'];
-    const isBovine = speciesName === 'Bovine';
-    
-    const demoSpermatList: SpermData[] = [
-      {
-        id: "SPM-001",
-        path: Array.from({ length: 40 }, (_, i) => ({
-          x: 120 + Math.sin(i * 0.4) * (isBovine ? 18 : 25) + i * 1.5,
-          y: 110 + Math.cos(i * 0.4) * (isBovine ? 15 : 20) + i * 1.2,
-          z: Math.sin(i * 0.2) * 4,
-          t: i * 0.016
-        })),
-        vcl: isBovine ? 142.5 : 124.6,
-        vsl: isBovine ? 84.1 : 68.2,
-        vap: isBovine ? 98.4 : 82.5,
-        lin: isBovine ? 0.59 : 0.55,
-        str: isBovine ? 0.85 : 0.83,
-        wob: isBovine ? 0.69 : 0.66,
-        alh: isBovine ? 4.25 : 3.85,
-        bcf: isBovine ? 28.4 : 26.1,
-        mad: isBovine ? 12.8 : 14.5,
-        morphometry: {
-          area: isBovine ? 32.5 : 28.4,
-          perimeter: isBovine ? 24.1 : 21.2,
-          length: isBovine ? 8.4 : 7.6,
-          width: isBovine ? 4.2 : 3.9,
-          circularity: isBovine ? 0.82 : 0.80,
-          elongation: 1.25,
-          lengthWidthRatio: isBovine ? 2.0 : 1.95,
-          acrosomeAreaPercent: 58.0
-        },
-        morphology: {
-          head: 'normal',
-          vacuoles: 'absent',
-          acrosome: 'normal',
-          midpiece: 'normal',
-          tail: 'normal',
-          droplet: 'none',
-          krugerStrict: 'strict_normal'
-        },
-        vitality: 'live',
-        classification: 'progressive',
-        isHyperactivated: isBovine ? true : false,
-        sdf: {
-          fragmented: false,
-          haloSized: 14.2,
-          dfi: 8.5
-        }
-      },
-      {
-        id: "SPM-002",
-        path: Array.from({ length: 40 }, (_, i) => ({
-          x: 250 + Math.sin(i * 0.8) * 4,
-          y: 160 + i * 0.4,
-          z: Math.cos(i * 0.4) * 2,
-          t: i * 0.016
-        })),
-        vcl: isBovine ? 46.2 : 38.4,
-        vsl: isBovine ? 15.5 : 12.1,
-        vap: isBovine ? 22.8 : 18.5,
-        lin: isBovine ? 0.34 : 0.31,
-        str: isBovine ? 0.68 : 0.65,
-        wob: isBovine ? 0.49 : 0.48,
-        alh: isBovine ? 1.85 : 1.55,
-        bcf: isBovine ? 11.2 : 9.8,
-        mad: isBovine ? 35.4 : 38.2,
-        morphometry: {
-          area: isBovine ? 36.4 : 31.2,
-          perimeter: isBovine ? 26.5 : 23.4,
-          length: isBovine ? 9.2 : 8.1,
-          width: isBovine ? 4.6 : 4.1,
-          circularity: isBovine ? 0.74 : 0.72,
-          elongation: 1.38,
-          lengthWidthRatio: 2.0,
-          acrosomeAreaPercent: 35.0
-        },
-        morphology: {
-          head: 'pyriform',
-          vacuoles: 'absent',
-          acrosome: 'abnormal',
-          midpiece: 'bent',
-          tail: 'normal',
-          droplet: 'none',
-          krugerStrict: 'abnormal'
-        },
-        vitality: 'live',
-        classification: 'non-progressive',
-        isHyperactivated: false,
-        sdf: {
-          fragmented: false,
-          haloSized: 11.5,
-          dfi: 12.4
-        }
-      },
-      {
-        id: "SPM-003",
-        path: Array.from({ length: 40 }, (_, i) => ({
-          x: 180 + Math.sin(i * 0.2) * 2,
-          y: 220 + Math.sin(i * 0.1) * 2,
-          z: 0,
-          t: i * 0.016
-        })),
-        vcl: 5.2,
-        vsl: 0.8,
-        vap: 1.5,
-        lin: 0.15,
-        str: 0.53,
-        wob: 0.28,
-        alh: 0.25,
-        bcf: 1.1,
-        mad: 2.5,
-        morphometry: {
-          area: isBovine ? 31.8 : 27.5,
-          perimeter: isBovine ? 22.4 : 19.8,
-          length: isBovine ? 8.1 : 7.2,
-          width: isBovine ? 4.0 : 3.6,
-          circularity: isBovine ? 0.86 : 0.84,
-          elongation: 1.15,
-          lengthWidthRatio: 2.02,
-          acrosomeAreaPercent: 20.0
-        },
-        morphology: {
-          head: 'amorphous',
-          vacuoles: 'present',
-          acrosome: 'abnormal',
-          midpiece: 'asymmetric',
-          tail: 'coiled',
-          droplet: 'proximal',
-          krugerStrict: 'abnormal'
-        },
-        vitality: 'dead',
-        classification: 'immotile',
-        isHyperactivated: false,
-        sdf: {
-          fragmented: true,
-          haloSized: 3.2,
-          dfi: 84.5
-        }
-      }
-    ];
+  const loadDemoData = (speciesNameOrKey: string) => {
+    const rawKey = (speciesNameOrKey || '').toLowerCase();
+    const animalKey: 'bovine' | 'equine' | 'canine' | 'porcine' | 'ovine' = 
+      rawKey.includes('bov') || rawKey.includes('bull') ? 'bovine'
+      : rawKey.includes('equ') || rawKey.includes('horse') || rawKey.includes('stallion') ? 'equine'
+      : rawKey.includes('can') || rawKey.includes('dog') ? 'canine'
+      : rawKey.includes('por') || rawKey.includes('pig') || rawKey.includes('boar') ? 'porcine'
+      : rawKey.includes('ovi') || rawKey.includes('sheep') || rawKey.includes('ram') ? 'ovine'
+      : 'bovine';
 
-    const demoSummary = {
-      totalCount: 84,
-      concentration: isBovine ? 562.5 : 124.8,
-      leukocytes: 0.15,
-      vitality: {
-        live: isBovine ? 84.5 : 78.2,
-        dead: isBovine ? 15.5 : 21.8,
-        total: 100
-      },
-      motility: {
-        progressive: isBovine ? 58.4 : 52.6,
-        nonProgressive: isBovine ? 18.2 : 16.4,
-        immotile: isBovine ? 23.4 : 31.0,
-        total: isBovine ? 76.6 : 69.0
-      },
-      kinematics: {
-        avgVcl: isBovine ? 128.4 : 110.5,
-        avgVsl: isBovine ? 74.2 : 62.4,
-        avgVap: isBovine ? 88.5 : 74.2,
-        avgLin: isBovine ? 0.58 : 0.56,
-        avgStr: isBovine ? 0.84 : 0.84,
-        avgWob: isBovine ? 0.69 : 0.67,
-        avgAlh: isBovine ? 3.95 : 3.45,
-        avgBcf: isBovine ? 26.4 : 24.2,
-        hyperactivation: {
-          count: isBovine ? 8 : 4,
-          percentage: isBovine ? 9.5 : 4.8
-        }
-      },
-      morphology: {
-        normal: isBovine ? 76.5 : 54.2,
-        abnormal: isBovine ? 23.5 : 45.8,
-        avgArea: isBovine ? 32.8 : 28.5,
-        tzi: isBovine ? 1.15 : 1.34,
-        mai: isBovine ? 1.10 : 1.22,
-        headDefects: {
-          large: 2.1,
-          small: 1.4,
-          amorphous: 3.8,
-          pyriform: 2.8,
-          tapered: 2.2,
-          round: 1.0
-        },
-        midpieceDefects: {
-          thick: isBovine ? 1.8 : 3.2,
-          bent: isBovine ? 3.2 : 5.8,
-          asymmetric: isBovine ? 1.5 : 2.4
-        },
-        tailDefects: {
-          short: 1.2,
-          coiled: isBovine ? 2.1 : 4.5,
-          bent: isBovine ? 2.5 : 4.8,
-          multiple: 0.6
-        },
-        acrosomeDefects: isBovine ? 2.1 : 4.2,
-        cytoplasmicDroplets: isBovine ? 1.4 : 3.1
-      },
-      sdf: {
-        dfi: isBovine ? 11.4 : 18.2,
-        fragmentedCount: isBovine ? 10 : 15,
-        totalCount: 84
-      },
-      interpretation: {
-        status: isBovine ? 'normal' as const : 'borderline' as const,
-        comments: isBovine 
-          ? [
-              "Patient concentration and total motility exceed criteria for bovine cryostorage reference limits (>70M/ml / >50%).",
-              "Superb acrosome structure and extremely low DNA Fragmentation Index (11.4%).",
-              "Low level of cytological and morphological defects detected overall."
-            ]
-          : [
-               "Equine concentration falls within normal fertile limits, but progressive mobility is borderline compared to premium stallion registries.",
-               "Slightly elevated midpiece and tail defects (bent midpieces and coiled tails) noted upon visual magnification.",
-               "DNA Fragmentation remains acceptable for AI procedures, but cooling and transportation should be conducted with care."
-            ],
-        recommendations: isBovine
-          ? [
-              "Approved for dilution and straw cryopreservation. Suggested dose target: 20 Million active sperm.",
-              "Excellent choice for immediate artificial insemination procedures."
-            ]
-          : [
-              "Formulate dose with nutrient-rich protective extender immediately following ejaculation.",
-              "Retest specimen quality after 24 hours of refrigerated storage (4°C) to verify cooling stability."
-            ]
-      }
-    };
+    const animal: VirtualAnimalRecord = VIRTUAL_ANIMALS[animalKey] || VIRTUAL_ANIMALS.bovine;
 
-    setResults({
-      timestamp: new Date().toISOString(),
-      patientId: isBovine ? "BOV-9872" : "EQU-3421",
-      species: speciesName,
-      settings: {
-        fps: 60,
-        micronsPerPixel: 0.65,
-        profile
-      },
-      summary: demoSummary,
-      spermatozoa: demoSpermatList
-    });
+    setResults(animal.results);
+    setClinicianName('Dr. Sarah Jenkins, DVM - Theriogenology Specialist');
+    setFacilityName(animal.ownerFacility || 'Central Semen Pathology & Cryopreservation Center');
+    setCollectionMethod(animal.macroscopic.collectionMethod as any);
+    setSampleVolume(animal.macroscopic.volume.toString());
+    setSamplePh(animal.macroscopic.ph.toString());
+    setSampleAppearance(animal.macroscopic.appearance);
+    setClinicianRemarks(animal.clinicianRemarks);
+    setSelectedSperm(animal.results.spermatozoa[0] || null);
+    setAiAnalysis(animal.aiDiagnosticNarrative);
 
-    setClinicianName('Dr. Sarah Jenkins, DVM');
-    setFacilityName('Central Semen Pathology Lab');
-    setCollectionMethod('Artificial Vagina');
-    setSampleVolume(isBovine ? '6.0' : '55.0');
-    setSamplePh(isBovine ? '6.8' : '7.4');
-    setSampleAppearance(isBovine ? 'Creamy Opaque' : 'Translucent Gray-White');
-    setClinicianRemarks(isBovine 
-      ? 'Excellent specimen quality. Retains high linearity parameters and low risk profile. Qualified for pedigree distribution.'
-      : 'Ejaculate volume is within standard stallion ranges. Recommend immediate extension to limit thermal shocks.'
-    );
-
-    setSelectedSperm(demoSpermatList[0]);
-    setAiAnalysis(isBovine 
-      ? 'Comprehensive Bovine (Bull) semen analysis displays robust concentration peaks exceeding 560 M/mL. Combined with progressive motility of 58.4%, the sample is deemed biologically premium and fit for high-throughput pedigree seeding lines.'
-      : 'Equine (Stallion) evaluation reveals progressive parameters bordering on critical thresholds. While overall concentration is strong, progressive motility measures of 52.6% warrant careful monitoring of transport temperatures.'
-    );
+    // Populate Cryo Calculator automatically with animal veterinary parameters
+    setCalculator(prev => ({
+      ...prev,
+      ejaculateVolume: animal.macroscopic.volume,
+      spermConcentration: animal.results.summary.concentration,
+      progressiveMotility: animal.results.summary.motility.progressive,
+      targetDoseMotile: animal.veterinarySft.targetDoseMotile,
+      selectedExtender: animal.veterinarySft.recommendedExtender.includes('BotuCrio') ? 'BotuCrio (Equine Freezing)' :
+                        animal.veterinarySft.recommendedExtender.includes('INRA') ? 'INRA 96 (Equine Fresh/Cooled)' :
+                        animal.veterinarySft.recommendedExtender.includes('CaniPRO') ? 'CaniPRO Chill 10 (Canine)' :
+                        animal.veterinarySft.recommendedExtender.includes('BTS') ? 'BTS (Beltsville Thawing Solution - Porcine)' :
+                        animal.veterinarySft.recommendedExtender.includes('Tris') ? 'Tris-Fructose-Glycerol (Ovine/Bovine)' :
+                        'BoviFree Plus (Egg-Yolk Free Bovine)'
+    }));
   };
+
+  // Auto-load virtual animal on initial mount if matching patientData is passed
+  useEffect(() => {
+    if (!results && patientData) {
+      const speciesName = patientData.species || patientData.id || 'Bovine';
+      loadDemoData(speciesName);
+    }
+  }, [patientData]);
 
   // Sync QC fields with loaded specimen results for visual continuity
   useEffect(() => {
@@ -1415,21 +1211,44 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
 
     try {
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 2.5,
         useCORS: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        logging: false
       });
       
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`ATSA-Report-${patientData.id}-${new Date().toISOString().split('T')[0]}.pdf`);
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgProps = pdf.getImageProperties(imgData);
+      const computedHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      let heightLeft = computedHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, computedHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - computedHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, computedHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      const reportId = results?.patientId || patientData.id || 'SPECIMEN';
+      pdf.save(`ATSA-Clinical-Report-${reportId}-${new Date().toISOString().split('T')[0]}.pdf`);
+      setEngineToast({
+        message: `${t('reportExportSuccess')} (${reportId})`,
+        type: 'success'
+      });
     } catch (err) {
       console.error("PDF Export failed:", err);
+      setEngineToast({
+        message: 'Failed to generate PDF report.',
+        type: 'error'
+      });
     }
   };
 
@@ -1482,6 +1301,10 @@ Digital Signature Verified - ATSA AI Engine v2.0
     navigator.clipboard.writeText(text);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
+    setEngineToast({
+      message: 'Report text summary copied to clipboard.',
+      type: 'success'
+    });
   };
 
   const exportToCSV = () => {
@@ -1546,6 +1369,10 @@ Digital Signature Verified - ATSA AI Engine v2.0
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setEngineToast({
+      message: `${t('csvExportSuccess')} (${results.patientId})`,
+      type: 'success'
+    });
   };
 
   const printReport = () => {
@@ -1605,6 +1432,10 @@ Digital Signature Verified - ATSA AI Engine v2.0
       </html>
     `);
     printWindow.document.close();
+    setEngineToast({
+      message: `${t('reportPrintSuccess')} (${results?.patientId || patientData.id})`,
+      type: 'success'
+    });
   };
 
   const handleAiChat = async (e: React.FormEvent) => {
@@ -2479,8 +2310,16 @@ Digital Signature Verified - ATSA AI Engine v2.0
           })}
         </div>
 
-        {/* Right Side: Quick Action Toggle Stats Panel */}
+        {/* Right Side: Quick Action Toggle Stats Panel & PDF Dossier Launcher */}
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowPDFDossier(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+            title="Generate multi-page certified clinical PDF Dossier"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Export PDF</span>
+          </button>
           <button
             onClick={() => setShowStats(!showStats)}
             className={cn(
@@ -2493,6 +2332,53 @@ Digital Signature Verified - ATSA AI Engine v2.0
             <BarChart3 className="w-3.5 h-3.5" />
             <span>{showStats ? "Hide Analytics" : "Show Analytics"}</span>
           </button>
+        </div>
+      </div>
+
+      {/* 5-Animal Virtual Clinical Library Quick-Switch Bar */}
+      <div className={cn(
+        "px-4 py-2 border-b flex items-center justify-between gap-3 overflow-x-auto no-scrollbar z-20 transition-colors",
+        theme === 'dark' ? "bg-[#0b0b0f] border-white/5" : "bg-slate-100 border-slate-200"
+      )}>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">
+            <ShieldCheck className="w-3 h-3" />
+            <span>Virtual Specimen Lab</span>
+          </div>
+          <span className={cn("text-[10px] hidden md:inline", theme === 'dark' ? "text-white/40" : "text-slate-400")}>
+            Select animal to load verified CASA metrics & full PDF report:
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {VIRTUAL_ANIMAL_KEYS.map((key) => {
+            const animal = VIRTUAL_ANIMALS[key];
+            const isSelected = results?.species?.toLowerCase() === animal.species.toLowerCase();
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => loadDemoData(key)}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer border select-none",
+                  isSelected
+                    ? "bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-500/20 font-black"
+                    : theme === 'dark'
+                      ? "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                )}
+              >
+                <span>{animal.avatarIcon}</span>
+                <span>{animal.species}</span>
+                <span className={cn(
+                  "text-[8px] px-1 py-0.2 rounded font-mono",
+                  isSelected ? "bg-black/30 text-white" : (theme === 'dark' ? "bg-white/10 text-white/50" : "bg-slate-100 text-slate-500")
+                )}>
+                  {animal.patientId}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -5504,41 +5390,53 @@ Digital Signature Verified - ATSA AI Engine v2.0
 
                           {/* RIGHT PANEL: PRINT REPORT SHEET PREVIEW (7/12 Columns) */}
                           <div className="xl:col-span-7 space-y-4">
-                            
-                            {/* Document Frame styling */}
-                            <div className="rounded-[24px] shadow-2xl overflow-hidden border border-black/10">
-                              
-                              {/* Tour Mode Banner (Visible in UI, Hidden in Print/PDF as it sits outside the selector) */}
-                              {(results?.patientId === "BOV-9872" || results?.patientId === "EQU-3421") && (
-                                <div className="bg-slate-900 border-b border-white/10 px-4 py-3 flex items-center justify-between gap-3 text-xs font-medium text-white select-none">
-                                  <div className="flex items-center gap-2">
-                                    <span className="flex h-2 w-2 relative">
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                    </span>
-                                    <span className="text-[10px] tracking-wide text-slate-300 font-sans">
-                                      🔬 <strong className="text-white">Active Demo Specimen</strong> ({results.species}) Loaded
-                                    </span>
+                            {results ? (
+                              <>
+                                {/* Document Frame styling */}
+                                <div className="rounded-[24px] shadow-2xl overflow-hidden border border-black/10">
+                                  
+                                  {/* Tour Mode Banner (Visible in UI, Hidden in Print/PDF as it sits outside the selector) */}
+                                  <div className="bg-slate-900 border-b border-white/10 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs font-medium text-white select-none">
+                                    <div className="flex items-center gap-2">
+                                      <span className="flex h-2 w-2 relative">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                      </span>
+                                      <span className="text-[10px] tracking-wide text-slate-300 font-sans">
+                                        🔬 <strong className="text-white">{results.species} Specimen</strong> ({results.patientId}) Loaded &middot; Ready for Clinical Certification
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      {VIRTUAL_ANIMAL_KEYS.map((key) => {
+                                        const anim = VIRTUAL_ANIMALS[key];
+                                        const isActive = results.species.toLowerCase() === anim.species.toLowerCase();
+                                        return (
+                                          <button
+                                            key={key}
+                                            onClick={() => loadDemoData(key)}
+                                            className={cn(
+                                              "px-2 py-1 rounded text-[9px] font-bold uppercase transition-colors cursor-pointer font-sans flex items-center gap-1",
+                                              isActive 
+                                                ? "bg-emerald-500 text-white" 
+                                                : "bg-white/5 hover:bg-white/10 text-white/70"
+                                            )}
+                                          >
+                                            <span>{anim.avatarIcon}</span>
+                                            <span>{anim.species}</span>
+                                          </button>
+                                        );
+                                      })}
+                                      <button
+                                        onClick={() => {
+                                          setResults(null);
+                                          setClinicianRemarks('');
+                                        }}
+                                        className="px-2 py-1 bg-red-500/15 hover:bg-red-500/30 text-red-400 rounded text-[9px] font-bold uppercase transition-colors cursor-pointer font-sans ml-1"
+                                      >
+                                        Clear Data
+                                      </button>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-1.5">
-                                    <button
-                                      onClick={() => loadDemoData(results.species === 'Bovine' ? 'Equine' : 'Bovine')}
-                                      className="px-2 py-1 bg-white/5 hover:bg-white/10 rounded text-[9px] font-bold uppercase transition-colors cursor-pointer font-sans"
-                                    >
-                                      Switch Sample
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setResults(null);
-                                        setClinicianRemarks('');
-                                      }}
-                                      className="px-2 py-1 bg-red-500/15 hover:bg-red-500/30 text-red-500 rounded text-[9px] font-bold uppercase transition-colors cursor-pointer font-sans"
-                                    >
-                                      Clear Data
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
                               
                               {/* Clinical White Paper Report Document (Pure Printable Style) */}
                               <div id="analysis-report" className="p-8 bg-white text-black relative select-text text-left">
@@ -5995,9 +5893,49 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                 Run Predictive AI Lab Interpretation & Clinical Conclusion
                               </button>
                             )}
-
+                          </>
+                        ) : (
+                          <div className={cn(
+                            "p-10 rounded-3xl border text-center space-y-6 flex flex-col items-center justify-center min-h-[500px]",
+                            theme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-slate-50 border-black/10 text-slate-900"
+                          )}>
+                            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                              <FileText className="w-8 h-8" />
+                            </div>
+                            <div className="max-w-md space-y-2">
+                              <h3 className="text-lg font-black uppercase tracking-tight">No Active Specimen Loaded</h3>
+                              <p className="text-xs opacity-60 leading-relaxed">
+                                Load a validated reference specimen dataset to preview and export certified clinical dossiers according to ISO 15189 and WHO standards.
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-center gap-2 pt-2 max-w-lg">
+                              {VIRTUAL_ANIMAL_KEYS.map((key) => {
+                                const anim = VIRTUAL_ANIMALS[key];
+                                return (
+                                  <button
+                                    key={key}
+                                    onClick={() => loadDemoData(key)}
+                                    className="px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-400 border border-emerald-500/30 text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    <span>{anim.avatarIcon}</span>
+                                    <span>Load {anim.species}</span>
+                                  </button>
+                                );
+                              })}
+                              <button
+                                onClick={() => setActiveTab('live')}
+                                className={cn(
+                                  "px-3.5 py-2 border rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer",
+                                  theme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-800"
+                                )}
+                              >
+                                Live Capture / Upload
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        )}
+                      </div>
+                    </div>
 
                         {/* ========================================== */}
                         {/* ADHESIVE PHYSICAL SPECIMEN LABEL PRINT DIALOGUE MODAL */}
@@ -6146,21 +6084,23 @@ Digital Signature Verified - ATSA AI Engine v2.0
                       </p>
                     </div>
                     
-                    <div className="flex flex-col gap-2 w-full max-w-[240px]">
-                      <button 
-                        onClick={() => loadDemoData('Bovine')}
-                        className="py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] uppercase rounded-xl transition-all shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        Load Bull Specimen
-                      </button>
-                      <button 
-                        onClick={() => loadDemoData('Equine')}
-                        className="py-2.5 px-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] uppercase rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Activity className="w-3.5 h-3.5 text-purple-400" />
-                        Load Stallion Specimen
-                      </button>
+                    <div className="flex flex-col gap-1.5 w-full max-w-[240px]">
+                      {VIRTUAL_ANIMAL_KEYS.map((key) => {
+                        const anim = VIRTUAL_ANIMALS[key];
+                        return (
+                          <button 
+                            key={key}
+                            onClick={() => loadDemoData(key)}
+                            className="py-2 px-3 bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/30 text-white font-bold text-[10px] uppercase rounded-xl transition-all flex items-center justify-between gap-1.5 cursor-pointer"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <span>{anim.avatarIcon}</span>
+                              <span>{anim.species} Specimen</span>
+                            </span>
+                            <span className="text-[8px] text-white/50 font-mono">{anim.patientId}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -6688,6 +6628,32 @@ Digital Signature Verified - ATSA AI Engine v2.0
           theme={theme}
         />
       )}
+
+      {/* Engine Action Feedback Toast */}
+      <AnimatePresence>
+        {engineToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-50 max-w-sm flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border bg-[#111114]/95 border-white/10 text-white backdrop-blur-md shadow-black/80"
+          >
+            <div className={cn(
+              "w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold",
+              engineToast.type === 'success' ? "bg-emerald-500/20 text-emerald-400" : engineToast.type === 'info' ? "bg-amber-500/20 text-amber-400" : "bg-red-500/20 text-red-400"
+            )}>
+              {engineToast.type === 'success' ? <Check className="w-4 h-4" /> : <HelpCircle className="w-4 h-4" />}
+            </div>
+            <p className="text-xs font-medium leading-tight flex-1">{engineToast.message}</p>
+            <button 
+              onClick={() => setEngineToast(null)} 
+              className="text-white/40 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -26,7 +26,11 @@ import {
   TrendingUp,
   TrendingDown,
   Globe,
-  ArrowLeft
+  ArrowLeft,
+  Trash2,
+  Flag,
+  MoreVertical,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -48,10 +52,12 @@ import { PatientHistoryView } from './components/PatientHistory';
 import { InventoryManagement } from './components/InventoryManagement';
 import { PerformanceTrendsChart } from './components/PerformanceTrendsChart';
 import { LandingPage } from './components/LandingPage';
+import { CountUpNumber } from './components/CountUpNumber';
+import { VIRTUAL_ANIMALS, VIRTUAL_ANIMAL_KEYS } from './data/virtualAnimalDatasets';
 import type { AppState, SpeciesProfile } from './types';
 import { auth, db, googleProvider } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { collection, addDoc, query, where, orderBy, limit, onSnapshot, Timestamp, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, limit, onSnapshot, Timestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from './lib/firestore-utils';
 import { useLanguage } from './context/LanguageContext';
 
@@ -101,6 +107,27 @@ export default function App() {
   const [selectedAnalyses, setSelectedAnalyses] = useState<string[]>([]);
   const [stats, setStats] = useState({ samplesToday: 0, avgProcessing: '0m' });
   const [previewAnalysis, setPreviewAnalysis] = useState<any | null>(null);
+  const [sampleToDelete, setSampleToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
+  const [actionToast, setActionToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  // Close active dropdown action menu on outside click
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setActiveActionMenuId(null);
+    };
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // Auto-dismiss action feedback toast after 3.5s
+  useEffect(() => {
+    if (actionToast) {
+      const timer = setTimeout(() => setActionToast(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [actionToast]);
 
   // Generate average sperm concentration data for the last 30 days
   const getTrendsData = () => {
@@ -290,6 +317,10 @@ export default function App() {
     pdf.save(`ATSA-Batch-Report-${new Date().getTime()}.pdf`);
     setIsBatchMode(false);
     setSelectedAnalyses([]);
+    setActionToast({
+      message: `${t('batchReportExportSuccess')} (${selectedData.length} records)`,
+      type: 'success'
+    });
   };
 
   const handleSingleExport = async (row: any) => {
@@ -450,6 +481,74 @@ export default function App() {
     pdf.text('Theriogenology Laboratory Specialist Seal', 140, 284);
     
     pdf.save(`ATSA-Diagnostic-Report-${row.patientId}-${row.species}.pdf`);
+    setActionToast({
+      message: `${t('reportExportSuccess')} (${row.patientId || row.id})`,
+      type: 'success'
+    });
+  };
+
+  const handleDeleteSample = async (sample: any) => {
+    if (!sample) return;
+    setIsDeleting(true);
+    try {
+      if (sample.id && !sample.id.startsWith('BOV-') && !sample.id.startsWith('EQU-') && !sample.id.startsWith('CAN-') && !sample.id.startsWith('POR-') && !sample.id.startsWith('OVI-') && !sample.isVirtual) {
+        try {
+          await deleteDoc(doc(db, 'analyses', sample.id));
+        } catch (err) {
+          console.warn('Firestore deletion notice:', err);
+        }
+      }
+      
+      // Update local state immediately
+      setRecentAnalyses(prev => prev.filter(a => a.id !== sample.id));
+      setRecent30DaysAnalyses(prev => prev.filter(a => a.id !== sample.id));
+      setSelectedAnalyses(prev => prev.filter(id => id !== sample.id));
+      if (previewAnalysis?.id === sample.id) {
+        setPreviewAnalysis(null);
+      }
+      
+      setActionToast({
+        message: `Sample ${sample.patientId || sample.id} deleted successfully.`,
+        type: 'success'
+      });
+    } catch (error) {
+      console.error('Error deleting sample:', error);
+      setActionToast({
+        message: 'Failed to delete sample. Please try again.',
+        type: 'error'
+      });
+    } finally {
+      setIsDeleting(false);
+      setSampleToDelete(null);
+      setActiveActionMenuId(null);
+    }
+  };
+
+  const handleToggleFlag = async (sample: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const nextFlagged = !sample.flagged;
+    
+    // Optimistic local update
+    setRecentAnalyses(prev => prev.map(a => a.id === sample.id ? { ...a, flagged: nextFlagged } : a));
+    setRecent30DaysAnalyses(prev => prev.map(a => a.id === sample.id ? { ...a, flagged: nextFlagged } : a));
+    
+    setActionToast({
+      message: nextFlagged 
+        ? `Sample ${sample.patientId || sample.id} marked as flagged for clinical review.` 
+        : `Flag removed from sample ${sample.patientId || sample.id}.`,
+      type: nextFlagged ? 'info' : 'success'
+    });
+
+    try {
+      if (sample.id && !sample.id.startsWith('BOV-') && !sample.id.startsWith('EQU-') && !sample.id.startsWith('CAN-') && !sample.id.startsWith('POR-') && !sample.id.startsWith('OVI-') && !sample.isVirtual) {
+        await updateDoc(doc(db, 'analyses', sample.id), {
+          flagged: nextFlagged,
+          flaggedAt: nextFlagged ? new Date().toISOString() : null
+        });
+      }
+    } catch (err) {
+      console.warn('Firestore flag update fallback:', err);
+    }
   };
 
   const toggleTheme = () => {
@@ -724,14 +823,14 @@ export default function App() {
     );
   }
 
-  if (appState === 'analysis' && activePatient) {
+  if (appState === 'analysis') {
     return (
       <CASAEngine 
         onBack={() => {
           setAnalysisInitialAction(null);
           setAppState('dashboard');
         }} 
-        patientData={activePatient} 
+        patientData={activePatient || { id: 'BOV-9872', species: 'Bovine', profile: SPECIES_PROFILES['Bovine'] }} 
         theme={theme} 
         initialAction={analysisInitialAction}
       />
@@ -1079,7 +1178,9 @@ export default function App() {
                             <p className={cn("text-[9px] uppercase tracking-wider font-bold opacity-40", theme === 'dark' ? "text-white/30" : "text-slate-400")}>Secure Firestore</p>
                           </div>
                         </div>
-                        <span className="text-xl font-black tracking-tight">{stats.samplesToday}</span>
+                        <span className="text-xl font-black tracking-tight font-mono">
+                          <CountUpNumber value={stats.samplesToday} decimals={0} duration={1200} />
+                        </span>
                       </div>
 
                       {/* Stat 2: Avg Processing */}
@@ -1093,7 +1194,7 @@ export default function App() {
                             <p className={cn("text-[9px] uppercase tracking-wider font-bold opacity-40", theme === 'dark' ? "text-white/30" : "text-slate-400")}>Optimized Pipeline</p>
                           </div>
                         </div>
-                        <span className="text-xl font-black tracking-tight">{stats.avgProcessing}</span>
+                        <span className="text-xl font-black tracking-tight font-mono">{stats.avgProcessing}</span>
                       </div>
 
                       {/* Stat 3: Real Average Concentration across loaded analysis (Tailored Metric) */}
@@ -1107,11 +1208,18 @@ export default function App() {
                             <p className={cn("text-[9px] uppercase tracking-wider font-bold opacity-40", theme === 'dark' ? "text-white/30" : "text-slate-400")}>Live Bio-Metric</p>
                           </div>
                         </div>
-                        <span className="text-xl font-black tracking-tight text-teal-400">
-                          {recentAnalyses.length > 0 
-                            ? (recentAnalyses.reduce((acc, curr) => acc + (curr.concentration || 0), 0) / recentAnalyses.length).toFixed(1)
-                            : "0.0"
-                          } <span className="text-[10px] font-normal text-muted-foreground">M/ml</span>
+                        <span className="text-xl font-black tracking-tight text-teal-400 font-mono">
+                          <CountUpNumber 
+                            value={
+                              recentAnalyses.length > 0 
+                                ? (recentAnalyses.reduce((acc, curr) => acc + (curr.concentration || 0), 0) / recentAnalyses.length)
+                                : (recent30DaysAnalyses.length > 0
+                                    ? (recent30DaysAnalyses.reduce((acc, curr) => acc + (curr.concentration || 0), 0) / recent30DaysAnalyses.length)
+                                    : 0)
+                            } 
+                            decimals={1} 
+                            duration={1400}
+                          /> <span className="text-[10px] font-normal text-muted-foreground font-sans">M/ml</span>
                         </span>
                       </div>
                     </div>
@@ -1213,6 +1321,122 @@ export default function App() {
                     <span>Compliant Cases:</span>
                     <strong className="text-emerald-500 font-bold">{complianceStats.count} / {complianceStats.total}</strong>
                   </div>
+                </div>
+              </section>
+
+              {/* 5-Animal Virtual Clinical Library Showcase */}
+              <section>
+                <div className="flex items-center justify-between gap-2 mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-500 border border-emerald-500/20">
+                      <Microscope className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className={cn("text-xs font-black uppercase tracking-wider", theme === 'dark' ? "text-white" : "text-slate-900")}>
+                        Multi-Species Virtual Datasets & Clinical PDF Dossiers
+                      </h3>
+                      <p className={cn("text-[10px]", theme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                        Select a validated species dataset to explore high-resolution kinematics, Kruger strict morphology, and export full certified PDF reports
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  {VIRTUAL_ANIMAL_KEYS.map((key) => {
+                    const animal = VIRTUAL_ANIMALS[key];
+                    return (
+                      <div
+                        key={key}
+                        className={cn(
+                          "group p-4 rounded-2xl border transition-all duration-300 flex flex-col justify-between relative overflow-hidden",
+                          theme === 'dark'
+                            ? "bg-[#09090b] border-white/[0.06] hover:border-emerald-500/30 hover:bg-[#0d0d12]"
+                            : "bg-white border-slate-200/80 hover:border-emerald-500/40 hover:shadow-md"
+                        )}
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-2xl p-1 bg-slate-100 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">
+                              {animal.avatarIcon}
+                            </span>
+                            <span className={cn(
+                              "text-[8px] font-mono font-bold px-1.5 py-0.5 rounded uppercase tracking-wider",
+                              animal.results.summary.interpretation.status === 'normal' 
+                                ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                            )}>
+                              {animal.results.summary.interpretation.status}
+                            </span>
+                          </div>
+
+                          <div>
+                            <h4 className={cn("text-sm font-bold tracking-tight", theme === 'dark' ? "text-white" : "text-slate-900")}>
+                              {animal.species}
+                            </h4>
+                            <p className="text-[10px] text-emerald-500 font-mono font-medium">
+                              {animal.patientId} &middot; {animal.breed}
+                            </p>
+                          </div>
+
+                          <div className={cn("p-2 rounded-xl text-[9px] space-y-1 font-mono", theme === 'dark' ? "bg-white/[0.02] border border-white/[0.04]" : "bg-slate-50 border border-slate-100")}>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Conc:</span>
+                              <span className="font-bold">{animal.results.summary.concentration} M/ml</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Prog Motility:</span>
+                              <span className="font-bold text-emerald-500">{animal.results.summary.motility.progressive}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Normal Morph:</span>
+                              <span className="font-bold">{animal.results.summary.morphology.normal}%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-3 mt-3 border-t border-black/5 dark:border-white/5 flex gap-1.5">
+                          <button
+                            onClick={() => {
+                              setActivePatient({
+                                id: animal.patientId,
+                                species: animal.species,
+                                profile: SPECIES_PROFILES[animal.species] || SPECIES_PROFILES['Bovine']
+                              });
+                              setAppState('analysis');
+                            }}
+                            className="flex-1 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer shadow-sm"
+                          >
+                            <Play className="w-2.5 h-2.5 fill-current" />
+                            <span>Analyze</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPreviewAnalysis({
+                                id: animal.patientId,
+                                patientId: animal.patientId,
+                                species: animal.species,
+                                concentration: animal.results.summary.concentration,
+                                motility: animal.results.summary.motility,
+                                morphology: animal.results.summary.morphology,
+                                date: new Date().toISOString(),
+                                interpretation: animal.results.summary.interpretation,
+                                clinicianRemarks: animal.clinicianRemarks,
+                                ...animal.results
+                              });
+                            }}
+                            className={cn(
+                              "p-1.5 rounded-lg border text-[9px] font-bold transition-all flex items-center justify-center cursor-pointer",
+                              theme === 'dark' ? "border-white/10 hover:bg-white/10 text-white" : "border-slate-200 hover:bg-slate-100 text-slate-700"
+                            )}
+                            title="Quick PDF Report Preview"
+                          >
+                            <Download className="w-3 h-3 text-emerald-500" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
 
@@ -1357,7 +1581,7 @@ export default function App() {
                         <th className="px-6 py-4">{t('concentrationValue')}</th>
                         <th className="px-6 py-4">{t('motility')}</th>
                         <th className="px-6 py-4">Verification</th>
-                        <th className="px-6 py-4 text-right">CASA Launch</th>
+                        <th className="px-6 py-4 text-right">{t('quickActions')}</th>
                       </tr>
                     </thead>
                     <tbody className="text-sm divide-y divide-slate-100 dark:divide-white/[0.04]">
@@ -1400,9 +1624,20 @@ export default function App() {
                               </td>
                             )}
                             <td className="px-6 py-4">
-                              <span className={cn("font-mono font-bold tracking-tight text-xs", theme === 'dark' ? "text-white" : "text-slate-800")}>
-                                {row.patientId}
-                              </span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={cn("font-mono font-bold tracking-tight text-xs", theme === 'dark' ? "text-white" : "text-slate-800")}>
+                                  {row.patientId}
+                                </span>
+                                {row.flagged && (
+                                  <span 
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-500 dark:text-amber-400 border border-amber-500/30 text-[9px] font-bold tracking-wide"
+                                    title={t('flaggedForReview')}
+                                  >
+                                    <Flag className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                                    <span>FLAGGED</span>
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-6 py-4">
                               <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-bold border", badgeClasses)}>
@@ -1440,32 +1675,167 @@ export default function App() {
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-1.5 relative">
+                                {/* Direct Action: View Report */}
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setPreviewAnalysis(row);
                                   }}
-                                  className={cn("p-1.5 rounded-xl transition-all border border-transparent hover:border-emerald-500/20 cursor-pointer", theme === 'dark' ? "bg-white/[0.02] text-white/40 hover:bg-white/10 hover:text-emerald-400" : "bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-emerald-600")}
-                                  title="Preview Report Summary"
+                                  className={cn(
+                                    "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all border cursor-pointer group/btn", 
+                                    theme === 'dark' 
+                                      ? "bg-white/[0.02] text-white/70 hover:bg-emerald-500/10 hover:text-emerald-400 border-white/[0.06] hover:border-emerald-500/20" 
+                                      : "bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 border-slate-200/70 hover:border-emerald-500/30"
+                                  )}
+                                  title={t('viewReport')}
                                 >
-                                  <Eye className="w-4 h-4" />
+                                  <FileText className="w-3.5 h-3.5 text-emerald-500 transition-transform group-hover/btn:scale-110" />
+                                  <span className="hidden xl:inline text-[11px] font-bold">{t('viewReport')}</span>
                                 </button>
+
+                                {/* Direct Action: Mark as Flagged */}
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setActivePatient({ 
-                                      id: row.patientId, 
-                                      species: row.species, 
-                                      profile: SPECIES_PROFILES[row.species] || SPECIES_PROFILES['Bovine'] 
-                                    });
-                                    setAppState('analysis');
+                                    handleToggleFlag(row, e);
                                   }}
-                                  className={cn("p-1.5 rounded-xl transition-all border border-transparent hover:border-emerald-500/20 cursor-pointer", theme === 'dark' ? "bg-white/[0.02] text-white/40 hover:bg-white/10 hover:text-emerald-400" : "bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-emerald-700")}
-                                  title="Open CASA analysis viewport"
+                                  className={cn(
+                                    "p-1.5 rounded-xl transition-all border cursor-pointer",
+                                    row.flagged
+                                      ? "bg-amber-500/15 text-amber-500 border-amber-500/30 hover:bg-amber-500/25"
+                                      : (theme === 'dark' 
+                                          ? "bg-white/[0.02] text-white/40 hover:bg-white/10 hover:text-amber-400 border-white/[0.06] hover:border-amber-500/20" 
+                                          : "bg-slate-50 text-slate-400 hover:bg-amber-50 hover:text-amber-600 border-slate-200/70 hover:border-amber-500/30")
+                                  )}
+                                  title={row.flagged ? t('unmarkFlagged') : t('markAsFlagged')}
                                 >
-                                  <ArrowUpRight className="w-4 h-4" />
+                                  <Flag className={cn("w-3.5 h-3.5 transition-transform hover:scale-110", row.flagged && "fill-amber-500 text-amber-500")} />
                                 </button>
+
+                                {/* Direct Action: Delete Sample */}
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSampleToDelete(row);
+                                  }}
+                                  className={cn(
+                                    "p-1.5 rounded-xl transition-all border cursor-pointer",
+                                    theme === 'dark' 
+                                      ? "bg-white/[0.02] text-white/40 hover:bg-red-500/10 hover:text-red-400 border-white/[0.06] hover:border-red-500/20" 
+                                      : "bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-600 border-slate-200/70 hover:border-red-500/30"
+                                  )}
+                                  title={t('deleteSample')}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 transition-transform hover:scale-110" />
+                                </button>
+
+                                {/* Quick Actions Dropdown Menu Trigger */}
+                                <div className="relative">
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveActionMenuId(activeActionMenuId === row.id ? null : row.id);
+                                    }}
+                                    className={cn(
+                                      "p-1.5 rounded-xl transition-all border cursor-pointer",
+                                      activeActionMenuId === row.id
+                                        ? (theme === 'dark' ? "bg-white/15 text-white border-white/20" : "bg-slate-200 text-slate-900 border-slate-300")
+                                        : (theme === 'dark' ? "bg-white/[0.02] text-white/40 hover:bg-white/10 hover:text-white border-white/[0.06]" : "bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-700 border-slate-200/70")
+                                    )}
+                                    title={t('quickActions')}
+                                  >
+                                    <MoreVertical className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {/* Quick Actions Dropdown Menu Popover */}
+                                  <AnimatePresence>
+                                    {activeActionMenuId === row.id && (
+                                      <motion.div
+                                        initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                                        transition={{ duration: 0.15 }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={cn(
+                                          "absolute right-0 top-full mt-1.5 w-52 rounded-xl shadow-2xl border py-1.5 z-40 text-left backdrop-blur-md",
+                                          theme === 'dark' ? "bg-[#141417]/95 border-white/10 text-white shadow-black/80" : "bg-white/95 border-slate-200 text-slate-800 shadow-slate-300/60"
+                                        )}
+                                      >
+                                        <div className="px-3 py-1.5 border-b border-slate-100 dark:border-white/5">
+                                          <p className="text-[10px] font-black uppercase tracking-wider opacity-40">{t('quickActions')}</p>
+                                          <p className="text-xs font-mono font-bold truncate">{row.patientId}</p>
+                                        </div>
+                                        
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveActionMenuId(null);
+                                            setPreviewAnalysis(row);
+                                          }}
+                                          className={cn(
+                                            "w-full px-3 py-2 text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left",
+                                            theme === 'dark' ? "hover:bg-white/5 hover:text-emerald-400" : "hover:bg-slate-50 hover:text-emerald-600"
+                                          )}
+                                        >
+                                          <FileText className="w-4 h-4 text-emerald-500" />
+                                          <span>{t('viewReport')}</span>
+                                        </button>
+
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveActionMenuId(null);
+                                            handleToggleFlag(row, e);
+                                          }}
+                                          className={cn(
+                                            "w-full px-3 py-2 text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left",
+                                            row.flagged
+                                              ? (theme === 'dark' ? "text-amber-400 hover:bg-white/5" : "text-amber-600 hover:bg-amber-50")
+                                              : (theme === 'dark' ? "hover:bg-white/5 hover:text-amber-400" : "hover:bg-slate-50 hover:text-amber-600")
+                                          )}
+                                        >
+                                          <Flag className={cn("w-4 h-4", row.flagged ? "fill-amber-500 text-amber-500" : "text-amber-500")} />
+                                          <span>{row.flagged ? t('unmarkFlagged') : t('markAsFlagged')}</span>
+                                        </button>
+
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveActionMenuId(null);
+                                            setActivePatient({ 
+                                              id: row.patientId, 
+                                              species: row.species, 
+                                              profile: SPECIES_PROFILES[row.species] || SPECIES_PROFILES['Bovine'] 
+                                            });
+                                            setAppState('analysis');
+                                          }}
+                                          className={cn(
+                                            "w-full px-3 py-2 text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left",
+                                            theme === 'dark' ? "hover:bg-white/5 hover:text-emerald-400" : "hover:bg-slate-50 hover:text-emerald-600"
+                                          )}
+                                        >
+                                          <ArrowUpRight className="w-4 h-4 text-teal-400" />
+                                          <span>Launch CASA Viewport</span>
+                                        </button>
+
+                                        <div className="my-1 border-t border-slate-100 dark:border-white/5" />
+
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveActionMenuId(null);
+                                            setSampleToDelete(row);
+                                          }}
+                                          className="w-full px-3 py-2 text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left text-red-500 hover:bg-red-500/10"
+                                        >
+                                          <Trash2 className="w-4 h-4 text-red-500" />
+                                          <span>{t('deleteSample')}</span>
+                                        </button>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
                               </div>
                             </td>
                           </tr>
@@ -1700,6 +2070,122 @@ export default function App() {
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Sample Confirmation Modal */}
+      <AnimatePresence>
+        {sampleToDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => {
+              if (!isDeleting) setSampleToDelete(null);
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              transition={{ type: "spring", duration: 0.4 }}
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                "w-full max-w-md rounded-2xl p-6 shadow-2xl border space-y-5",
+                theme === 'dark' ? "bg-[#111114] border-white/10 text-white" : "bg-white border-slate-200 text-slate-800"
+              )}
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0 text-red-500">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-bold tracking-tight">{t('confirmDeleteSampleTitle')}</h3>
+                  <p className={cn("text-xs leading-relaxed", theme === 'dark' ? "text-white/60" : "text-slate-500")}>
+                    {t('confirmDeleteSampleDesc')}
+                  </p>
+                </div>
+              </div>
+
+              <div className={cn("p-3.5 rounded-xl border space-y-2 text-xs", theme === 'dark' ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-100")}>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Sample ID</span>
+                  <span className="font-mono font-bold">{sampleToDelete.patientId || sampleToDelete.id}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Species</span>
+                  <span className="font-semibold text-emerald-500">{sampleToDelete.species}</span>
+                </div>
+                {sampleToDelete.timestamp && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Recorded Date</span>
+                    <span className="font-mono text-[11px] opacity-70">
+                      {new Date(sampleToDelete.timestamp).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setSampleToDelete(null)}
+                  className={cn(
+                    "px-4 py-2.5 text-xs font-bold rounded-xl transition-colors cursor-pointer",
+                    theme === 'dark' ? "bg-white/5 hover:bg-white/10 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  )}
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => handleDeleteSample(sampleToDelete)}
+                  className="px-5 py-2.5 text-xs font-bold bg-red-500 hover:bg-red-600 active:scale-[0.99] text-white rounded-xl transition-all shadow-lg shadow-red-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{t('deleteSample')}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Action Feedback Toast */}
+      <AnimatePresence>
+        {actionToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-50 max-w-sm flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border bg-[#111114]/95 border-white/10 text-white backdrop-blur-md shadow-black/80"
+          >
+            <div className={cn(
+              "w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold",
+              actionToast.type === 'success' ? "bg-emerald-500/20 text-emerald-400" : actionToast.type === 'info' ? "bg-amber-500/20 text-amber-400" : "bg-red-500/20 text-red-400"
+            )}>
+              {actionToast.type === 'success' ? <Check className="w-4 h-4" /> : actionToast.type === 'info' ? <Flag className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+            </div>
+            <p className="text-xs font-medium leading-tight flex-1">{actionToast.message}</p>
+            <button 
+              onClick={() => setActionToast(null)} 
+              className="text-white/40 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

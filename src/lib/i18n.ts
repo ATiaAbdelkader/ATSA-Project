@@ -293,6 +293,46 @@ export const translations: TranslationDict = {
     fr: "Aucune analyse récente. Enregistrez un échantillon pour commencer.",
     ar: "لم يتم العثور على تحليلات حديثة. قم بتسجيل عينة للبدء في التحليل."
   },
+  quickActions: {
+    en: "Quick Actions",
+    fr: "Actions Rapides",
+    ar: "إجراءات سريعة"
+  },
+  viewReport: {
+    en: "View Report",
+    fr: "Voir le Rapport",
+    ar: "عرض التقرير"
+  },
+  deleteSample: {
+    en: "Delete Sample",
+    fr: "Supprimer l'Échantillon",
+    ar: "حذف العينة"
+  },
+  markAsFlagged: {
+    en: "Mark as Flagged",
+    fr: "Marquer pour Examen",
+    ar: "وضع علامة للمراجعة"
+  },
+  unmarkFlagged: {
+    en: "Remove Flag",
+    fr: "Retirer le Signalement",
+    ar: "إزالة علامة المراجعة"
+  },
+  flaggedForReview: {
+    en: "Flagged for Review",
+    fr: "Signalé pour Examen",
+    ar: "معلّم للمراجعة"
+  },
+  confirmDeleteSampleTitle: {
+    en: "Delete Semen Sample?",
+    fr: "Supprimer l'Échantillon ?",
+    ar: "هل تريد حذف العينة؟"
+  },
+  confirmDeleteSampleDesc: {
+    en: "Are you sure you want to permanently delete this analysis record? This action cannot be undone.",
+    fr: "Êtes-vous sûr de vouloir supprimer définitivement cet enregistrement d'analyse ? Cette action est irréversible.",
+    ar: "هل أنت متأكد من رغبتك في حذف سجل التحليل هذا نهائياً؟ لا يمكن التراجع عن هذا الإجراء."
+  },
 
   // Help & Troubleshooting alerts
   notifications: {
@@ -1113,5 +1153,25 @@ export const translations: TranslationDict = {
     en: "Laboratory Utilities",
     fr: "Utilitaires de Laboratoire",
     ar: "أدوات ومرافق المختبر"
+  },
+  reportExportSuccess: {
+    en: "Report (PDF) generated and downloaded successfully.",
+    fr: "Rapport (PDF) généré et téléchargé avec succès.",
+    ar: "تم إنشاء وتحميل التقرير (PDF) بنجاح."
+  },
+  batchReportExportSuccess: {
+    en: "Consolidated batch report generated and downloaded successfully.",
+    fr: "Rapport consolidé par lot généré et téléchargé avec succès.",
+    ar: "تم إنشاء وتحميل التقرير التجميعي المجمع بنجاح."
+  },
+  reportPrintSuccess: {
+    en: "Report sent to printer successfully.",
+    fr: "Rapport envoyé à l'imprimante avec succès.",
+    ar: "تم إرسال التقرير إلى قائمة الطباعة بنجاح."
+  },
+  csvExportSuccess: {
+    en: "Kinematics dataset exported to CSV successfully.",
+    fr: "Ensemble de données cinématiques exporté en CSV avec succès.",
+    ar: "تم تصدير مجموعة البيانات الحركية إلى CSV بنجاح."
   }
 };

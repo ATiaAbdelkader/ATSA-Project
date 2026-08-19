@@ -163,10 +163,21 @@ export const PerformanceTrendsChart: React.FC<PerformanceTrendsChartProps> = ({
   const [showWhoReference, setShowWhoReference] = useState<boolean>(true);
   const [showMeanReference, setShowMeanReference] = useState<boolean>(true);
   const [useDemoFallback, setUseDemoFallback] = useState<boolean>(false);
+  const [animationKey, setAnimationKey] = useState<number>(0);
+  const [isDrawingAnimation, setIsDrawingAnimation] = useState<boolean>(true);
 
   // Active Hovered State for Hover-to-Zoom
   const [hoveredData, setHoveredData] = useState<DailyTrendRecord | null>(null);
   const [pinnedDay, setPinnedDay] = useState<DailyTrendRecord | null>(null);
+
+  // Trigger drawing animation on mount or when zoom / key changes
+  React.useEffect(() => {
+    setIsDrawingAnimation(true);
+    const timer = setTimeout(() => {
+      setIsDrawingAnimation(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [animationKey, zoomRange, chartType]);
 
   // Process raw analyses into chronological daily trends
   const trendData = useMemo<DailyTrendRecord[]>(() => {
@@ -347,6 +358,36 @@ export const PerformanceTrendsChart: React.FC<PerformanceTrendsChartProps> = ({
 
         {/* Action / Zoom Filter Controls */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Replay Line Draw Entry Animation */}
+          <button
+            onClick={() => setAnimationKey(k => k + 1)}
+            className={cn(
+              "px-2.5 py-1.5 rounded-xl text-[10px] font-bold font-mono border flex items-center gap-1.5 transition-all cursor-pointer",
+              isDrawingAnimation
+                ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                : isDark ? "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200"
+            )}
+            title="Replay Line Draw Entry Animation (Left to Right)"
+          >
+            <RefreshCw className={cn("w-3 h-3 text-emerald-400", isDrawingAnimation && "animate-spin")} />
+            <span className="hidden sm:inline">Replay Line Draw</span>
+          </button>
+
+          {/* Chart Style Toggle (Area Gradient vs Precision Line) */}
+          <button
+            onClick={() => setChartType(chartType === 'area' ? 'line' : 'area')}
+            className={cn(
+              "px-2.5 py-1.5 rounded-xl text-[10px] font-bold font-mono border flex items-center gap-1.5 transition-all cursor-pointer",
+              chartType === 'line'
+                ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-400"
+                : isDark ? "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200"
+            )}
+            title="Toggle between Area Gradient and Precision Line"
+          >
+            <Activity className="w-3 h-3 text-cyan-400" />
+            <span>{chartType === 'area' ? 'Area Fill' : 'Line Trace'}</span>
+          </button>
+
           {/* Zoom Presets */}
           <div className={cn("flex items-center p-1 rounded-xl border text-[10px] font-bold font-mono", isDark ? "bg-white/5 border-white/10" : "bg-slate-100 border-slate-200")}>
             {(['30D', '14D', '7D'] as const).map((range) => (
@@ -394,7 +435,22 @@ export const PerformanceTrendsChart: React.FC<PerformanceTrendsChartProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Main Interactive Line / Area Chart */}
         <div className={cn("lg:col-span-8 space-y-3", !enableHoverZoomLens && "lg:col-span-12")}>
-          <div className="h-[270px] w-full relative">
+          <div className="h-[270px] w-full relative overflow-hidden rounded-xl">
+            {/* Visual Drawing Tracer Beam synchronized with line draw */}
+            {isDrawingAnimation && !visibleData.every(d => d.concentration === 0) && (
+              <motion.div
+                key={`beam-${animationKey}-${zoomRange}-${chartType}`}
+                initial={{ left: '0%', opacity: 1 }}
+                animate={{ left: '100%', opacity: 0 }}
+                transition={{ duration: 1.8, ease: "easeOut", delay: 0.1 }}
+                className="absolute top-2 bottom-6 w-0.5 pointer-events-none z-20 flex flex-col items-center"
+                style={{ transform: 'translateX(-50%)' }}
+              >
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-300 shadow-[0_0_14px_#34d399] -mt-1 animate-ping" />
+                <div className="w-full h-full bg-gradient-to-b from-emerald-400/90 via-emerald-400/30 to-transparent" />
+              </motion.div>
+            )}
+
             {visibleData.every(d => d.concentration === 0) ? (
               <div className="h-full w-full flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-white/10 rounded-2xl p-6 text-center">
                 <Activity className="w-8 h-8 text-slate-300 dark:text-white/10 mb-2 animate-pulse" />
@@ -411,7 +467,7 @@ export const PerformanceTrendsChart: React.FC<PerformanceTrendsChartProps> = ({
                 </button>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer key={`chart-container-${animationKey}-${zoomRange}-${chartType}`} width="100%" height="100%">
                 <AreaChart 
                   data={visibleData} 
                   margin={{ top: 15, right: 10, left: -20, bottom: 5 }}
@@ -573,12 +629,17 @@ export const PerformanceTrendsChart: React.FC<PerformanceTrendsChartProps> = ({
                   />
 
                   <Area 
+                    key={`area-draw-${animationKey}-${zoomRange}-${chartType}`}
                     type="monotone" 
                     dataKey="concentration" 
                     stroke="url(#activeHoverStroke)" 
-                    strokeWidth={2.5} 
-                    fillOpacity={1} 
+                    strokeWidth={chartType === 'area' ? 2.5 : 3} 
+                    fillOpacity={chartType === 'area' ? 1 : 0.05} 
                     fill="url(#dashboardConcGradient)"
+                    isAnimationActive={true}
+                    animationDuration={1800}
+                    animationEasing="ease-out"
+                    animationBegin={100}
                     activeDot={{ 
                       r: 7, 
                       stroke: '#10b981', 

@@ -42,6 +42,7 @@
             "recommendations": { "type": "array", "items": { "type": "string" } }
           }
         },
+        "flagged": { "type": "boolean", "description": "Whether the sample has been marked/flagged for clinical review" },
         "uid": { "type": "string", "description": "The UID of the user who performed the analysis" }
       },
       "required": ["patientId", "timestamp", "uid"]
