@@ -90,6 +90,26 @@ export const translations: TranslationDict = {
     fr: "Se souvenir de ce poste de travail",
     ar: "تذكر محطة العمل هذه"
   },
+  vercelAuthGuide: {
+    en: "Vercel / Domain Deployment Guide",
+    fr: "Guide de Déploiement Vercel",
+    ar: "دليل النشر على فيرسل والمجالات"
+  },
+  authErrorTitle: {
+    en: "Authentication Notice",
+    fr: "Avis d'Authentification",
+    ar: "إشعار المصادقة"
+  },
+  copyDomain: {
+    en: "Copy Domain",
+    fr: "Copier le Domaine",
+    ar: "نسخ النطاق"
+  },
+  copied: {
+    en: "Copied!",
+    fr: "Copié !",
+    ar: "تم النسخ!"
+  },
   authGoogle: {
     en: "Authenticate with Google",
     fr: "S'authentifier avec Google",
@@ -1173,5 +1193,135 @@ export const translations: TranslationDict = {
     en: "Kinematics dataset exported to CSV successfully.",
     fr: "Ensemble de données cinématiques exporté en CSV avec succès.",
     ar: "تم تصدير مجموعة البيانات الحركية إلى CSV بنجاح."
+  },
+  accountSettings: {
+    en: "Account & Workstation Settings",
+    fr: "Paramètres du Compte & Poste",
+    ar: "إعدادات الحساب ومحطة العمل"
+  },
+  profileDetails: {
+    en: "Profile Details",
+    fr: "Détails du Profil",
+    ar: "بيانات الملف الشخصي"
+  },
+  workstationPrefs: {
+    en: "Workstation Adjustments",
+    fr: "Ajustements du Poste",
+    ar: "تعديلات محطة التحليل"
+  },
+  securitySession: {
+    en: "Security & Session",
+    fr: "Sécurité & Session",
+    ar: "الأمان والجلسة"
+  },
+  displayName: {
+    en: "Full Name / Display Name",
+    fr: "Nom Complet / Affichage",
+    ar: "الاسم الكامل"
+  },
+  emailAddress: {
+    en: "Email Address",
+    fr: "Adresse E-mail",
+    ar: "البريد الإلكتروني"
+  },
+  clinicalRole: {
+    en: "Clinical Role / Title",
+    fr: "Titre Professionnel / Rôle",
+    ar: "المنصب / الصفة المهنية"
+  },
+  labSector: {
+    en: "Lab Sector / Workstation ID",
+    fr: "Secteur Labo / ID Poste",
+    ar: "قطاع المعمل / رقم المحطة"
+  },
+  institution: {
+    en: "Institution / Facility",
+    fr: "Institution / Établissement",
+    ar: "المؤسسة / المركز"
+  },
+  specialization: {
+    en: "Specialization",
+    fr: "Spécialisation",
+    ar: "التخصص الدقيق"
+  },
+  contactPhone: {
+    en: "Phone / Contact Extension",
+    fr: "Téléphone / Poste",
+    ar: "الهاتف / التحويلة"
+  },
+  avatarUrl: {
+    en: "Avatar Image URL",
+    fr: "URL de l'Avatar",
+    ar: "رابط الصورة الشخصية"
+  },
+  presetAvatars: {
+    en: "Choose Preset Avatar",
+    fr: "Choisir un Avatar Prédéfini",
+    ar: "اختيار صورة رمزية"
+  },
+  defaultSpecies: {
+    en: "Default CASA Species",
+    fr: "Espèce CASA par Défaut",
+    ar: "السلالة الافتراضية للتحليل"
+  },
+  unitScale: {
+    en: "Kinematic Velocity Units",
+    fr: "Unités de Vitesse Cinématique",
+    ar: "وحدة قياس السرعة الحركية"
+  },
+  autoSaveReports: {
+    en: "Auto-Export PDF Dossier",
+    fr: "Auto-Export Dossier PDF",
+    ar: "تصدير التقرير تلقائياً"
+  },
+  highContrastMode: {
+    en: "High-Contrast Microscopy",
+    fr: "Microscopie Contraste Élevé",
+    ar: "مجهر عالي التباين"
+  },
+  soundAlerts: {
+    en: "Assay Audio Alerts",
+    fr: "Alertes Audio des Analyses",
+    ar: "تنبيهات صوتية لانتهاء الفحص"
+  },
+  saveChanges: {
+    en: "Save Changes",
+    fr: "Enregistrer les Modifications",
+    ar: "حفظ التعديلات"
+  },
+  saving: {
+    en: "Saving...",
+    fr: "Enregistrement...",
+    ar: "جارٍ الحفظ..."
+  },
+  profileSavedSuccess: {
+    en: "Account profile and adjustments updated successfully.",
+    fr: "Profil et paramètres mis à jour avec succès.",
+    ar: "تم تحديث الملف الشخصي وتعديلات الحساب بنجاح."
+  },
+  accountProfileDesc: {
+    en: "Adjust your clinician credentials, laboratory sector, and diagnostic workstation preferences.",
+    fr: "Ajustez vos identifiants, secteur de laboratoire et préférences de poste.",
+    ar: "قم بتعديل بياناتك المهنية، قطاع المختبر، وتفضيلات محطة التحليل."
+  },
+  signedInAs: {
+    en: "Signed in as",
+    fr: "Connecté en tant que",
+    ar: "مسجل الدخول باسم"
+  },
+  authMethod: {
+    en: "Authentication Method",
+    fr: "Méthode d'Authentification",
+    ar: "طريقة المصادقة"
+  },
+  activeSession: {
+    en: "Active & Secure",
+    fr: "Actif & Sécurisé",
+    ar: "نشط وآمن"
+  },
+  editAccountTooltip: {
+    en: "Click to adjust account and settings",
+    fr: "Cliquez pour modifier le compte et paramètres",
+    ar: "انقر لتعديل الحساب والإعدادات"
   }
 };

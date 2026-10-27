@@ -30,7 +30,13 @@ import {
   Trash2,
   Flag,
   MoreVertical,
-  AlertTriangle
+  AlertTriangle,
+  AlertCircle,
+  ExternalLink,
+  Copy,
+  HelpCircle,
+  RefreshCw,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -53,13 +59,31 @@ import { InventoryManagement } from './components/InventoryManagement';
 import { PerformanceTrendsChart } from './components/PerformanceTrendsChart';
 import { LandingPage } from './components/LandingPage';
 import { CountUpNumber } from './components/CountUpNumber';
+import { AccountSettingsModal, UserProfileData } from './components/AccountSettingsModal';
 import { VIRTUAL_ANIMALS, VIRTUAL_ANIMAL_KEYS } from './data/virtualAnimalDatasets';
 import type { AppState, SpeciesProfile } from './types';
 import { auth, db, googleProvider } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { collection, addDoc, query, where, orderBy, limit, onSnapshot, Timestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, limit, onSnapshot, Timestamp, doc, updateDoc, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from './lib/firestore-utils';
 import { useLanguage } from './context/LanguageContext';
+
+const DEFAULT_USER_PROFILE: UserProfileData = {
+  displayName: 'Dr. Theriogenology Specialist',
+  email: 'specialist@atsa-lab.org',
+  role: 'Senior Embryologist & CASA Specialist',
+  sector: 'Lab Sector A-4',
+  institution: 'ATSA Advanced Reproductive Center',
+  specialization: 'Equine & Bovine In-Vitro Fertilization',
+  phone: '+1 (555) 019-2834',
+  photoURL: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=256&q=80',
+  defaultSpecies: 'Bovine',
+  unitScale: 'µm',
+  autoSaveReports: false,
+  highContrastMode: false,
+  soundAlerts: true,
+  themePreference: 'dark'
+};
 
 export default function App() {
   const { language, setLanguage, t, dir } = useLanguage();
@@ -111,6 +135,22 @@ export default function App() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
   const [actionToast, setActionToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const [authError, setAuthError] = useState<{ code: string; message: string; host: string; suggestion: string } | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isVercelGuideOpen, setIsVercelGuideOpen] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfileData>(() => {
+    const saved = localStorage.getItem('atsa_user_profile');
+    if (saved) {
+      try {
+        return { ...DEFAULT_USER_PROFILE, ...JSON.parse(saved) };
+      } catch (e) {
+        console.warn('Could not parse local user profile:', e);
+      }
+    }
+    return DEFAULT_USER_PROFILE;
+  });
 
   // Close active dropdown action menu on outside click
   useEffect(() => {
@@ -270,6 +310,58 @@ export default function App() {
 
     return () => unsubscribe();
   }, [user]);
+
+  // Sync and fetch profile from Firestore when user changes
+  useEffect(() => {
+    if (!user) return;
+
+    setUserProfile(prev => ({
+      ...prev,
+      displayName: user.displayName || prev.displayName,
+      email: user.email || prev.email,
+      photoURL: user.photoURL || prev.photoURL
+    }));
+
+    if (user.uid && user.uid !== 'jury_guest_pass') {
+      const userDocRef = doc(db, 'users', user.uid);
+      getDoc(userDocRef).then((snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as Partial<UserProfileData>;
+          setUserProfile(prev => ({
+            ...prev,
+            ...data,
+            displayName: data.displayName || user.displayName || prev.displayName,
+            email: user.email || data.email || prev.email,
+            photoURL: data.photoURL || user.photoURL || prev.photoURL
+          }));
+        }
+      }).catch((err) => {
+        console.warn('Could not read user profile from Firestore:', err);
+      });
+    }
+  }, [user]);
+
+  const handleSaveProfile = async (updated: UserProfileData) => {
+    setUserProfile(updated);
+    localStorage.setItem('atsa_user_profile', JSON.stringify(updated));
+
+    if (user) {
+      setUser(prev => prev ? ({ ...prev, displayName: updated.displayName, photoURL: updated.photoURL } as User) : null);
+    }
+
+    if (user && user.uid !== 'jury_guest_pass') {
+      try {
+        await setDoc(doc(db, 'users', user.uid), updated, { merge: true });
+      } catch (err) {
+        console.warn('Could not persist profile updates to Firestore:', err);
+      }
+    }
+
+    setActionToast({
+      message: t('profileSavedSuccess'),
+      type: 'success'
+    });
+  };
 
   const handleBatchExport = async () => {
     if (selectedAnalyses.length === 0) return;
@@ -555,11 +647,55 @@ export default function App() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
+  const handleCopyDomain = (textToCopy?: string) => {
+    const val = textToCopy || (typeof window !== 'undefined' ? window.location.hostname : '');
+    if (val && navigator.clipboard) {
+      navigator.clipboard.writeText(val);
+      setCopiedDomain(true);
+      setTimeout(() => setCopiedDomain(false), 2500);
+    }
+  };
+
   const handleLogin = async () => {
+    setIsLoggingIn(true);
+    setAuthError(null);
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed:", error);
+      const code = error?.code || 'auth/unknown';
+      const host = typeof window !== 'undefined' ? window.location.hostname : 'unknown-host';
+      let message = error?.message || 'Authentication process encountered an unexpected issue.';
+      let suggestion = 'Please check your connection and retry.';
+
+      if (code === 'auth/unauthorized-domain') {
+        message = `Firebase Unauthorized Domain: "${host}" is not on the Authorized Domains whitelist.`;
+        suggestion = `To fix this on Vercel: Open Firebase Console > Authentication > Settings > Authorized domains, click "Add domain", and paste "${host}" (or add "vercel.app" for all deployments).`;
+      } else if (code === 'auth/popup-blocked') {
+        message = 'Authentication pop-up was blocked by your browser settings.';
+        suggestion = 'Please allow pop-ups for this website in your browser address bar and click "Authenticate with Google" again.';
+      } else if (code === 'auth/popup-closed-by-user') {
+        message = 'Google sign-in window was closed before completing authentication.';
+        suggestion = 'Click the button again and proceed through the Google account selection.';
+      } else if (code === 'auth/cancelled-popup-request') {
+        message = 'Another sign-in request is already in progress.';
+        suggestion = 'Wait a moment or refresh the page before initiating sign-in.';
+      } else if (code === 'auth/operation-not-allowed') {
+        message = 'Google Sign-In provider is disabled in Firebase.';
+        suggestion = 'In Firebase Console, navigate to Authentication > Sign-in method and enable Google provider.';
+      } else if (code === 'auth/network-request-failed') {
+        message = 'Network error: Failed to connect to Google Firebase auth servers.';
+        suggestion = 'Verify your internet connection and ensure any aggressive adblockers/VPNs allow Google authentication.';
+      }
+
+      setAuthError({
+        code,
+        message,
+        host,
+        suggestion
+      });
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -771,13 +907,102 @@ export default function App() {
                 <label htmlFor="remember" className={cn("text-xs font-medium", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('rememberWorkstation')}</label>
               </div>
 
+              {/* Auth Error Diagnostic Card */}
+              {authError && (
+                <div className="p-4 rounded-2xl border border-red-500/30 bg-red-500/10 text-left space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 text-red-500 font-bold text-xs">
+                      <ShieldAlert className="w-4 h-4 shrink-0 text-red-500" />
+                      <span>{t('authErrorTitle')}</span>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setAuthError(null)}
+                      className="text-white/40 hover:text-white p-0.5 rounded cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  
+                  <p className="text-xs text-red-200/90 leading-relaxed">
+                    {authError.message}
+                  </p>
+
+                  <div className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl leading-relaxed">
+                    <p className="font-semibold mb-1 text-amber-200">How to resolve:</p>
+                    <p>{authError.suggestion}</p>
+                  </div>
+
+                  {authError.code === 'auth/unauthorized-domain' && (
+                    <div className="pt-1 flex flex-col gap-2">
+                      <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-black/40 border border-white/10 font-mono text-[10px] text-white/80">
+                        <span className="truncate">{authError.host}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyDomain(authError.host)}
+                          className="flex items-center gap-1 px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-emerald-400 cursor-pointer shrink-0 transition-colors"
+                        >
+                          {copiedDomain ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedDomain ? t('copied') : t('copyDomain')}</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <a
+                          href="https://console.firebase.google.com/project/ai-studio-applet-webapp-5a3d7/authentication/settings"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold transition-colors"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Firebase Auth Settings</span>
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsVercelGuideOpen(true)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 text-[10px] font-bold cursor-pointer transition-colors"
+                        >
+                          <HelpCircle className="w-3 h-3 text-cyan-400" />
+                          <span>Vercel Fix Guide</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-white/10 flex justify-between items-center">
+                    <span className="text-[9px] font-mono text-white/40">{authError.code}</span>
+                    <button
+                      type="button"
+                      onClick={handleGuestLogin}
+                      className="text-[10px] font-bold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                    >
+                      Bypass using Guest Pass →
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <button 
                 type="submit"
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-5 rounded-2xl mt-4 transition-all shadow-xl shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                disabled={isLoggingIn}
+                className={cn(
+                  "w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-5 rounded-2xl mt-4 transition-all shadow-xl shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer",
+                  isLoggingIn && "opacity-75 cursor-wait"
+                )}
               >
-                <LogIn className="w-5 h-5" />
-                {t('authGoogle')}
-                <ChevronRight className="w-4 h-4" />
+                {isLoggingIn ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <span>Connecting to Google Workstation...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-5 h-5" />
+                    {t('authGoogle')}
+                    <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
 
               <div className="relative flex py-2 items-center">
@@ -799,15 +1024,181 @@ export default function App() {
                 <Award className="w-4 h-4 text-amber-500" />
                 {t('instantJuryAccess')}
               </button>
+
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsVercelGuideOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400/80 hover:text-emerald-400 transition-colors cursor-pointer"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  <span>{t('vercelAuthGuide')}</span>
+                </button>
+              </div>
             </form>
 
-            <div className={cn("mt-12 p-6 rounded-3xl border border-dashed text-center", theme === 'dark' ? "border-white/10 bg-white/5" : "border-slate-200 bg-slate-50")}>
+            <div className={cn("mt-10 p-6 rounded-3xl border border-dashed text-center", theme === 'dark' ? "border-white/10 bg-white/5" : "border-slate-200 bg-slate-50")}>
               <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('securityNoticeTitle')}</p>
               <p className={cn("text-xs leading-relaxed", theme === 'dark' ? "text-white/20" : "text-slate-400")}>
                 {t('securityNoticeDesc')}
               </p>
             </div>
           </motion.div>
+
+          {/* Vercel & Production Deployment Guide Modal */}
+          <AnimatePresence>
+            {isVercelGuideOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                  className={cn(
+                    "w-full max-w-2xl rounded-3xl border shadow-2xl p-6 sm:p-8 overflow-y-auto max-h-[90vh]",
+                    theme === 'dark' ? "bg-[#0d0d10] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-4 pb-6 border-b border-black/10 dark:border-white/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                        <Globe className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold">Vercel & Domain Deployment Guide</h3>
+                        <p className={cn("text-xs", theme === 'dark' ? "text-white/40" : "text-slate-500")}>
+                          Resolving Firebase Google Authentication on Vercel deployments
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsVercelGuideOpen(false)}
+                      className="p-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Current Environment Status Widget */}
+                  <div className="mt-6 p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Current Hostname</span>
+                      <div className="flex items-center gap-2">
+                        <code className="px-2.5 py-1 rounded-lg bg-black/20 dark:bg-black/40 font-mono text-xs font-semibold text-emerald-400">
+                          {typeof window !== 'undefined' ? window.location.hostname : 'localhost'}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyDomain()}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-xs font-semibold cursor-pointer transition-colors"
+                        >
+                          {copiedDomain ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedDomain ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                      <span className="font-semibold text-slate-300">Firebase Project ID:</span>
+                      <code className="font-mono text-slate-300">ai-studio-applet-webapp-5a3d7</code>
+                    </div>
+                  </div>
+
+                  {/* 4 Step Diagnostic Checklist */}
+                  <div className="mt-6 space-y-4">
+                    {/* Step 1 */}
+                    <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                          Step 1: Whitelist Domain in Firebase Console (Most Common Cause)
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">Required</span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-slate-300">
+                        Firebase blocks Google sign-in from any domain that isn't explicitly listed in the Authorized Domains list. To authorize your Vercel deployment:
+                      </p>
+                      <ol className="list-decimal list-inside text-xs space-y-1 text-slate-300/90 pl-1">
+                        <li>Open the Firebase Console Settings page below.</li>
+                        <li>Scroll down to <strong>Authorized domains</strong>.</li>
+                        <li>Click <strong>Add domain</strong> and enter: <code className="text-emerald-300 font-mono">{typeof window !== 'undefined' ? window.location.hostname : 'your-app.vercel.app'}</code> (or <code className="text-emerald-300 font-mono">vercel.app</code> to cover all Vercel previews).</li>
+                        <li>Click <strong>Save</strong>. Domain authorization takes effect immediately.</li>
+                      </ol>
+                      <div className="pt-2">
+                        <a
+                          href="https://console.firebase.google.com/project/ai-studio-applet-webapp-5a3d7/authentication/settings"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-md transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Open Firebase Authorized Domains Settings</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Step 2 */}
+                    <div className="p-4 rounded-2xl border border-black/5 dark:border-white/10 bg-black/5 dark:bg-white/5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                          Step 2: Cross-Origin-Opener-Policy (Already Configured)
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold">Handled in Repo</span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-slate-300">
+                        We have added <code className="text-cyan-300 font-mono">vercel.json</code> to the root of the project with <code className="text-cyan-300 font-mono">Cross-Origin-Opener-Policy: same-origin-allow-popups</code>. This ensures the Google OAuth popup window can safely communicate authentication tokens back to ATSA on Vercel.
+                      </p>
+                    </div>
+
+                    {/* Step 3 */}
+                    <div className="p-4 rounded-2xl border border-black/5 dark:border-white/10 bg-black/5 dark:bg-white/5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                          Step 3: Environment Variables (Optional)
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-slate-400 font-bold">Automatic Fallback</span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-slate-300">
+                        The codebase is configured to read <code className="text-emerald-300 font-mono">firebase-applet-config.json</code> automatically, with optional overrides via <code className="text-emerald-300 font-mono">VITE_FIREBASE_*</code> environment variables in Vercel Project Settings. Refer to <code className="text-emerald-300 font-mono">.env.example</code> for the complete variable list.
+                      </p>
+                    </div>
+
+                    {/* Step 4 */}
+                    <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                          Instant Access: Reviewer & Jury Guest Pass
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">1-Click Bypass</span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-amber-200/90">
+                        Need to test, demo, or grade the application immediately on Vercel without configuring Firebase Console right away? Click the Guest Pass button to immediately enter the dashboard with full CASA analysis and simulation capabilities enabled.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsVercelGuideOpen(false);
+                          handleGuestLogin();
+                        }}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition-colors cursor-pointer"
+                      >
+                        <Award className="w-4 h-4" />
+                        <span>Enter Dashboard Now with Guest Pass</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsVercelGuideOpen(false)}
+                      className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Close Guide
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
 
           <button 
             onClick={toggleTheme}
@@ -945,11 +1336,15 @@ export default function App() {
             <Globe className="w-5 h-5" />
             <span className="font-medium hidden lg:block text-sm">Product Overview</span>
           </button>
-          <button className={cn(
-            "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 cursor-pointer",
-            theme === 'dark' ? "text-white/40 hover:bg-white/5 hover:text-white" : "text-slate-400 hover:bg-slate-50 hover:text-slate-900"
-          )}>
-            <Settings className="w-5 h-5" />
+          <button 
+            type="button"
+            onClick={() => setIsAccountModalOpen(true)}
+            className={cn(
+              "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 cursor-pointer group",
+              theme === 'dark' ? "text-white/50 hover:bg-white/5 hover:text-white" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+            )}
+          >
+            <Settings className="w-5 h-5 group-hover:rotate-45 transition-transform" />
             <span className="font-medium hidden lg:block text-sm">{t('settings')}</span>
           </button>
           <button 
@@ -981,7 +1376,17 @@ export default function App() {
             <div className="hidden md:block w-px h-8 bg-white/[0.04] dark:bg-white/[0.04] bg-slate-200" />
             <div>
               <h2 className={cn("text-[10px] font-bold uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>{t('welcomeBack')}</h2>
-              <p className={cn("text-base font-bold tracking-tight", theme === 'dark' ? "text-white" : "text-slate-900")}>{user?.displayName || user?.email}</p>
+              <button
+                type="button"
+                onClick={() => setIsAccountModalOpen(true)}
+                className={cn(
+                  "text-base font-bold tracking-tight hover:text-emerald-400 transition-colors cursor-pointer text-left block truncate max-w-[200px] sm:max-w-xs",
+                  theme === 'dark' ? "text-white" : "text-slate-900"
+                )}
+                title={t('editAccountTooltip')}
+              >
+                {userProfile.displayName || user?.displayName || user?.email}
+              </button>
             </div>
           </div>
 
@@ -1086,17 +1491,44 @@ export default function App() {
               </AnimatePresence>
             </div>
             <div className={cn("h-10 w-px mx-2", theme === 'dark' ? "bg-white/10" : "bg-slate-200")} />
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <p className={cn("text-sm font-medium", theme === 'dark' ? "text-white" : "text-slate-900")}>Laboratory Personnel</p>
-                <p className={cn("text-xs", theme === 'dark' ? "text-white/40" : "text-slate-400")}>Lab Sector A-4</p>
-              </div>
-              {user?.photoURL ? (
-                <img src={user.photoURL} alt="User" className="w-10 h-10 rounded-full border-2 border-white/10" referrerPolicy="no-referrer" />
-              ) : (
-                <div className={cn("w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-blue-500 border-2", theme === 'dark' ? "border-white/10" : "border-slate-200")} />
+            <button
+              type="button"
+              onClick={() => setIsAccountModalOpen(true)}
+              className={cn(
+                "flex items-center gap-3 p-1.5 pl-3 rounded-2xl border transition-all cursor-pointer group text-left",
+                theme === 'dark' 
+                  ? "bg-white/[0.03] hover:bg-white/[0.08] border-white/10 hover:border-emerald-500/40" 
+                  : "bg-slate-50 hover:bg-slate-100 border-slate-200 hover:border-emerald-500/40"
               )}
-            </div>
+              title={t('editAccountTooltip')}
+            >
+              <div className="text-right hidden sm:block">
+                <p className={cn("text-xs font-bold leading-tight group-hover:text-emerald-400 transition-colors truncate max-w-[160px]", theme === 'dark' ? "text-white" : "text-slate-900")}>
+                  {userProfile.displayName || user?.displayName || 'Laboratory Specialist'}
+                </p>
+                <p className={cn("text-[10px] leading-tight mt-0.5", theme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                  {userProfile.sector || 'Lab Sector A-4'} • <span className="font-semibold text-emerald-500 group-hover:underline">{t('settings')}</span>
+                </p>
+              </div>
+              {userProfile.photoURL || user?.photoURL ? (
+                <img 
+                  src={userProfile.photoURL || user?.photoURL || ''} 
+                  alt="User" 
+                  className="w-10 h-10 rounded-xl border-2 border-emerald-500/30 object-cover shadow-sm group-hover:scale-105 group-hover:border-emerald-400 transition-all" 
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className={cn(
+                  "w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 border-2 flex items-center justify-center font-bold text-white shadow-sm group-hover:scale-105 transition-all",
+                  theme === 'dark' ? "border-white/10" : "border-slate-200"
+                )}>
+                  {(userProfile.displayName || user?.displayName || 'U').charAt(0).toUpperCase()}
+                </div>
+              )}
+            </button>
           </div>
         </header>
 
@@ -2163,6 +2595,17 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Account Settings & Workstation Profile Adjustments Modal */}
+      <AccountSettingsModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        user={user}
+        profileData={userProfile}
+        onSaveProfile={handleSaveProfile}
+        onLogout={handleLogout}
+        theme={theme}
+      />
 
       {/* Action Feedback Toast */}
       <AnimatePresence>
