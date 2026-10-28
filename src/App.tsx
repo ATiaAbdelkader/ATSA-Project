@@ -1536,9 +1536,9 @@ export default function App() {
           {appState === 'dashboard' && (
             <div className="p-8 max-w-7xl mx-auto space-y-8">
               {/* Hero Section & Laboratory Performance */}
-              <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+              <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-6 items-stretch">
                 {/* Hero card */}
-                <div className="md:col-span-2 lg:col-span-2 p-8 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 rounded-[32px] relative overflow-hidden group shadow-[0_12px_40px_rgba(16,185,129,0.15)] transition-transform duration-500 hover:scale-[1.005]">
+                <div className="md:col-span-2 xl:col-span-5 p-7 sm:p-8 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 rounded-[32px] relative overflow-hidden group shadow-[0_12px_40px_rgba(16,185,129,0.15)] transition-transform duration-500 hover:scale-[1.005] flex flex-col justify-between">
                   {/* Subtle ambient light patterns inside card */}
                   <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent opacity-70 pointer-events-none" />
                   <div className="absolute -top-12 -left-12 w-40 h-40 bg-teal-400/20 rounded-full blur-2xl pointer-events-none" />
@@ -1582,7 +1582,7 @@ export default function App() {
 
                 {/* Lab Performance Overview Card */}
                 <div className={cn(
-                  "p-8 border rounded-[32px] flex flex-col justify-between transition-all duration-300 relative overflow-hidden",
+                  "md:col-span-1 xl:col-span-4 p-6 sm:p-7 border rounded-[32px] flex flex-col justify-between transition-all duration-300 relative overflow-hidden",
                   theme === 'dark' 
                     ? "bg-[#09090b] border-white/[0.06] shadow-[0_10px_30px_rgba(0,0,0,0.2)]" 
                     : "bg-white border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.02)]"
@@ -1591,81 +1591,153 @@ export default function App() {
                     <div className="absolute top-0 right-0 w-[150px] h-[150px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
                   )}
                   <div>
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className={cn("text-[10px] font-black uppercase tracking-widest", theme === 'dark' ? "text-white/40" : "text-slate-400")}>
-                        Lab Performance Monitoring
-                      </h3>
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Database Connected" />
+                    <div className="flex items-center justify-between mb-5">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-emerald-500" />
+                        <h3 className={cn("text-[11px] font-black uppercase tracking-widest", theme === 'dark' ? "text-white/60" : "text-slate-500")}>
+                          Lab Performance Monitoring
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider">Live</span>
+                      </div>
                     </div>
 
-                    <div className="space-y-5">
+                    <div className="space-y-3.5">
                       {/* Stat 1: Samples Today */}
-                      <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-500/[0.02] dark:bg-white/[0.02] border border-slate-100 dark:border-white/[0.04]">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2.5 bg-blue-500/10 rounded-xl">
-                            <Users className="w-4 h-4 text-blue-500" />
+                      <div className={cn(
+                        "p-3.5 rounded-2xl border transition-all duration-200 group",
+                        theme === 'dark' 
+                          ? "bg-white/[0.02] border-white/[0.06] hover:border-blue-500/30 hover:bg-white/[0.03]" 
+                          : "bg-slate-50/70 border-slate-200/80 hover:border-blue-500/30 hover:bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
+                      )}>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="p-2 bg-blue-500/10 rounded-xl text-blue-500 shrink-0">
+                              <Users className="w-4 h-4" />
+                            </div>
+                            <p className={cn("text-xs font-bold truncate", theme === 'dark' ? "text-white/90" : "text-slate-800")}>
+                              {t('statsToday')}
+                            </p>
                           </div>
-                          <div>
-                            <p className={cn("text-xs font-semibold", theme === 'dark' ? "text-white/60" : "text-slate-600")}>{t('statsToday')}</p>
-                            <p className={cn("text-[9px] uppercase tracking-wider font-bold opacity-40", theme === 'dark' ? "text-white/30" : "text-slate-400")}>Secure Firestore</p>
+                          <span className={cn(
+                            "text-[9px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-md border shrink-0 whitespace-nowrap",
+                            theme === 'dark' ? "bg-white/5 border-white/10 text-white/40" : "bg-slate-100 border-slate-200 text-slate-500"
+                          )}>
+                            Secure Firestore
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-2 pt-1 border-t border-black/[0.03] dark:border-white/[0.04]">
+                          <span className={cn("text-[10px] font-medium uppercase tracking-wider", theme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                            Active Specimens
+                          </span>
+                          <div className="flex items-baseline gap-1 font-mono shrink-0">
+                            <span className={cn("text-2xl font-black tracking-tight", theme === 'dark' ? "text-white" : "text-slate-900")}>
+                              <CountUpNumber value={stats.samplesToday} decimals={0} duration={1200} />
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-white/40 uppercase font-sans">recorded</span>
                           </div>
                         </div>
-                        <span className="text-xl font-black tracking-tight font-mono">
-                          <CountUpNumber value={stats.samplesToday} decimals={0} duration={1200} />
-                        </span>
                       </div>
 
                       {/* Stat 2: Avg Processing */}
-                      <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-500/[0.02] dark:bg-white/[0.02] border border-slate-100 dark:border-white/[0.04]">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2.5 bg-emerald-500/10 rounded-xl">
-                            <Clock className="w-4 h-4 text-emerald-500" />
+                      <div className={cn(
+                        "p-3.5 rounded-2xl border transition-all duration-200 group",
+                        theme === 'dark' 
+                          ? "bg-white/[0.02] border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.03]" 
+                          : "bg-slate-50/70 border-slate-200/80 hover:border-emerald-500/30 hover:bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
+                      )}>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-500 shrink-0">
+                              <Clock className="w-4 h-4" />
+                            </div>
+                            <p className={cn("text-xs font-bold truncate", theme === 'dark' ? "text-white/90" : "text-slate-800")}>
+                              {t('avgProcessing')}
+                            </p>
                           </div>
-                          <div>
-                            <p className={cn("text-xs font-semibold", theme === 'dark' ? "text-white/60" : "text-slate-600")}>{t('avgProcessing')}</p>
-                            <p className={cn("text-[9px] uppercase tracking-wider font-bold opacity-40", theme === 'dark' ? "text-white/30" : "text-slate-400")}>Optimized Pipeline</p>
+                          <span className={cn(
+                            "text-[9px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-md border shrink-0 whitespace-nowrap",
+                            theme === 'dark' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                          )}>
+                            Optimized Pipeline
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-2 pt-1 border-t border-black/[0.03] dark:border-white/[0.04]">
+                          <span className={cn("text-[10px] font-medium uppercase tracking-wider", theme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                            Processing Latency
+                          </span>
+                          <div className="flex items-baseline gap-1 font-mono shrink-0">
+                            <span className="text-2xl font-black tracking-tight text-emerald-500 dark:text-emerald-400">
+                              {stats.avgProcessing}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-white/40 uppercase font-sans">avg / batch</span>
                           </div>
                         </div>
-                        <span className="text-xl font-black tracking-tight font-mono">{stats.avgProcessing}</span>
                       </div>
 
-                      {/* Stat 3: Real Average Concentration across loaded analysis (Tailored Metric) */}
-                      <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-500/[0.02] dark:bg-white/[0.02] border border-slate-100 dark:border-white/[0.04]">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2.5 bg-teal-500/10 rounded-xl">
-                            <Activity className="w-4 h-4 text-teal-500" />
+                      {/* Stat 3: Real Average Concentration across loaded analysis */}
+                      <div className={cn(
+                        "p-3.5 rounded-2xl border transition-all duration-200 group",
+                        theme === 'dark' 
+                          ? "bg-white/[0.02] border-white/[0.06] hover:border-teal-500/30 hover:bg-white/[0.03]" 
+                          : "bg-slate-50/70 border-slate-200/80 hover:border-teal-500/30 hover:bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
+                      )}>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="p-2 bg-teal-500/10 rounded-xl text-teal-500 shrink-0">
+                              <Activity className="w-4 h-4" />
+                            </div>
+                            <p className={cn("text-xs font-bold truncate", theme === 'dark' ? "text-white/90" : "text-slate-800")}>
+                              Avg. Concentration
+                            </p>
                           </div>
-                          <div>
-                            <p className={cn("text-xs font-semibold", theme === 'dark' ? "text-white/60" : "text-slate-600")}>Avg. Concentration</p>
-                            <p className={cn("text-[9px] uppercase tracking-wider font-bold opacity-40", theme === 'dark' ? "text-white/30" : "text-slate-400")}>Live Bio-Metric</p>
+                          <span className={cn(
+                            "text-[9px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-md border shrink-0 whitespace-nowrap",
+                            theme === 'dark' ? "bg-teal-500/10 border-teal-500/20 text-teal-400" : "bg-teal-50 border-teal-200 text-teal-700"
+                          )}>
+                            Live Bio-Metric
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-2 pt-1 border-t border-black/[0.03] dark:border-white/[0.04]">
+                          <span className={cn("text-[10px] font-medium uppercase tracking-wider", theme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                            Analyzed Cohort
+                          </span>
+                          <div className="flex items-baseline gap-1.5 font-mono shrink-0">
+                            <span className="text-2xl font-black tracking-tight text-teal-500 dark:text-teal-400">
+                              <CountUpNumber 
+                                value={
+                                  recentAnalyses.length > 0 
+                                    ? (recentAnalyses.reduce((acc, curr) => acc + (curr.concentration || 0), 0) / recentAnalyses.length)
+                                    : (recent30DaysAnalyses.length > 0
+                                        ? (recent30DaysAnalyses.reduce((acc, curr) => acc + (curr.concentration || 0), 0) / recent30DaysAnalyses.length)
+                                        : 0)
+                                } 
+                                decimals={1} 
+                                duration={1400}
+                              />
+                            </span>
+                            <span className="text-[11px] font-bold text-teal-600 dark:text-teal-300 font-sans">M/ml</span>
                           </div>
                         </div>
-                        <span className="text-xl font-black tracking-tight text-teal-400 font-mono">
-                          <CountUpNumber 
-                            value={
-                              recentAnalyses.length > 0 
-                                ? (recentAnalyses.reduce((acc, curr) => acc + (curr.concentration || 0), 0) / recentAnalyses.length)
-                                : (recent30DaysAnalyses.length > 0
-                                    ? (recent30DaysAnalyses.reduce((acc, curr) => acc + (curr.concentration || 0), 0) / recent30DaysAnalyses.length)
-                                    : 0)
-                            } 
-                            decimals={1} 
-                            duration={1400}
-                          /> <span className="text-[10px] font-normal text-muted-foreground font-sans">M/ml</span>
-                        </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className={cn("pt-5 border-t", theme === 'dark' ? "border-white/[0.05]" : "border-slate-100")}>
-                    <button className="w-full text-emerald-500 hover:text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 hover:gap-2.5 transition-all duration-300 cursor-pointer">
-                      View Diagnostics Link <ArrowUpRight className="w-4 h-4" />
+                  <div className={cn("pt-4 mt-4 border-t", theme === 'dark' ? "border-white/[0.05]" : "border-slate-100")}>
+                    <button 
+                      onClick={() => setAppState('history')}
+                      className="w-full text-emerald-500 hover:text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 hover:gap-2.5 transition-all duration-300 cursor-pointer py-1"
+                    >
+                      View Diagnostics Archive <ArrowUpRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
+
                 {/* WHO Reference Compliance Meter */}
                 <div className={cn(
-                  "p-8 border rounded-[32px] flex flex-col justify-between transition-all duration-300 relative overflow-hidden",
+                  "md:col-span-1 xl:col-span-3 p-6 sm:p-7 border rounded-[32px] flex flex-col justify-between transition-all duration-300 relative overflow-hidden",
                   theme === 'dark' 
                     ? "bg-[#09090b] border-white/[0.06] shadow-[0_10px_30px_rgba(0,0,0,0.2)]" 
                     : "bg-white border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.02)]"
