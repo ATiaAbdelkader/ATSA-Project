@@ -1536,9 +1536,9 @@ export default function App() {
           {appState === 'dashboard' && (
             <div className="p-8 max-w-7xl mx-auto space-y-8">
               {/* Hero Section & Laboratory Performance */}
-              <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
                 {/* Hero card */}
-                <div className="lg:col-span-2 p-8 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 rounded-[32px] relative overflow-hidden group shadow-[0_12px_40px_rgba(16,185,129,0.15)] transition-transform duration-500 hover:scale-[1.005]">
+                <div className="md:col-span-2 lg:col-span-2 p-8 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 rounded-[32px] relative overflow-hidden group shadow-[0_12px_40px_rgba(16,185,129,0.15)] transition-transform duration-500 hover:scale-[1.005]">
                   {/* Subtle ambient light patterns inside card */}
                   <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent opacity-70 pointer-events-none" />
                   <div className="absolute -top-12 -left-12 w-40 h-40 bg-teal-400/20 rounded-full blur-2xl pointer-events-none" />
@@ -1663,33 +1663,9 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-              </section>
-
-              {/* Performance Trends of Clinic */}
-              <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Performance Trends Chart with Hover-To-Zoom & Detailed Tooltip */}
-                <div className="lg:col-span-2">
-                  <PerformanceTrendsChart 
-                    analyses={recent30DaysAnalyses} 
-                    theme={theme} 
-                    language={language}
-                    onSelectSample={(sample) => {
-                      if (sample.patientId) {
-                        const profileKey = (sample.species?.toLowerCase() || 'human') as keyof typeof SPECIES_PROFILES;
-                        setActivePatient({
-                          id: sample.patientId,
-                          species: sample.species || 'Human',
-                          profile: SPECIES_PROFILES[profileKey] || SPECIES_PROFILES.human
-                        });
-                      }
-                      setAppState('history');
-                    }}
-                  />
-                </div>
-
                 {/* WHO Reference Compliance Meter */}
                 <div className={cn(
-                  "lg:col-span-1 p-8 border rounded-[32px] flex flex-col justify-between transition-all duration-300 relative overflow-hidden",
+                  "p-8 border rounded-[32px] flex flex-col justify-between transition-all duration-300 relative overflow-hidden",
                   theme === 'dark' 
                     ? "bg-[#09090b] border-white/[0.06] shadow-[0_10px_30px_rgba(0,0,0,0.2)]" 
                     : "bg-white border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.02)]"
@@ -1754,6 +1730,26 @@ export default function App() {
                     <strong className="text-emerald-500 font-bold">{complianceStats.count} / {complianceStats.total}</strong>
                   </div>
                 </div>
+              </section>
+
+              {/* Performance Trends of Clinic - Full-Width Analytical Terminal */}
+              <section className="w-full min-w-0">
+                <PerformanceTrendsChart 
+                  analyses={recent30DaysAnalyses} 
+                  theme={theme} 
+                  language={language}
+                  onSelectSample={(sample) => {
+                    if (sample.patientId) {
+                      const profileKey = (sample.species?.toLowerCase() || 'human') as keyof typeof SPECIES_PROFILES;
+                      setActivePatient({
+                        id: sample.patientId,
+                        species: sample.species || 'Human',
+                        profile: SPECIES_PROFILES[profileKey] || SPECIES_PROFILES.human
+                      });
+                    }
+                    setAppState('history');
+                  }}
+                />
               </section>
 
               {/* 5-Animal Virtual Clinical Library Showcase */}

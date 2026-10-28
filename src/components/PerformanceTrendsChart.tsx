@@ -21,7 +21,8 @@ import {
   ArrowUpRight, 
   ShieldCheck,
   Zap,
-  Info
+  Info,
+  X
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -434,8 +435,8 @@ export const PerformanceTrendsChart: React.FC<PerformanceTrendsChartProps> = ({
       {/* Main Chart + Hover-To-Zoom Focus HUD */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Main Interactive Line / Area Chart */}
-        <div className={cn("lg:col-span-8 space-y-3", !enableHoverZoomLens && "lg:col-span-12")}>
-          <div className="h-[270px] w-full relative overflow-hidden rounded-xl">
+        <div className={cn("lg:col-span-7 xl:col-span-7 space-y-3 min-w-0", !enableHoverZoomLens && "lg:col-span-12")}>
+          <div className="h-[285px] w-full relative overflow-hidden rounded-xl">
             {/* Visual Drawing Tracer Beam synchronized with line draw */}
             {isDrawingAnimation && !visibleData.every(d => d.concentration === 0) && (
               <motion.div
@@ -690,99 +691,189 @@ export const PerformanceTrendsChart: React.FC<PerformanceTrendsChartProps> = ({
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             className={cn(
-              "lg:col-span-4 p-5 rounded-2xl border space-y-4 relative overflow-hidden",
+              "lg:col-span-5 xl:col-span-5 p-5 sm:p-6 rounded-2xl border space-y-4 relative overflow-hidden min-w-0",
               isDark 
-                ? "bg-gradient-to-b from-[#111115] to-[#0b0b0d] border-emerald-500/30 shadow-xl shadow-emerald-950/20" 
-                : "bg-slate-50 border-emerald-500/20 shadow-sm"
+                ? "bg-gradient-to-b from-[#111116] via-[#0d0d10] to-[#09090b] border-emerald-500/25 shadow-xl shadow-emerald-950/20" 
+                : "bg-slate-50/90 border-slate-200 shadow-sm"
             )}
           >
             {/* Focal Lens Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 dark:border-white/10 border-slate-200">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <ZoomIn className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400 block">
-                    {hoveredData ? 'Active Hover Zoom Lens' : pinnedDay ? 'Pinned Day Focus' : 'Latest Focal Point'}
+            <div className="pb-3 border-b border-white/10 dark:border-white/10 border-slate-200/80 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="relative flex h-2.5 w-2.5 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                   </span>
-                  <h5 className="text-xs font-bold truncate">{activeFocusDay.fullDate}</h5>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 dark:text-emerald-400 whitespace-nowrap">
+                    {hoveredData ? 'Live Hover Lens' : pinnedDay ? 'Pinned Focal Day' : 'Latest Focal Point'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                  {pinnedDay && (
+                    <button
+                      onClick={() => setPinnedDay(null)}
+                      className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                      title="Clear pinned day"
+                    >
+                      <X className="w-3 h-3" />
+                      Unpin
+                    </button>
+                  )}
+                  <span className={cn(
+                    "px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase tracking-wider border shrink-0 whitespace-nowrap",
+                    activeFocusDay.whoCompliant 
+                      ? "bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border-emerald-500/30" 
+                      : "bg-amber-500/10 text-amber-500 dark:text-amber-400 border-amber-500/30"
+                  )}>
+                    {activeFocusDay.whoCompliant ? 'WHO Compliant' : 'Sub-WHO'}
+                  </span>
                 </div>
               </div>
 
-              <span className={cn(
-                "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider font-mono",
-                activeFocusDay.whoCompliant ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-              )}>
-                {activeFocusDay.whoCompliant ? 'Normozoospermic' : 'Sub-WHO'}
-              </span>
+              {/* Date & Timeline Position */}
+              <div className="flex items-center justify-between gap-2 pt-0.5 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Calendar className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
+                  <h5 className="text-xs sm:text-sm font-bold truncate text-slate-800 dark:text-white">
+                    {activeFocusDay.fullDate}
+                  </h5>
+                </div>
+                <span className="shrink-0 text-[9px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/70 whitespace-nowrap">
+                  {activeFocusDay.daysAgo === 0 ? 'Today' : `${activeFocusDay.daysAgo}d ago`}
+                </span>
+              </div>
             </div>
 
-            {/* Exact Concentration & Exact Sample Count */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className={cn("p-3 rounded-xl border", isDark ? "bg-black/40 border-white/10" : "bg-white border-slate-200")}>
-                <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400 block mb-0.5">
-                  Exact Concentration
-                </span>
-                <div className="text-2xl font-mono font-black text-emerald-400">
-                  {activeFocusDay.concentration.toFixed(2)}
+            {/* Exact Concentration & Exact Sample Count Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+              {/* Exact Concentration */}
+              <div className={cn(
+                "p-3.5 rounded-xl border flex flex-col justify-between transition-all min-w-0",
+                isDark ? "bg-black/40 border-white/10" : "bg-white border-slate-200/90 shadow-2xs"
+              )}>
+                <div className="flex items-center justify-between gap-1 mb-1.5 min-w-0">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-white/60 flex items-center gap-1.5 truncate">
+                    <Activity className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
+                    <span className="truncate">Exact Concentration</span>
+                  </span>
+                  <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 font-bold shrink-0 whitespace-nowrap">
+                    Ref ≥ 15
+                  </span>
                 </div>
-                <span className="text-[9px] opacity-60 font-mono">Million / mL</span>
+
+                <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5 my-1 min-w-0">
+                  <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-500 dark:text-emerald-400 tabular-nums">
+                    {activeFocusDay.concentration.toFixed(2)}
+                  </span>
+                  <span className="text-xs font-semibold text-slate-400 dark:text-white/50 font-sans whitespace-nowrap">
+                    Million / mL
+                  </span>
+                </div>
+
+                <div className="text-[9px] font-mono mt-1.5 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-slate-400 dark:text-white/40 min-w-0 gap-1">
+                  <span className="shrink-0">Standard 2010</span>
+                  <span className={cn("font-bold truncate text-right", activeFocusDay.concentration >= 15 ? "text-emerald-500 dark:text-emerald-400" : "text-amber-500 dark:text-amber-400")}>
+                    {activeFocusDay.concentration >= 15 ? 'Normozoospermic' : activeFocusDay.concentration > 0 ? 'Oligozoospermic' : 'No Data'}
+                  </span>
+                </div>
               </div>
 
-              <div className={cn("p-3 rounded-xl border", isDark ? "bg-black/40 border-white/10" : "bg-white border-slate-200")}>
-                <span className="text-[8px] font-black uppercase tracking-widest text-cyan-400 block mb-0.5">
-                  Exact Sample Count
-                </span>
-                <div className="text-2xl font-mono font-black text-cyan-400">
-                  {activeFocusDay.count}
+              {/* Exact Sample Count */}
+              <div className={cn(
+                "p-3.5 rounded-xl border flex flex-col justify-between transition-all min-w-0",
+                isDark ? "bg-black/40 border-white/10" : "bg-white border-slate-200/90 shadow-2xs"
+              )}>
+                <div className="flex items-center justify-between gap-1 mb-1.5 min-w-0">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-white/60 flex items-center gap-1.5 truncate">
+                    <Users className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400 shrink-0" />
+                    <span className="truncate">Exact Sample Count</span>
+                  </span>
+                  <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 dark:text-cyan-400 font-bold shrink-0 whitespace-nowrap">
+                    Specimens
+                  </span>
                 </div>
-                <span className="text-[9px] opacity-60 font-mono">
-                  {activeFocusDay.count === 1 ? 'Patient Specimen' : 'Patient Specimens'}
-                </span>
+
+                <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5 my-1 min-w-0">
+                  <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-cyan-500 dark:text-cyan-400 tabular-nums">
+                    {activeFocusDay.count}
+                  </span>
+                  <span className="text-xs font-semibold text-slate-400 dark:text-white/50 font-sans whitespace-nowrap">
+                    {activeFocusDay.count === 1 ? 'Patient Specimen' : 'Patient Specimens'}
+                  </span>
+                </div>
+
+                <div className="text-[9px] font-mono mt-1.5 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-slate-400 dark:text-white/40 min-w-0 gap-1">
+                  <span className="shrink-0">Database Log</span>
+                  <span className="font-bold text-cyan-500 dark:text-cyan-400 truncate text-right">
+                    {activeFocusDay.count > 0 ? `${activeFocusDay.count} Valid Logs` : '0 Records Logged'}
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* WHO Comparison Visual Bar */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-[10px] font-mono">
-                <span className="opacity-70">WHO 15 M/ml Benchmark</span>
-                <span className={cn("font-bold", activeFocusDay.concentration >= 15 ? "text-emerald-400" : "text-amber-400")}>
+            <div className="space-y-1.5 p-3 rounded-xl bg-slate-500/[0.03] dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/[0.06] min-w-0">
+              <div className="flex flex-wrap items-center justify-between text-[10px] font-mono gap-1">
+                <span className="opacity-75 flex items-center gap-1.5 font-semibold text-slate-600 dark:text-white/70 truncate">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
+                  <span className="truncate">WHO 15 M/mL Benchmark</span>
+                </span>
+                <span className={cn(
+                  "font-bold text-[9px] px-2 py-0.5 rounded-full whitespace-nowrap ml-auto",
+                  activeFocusDay.concentration >= 15 
+                    ? "bg-emerald-500/10 text-emerald-500 dark:text-emerald-400" 
+                    : activeFocusDay.concentration > 0 
+                      ? "bg-amber-500/10 text-amber-500 dark:text-amber-400" 
+                      : "bg-slate-500/10 text-slate-400 dark:text-white/40"
+                )}>
                   {activeFocusDay.concentration >= 15 
-                    ? `+${(( (activeFocusDay.concentration - 15) / 15 ) * 100).toFixed(0)}% Above Ref` 
-                    : `${(((15 - activeFocusDay.concentration) / 15) * 100).toFixed(0)}% Below Ref`}
+                    ? `+${(((activeFocusDay.concentration - 15) / 15) * 100).toFixed(0)}% Above Ref` 
+                    : activeFocusDay.concentration > 0 
+                      ? `${(((15 - activeFocusDay.concentration) / 15) * 100).toFixed(0)}% Below Ref` 
+                      : '0.00 M/mL (No Activity)'}
                 </span>
               </div>
               <div className="h-2 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden relative">
-                {/* 15 M/ml marker */}
-                <div className="absolute top-0 bottom-0 left-[30%] w-0.5 bg-amber-400 z-10" title="WHO 15 M/ml threshold" />
+                {/* 15 M/ml marker tick */}
+                <div className="absolute top-0 bottom-0 left-[25%] w-0.5 bg-amber-400 z-10" title="WHO 15 M/mL Threshold" />
                 <div 
                   className={cn(
-                    "h-full rounded-full transition-all duration-300",
-                    activeFocusDay.concentration >= 15 ? "bg-emerald-500" : "bg-amber-500"
+                    "h-full rounded-full transition-all duration-500",
+                    activeFocusDay.concentration >= 15 ? "bg-emerald-500" : activeFocusDay.concentration > 0 ? "bg-amber-500" : "bg-slate-400/20"
                   )}
-                  style={{ width: `${Math.min(100, Math.max(5, (activeFocusDay.concentration / 60) * 100))}%` }}
+                  style={{ width: `${Math.min(100, Math.max(0, (activeFocusDay.concentration / 60) * 100))}%` }}
                 />
+              </div>
+              <div className="flex justify-between text-[8px] font-mono opacity-50 text-slate-500 dark:text-white/50">
+                <span>0 M/mL</span>
+                <span className="text-amber-500 dark:text-amber-400 font-bold">15 M/mL WHO Lower Limit</span>
+                <span>60+ M/mL</span>
               </div>
             </div>
 
             {/* Individual Specimen Breakdown Table on That Day */}
-            <div className="space-y-1.5 pt-1">
-              <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-white/50">
-                <span className="flex items-center gap-1">
-                  <Users className="w-3 h-3 text-cyan-400" />
-                  Day's Individual Records ({activeFocusDay.samples.length})
+            <div className="space-y-1.5 pt-1 min-w-0">
+              <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-white/50 min-w-0 gap-1">
+                <span className="flex items-center gap-1.5 truncate">
+                  <Users className="w-3 h-3 text-cyan-500 dark:text-cyan-400 shrink-0" />
+                  <span className="truncate">Day's Individual Records ({activeFocusDay.samples.length})</span>
                 </span>
                 {activeFocusDay.minConc > 0 && (
-                  <span className="font-mono text-emerald-400">
-                    Range: {activeFocusDay.minConc} - {activeFocusDay.maxConc} M/ml
+                  <span className="font-mono text-emerald-500 dark:text-emerald-400 shrink-0 whitespace-nowrap ml-auto">
+                    Range: {activeFocusDay.minConc} - {activeFocusDay.maxConc} M/mL
                   </span>
                 )}
               </div>
 
               {activeFocusDay.samples.length === 0 ? (
-                <div className="p-3 rounded-xl border border-dashed border-white/10 text-center text-[10px] opacity-50">
-                  No individual patient specimens recorded on this calendar day.
+                <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-white/10 text-center space-y-1">
+                  <Microscope className="w-5 h-5 mx-auto text-slate-300 dark:text-white/20" />
+                  <p className="text-xs font-semibold text-slate-500 dark:text-white/50">No Patient Specimens on this Date</p>
+                  <p className="text-[9px] text-slate-400 dark:text-white/30 font-sans">
+                    Hover over or click points on the timeline above to inspect recorded analyses.
+                  </p>
                 </div>
               ) : (
                 <div className="max-h-[140px] overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
@@ -791,24 +882,24 @@ export const PerformanceTrendsChart: React.FC<PerformanceTrendsChartProps> = ({
                       key={s.id || idx}
                       onClick={() => onSelectSample && onSelectSample(s)}
                       className={cn(
-                        "p-2 rounded-xl border flex items-center justify-between text-[10px] font-mono transition-all",
+                        "p-2.5 rounded-xl border flex items-center justify-between text-[10px] font-mono transition-all gap-2 min-w-0",
                         onSelectSample ? "cursor-pointer hover:border-emerald-500/40" : "",
-                        isDark ? "bg-white/[0.03] border-white/10" : "bg-white border-slate-200"
+                        isDark ? "bg-white/[0.03] border-white/10" : "bg-white border-slate-200 shadow-2xs"
                       )}
                     >
-                      <div>
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span>{s.patientId}</span>
-                          <span className="px-1.5 py-0.2 text-[8px] rounded bg-emerald-500/10 text-emerald-400">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold flex items-center gap-1.5 truncate">
+                          <span className={cn("truncate", isDark ? "text-white" : "text-slate-900")}>{s.patientId}</span>
+                          <span className="px-1.5 py-0.2 text-[8px] rounded bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border border-emerald-500/20 shrink-0 whitespace-nowrap">
                             {s.species}
                           </span>
                         </div>
-                        <span className="text-[8px] opacity-60 font-sans">Time: {s.timeStr} • {s.status}</span>
+                        <span className="text-[8px] opacity-60 font-sans block truncate">Time: {s.timeStr} &middot; {s.status}</span>
                       </div>
 
-                      <div className="text-right">
-                        <div className="font-bold text-emerald-400">{s.concentration.toFixed(1)} M/ml</div>
-                        <div className="text-[8px] opacity-60">Mot: {s.motility}% (Prog: {s.progressive}%)</div>
+                      <div className="text-right shrink-0">
+                        <div className="font-bold text-emerald-500 dark:text-emerald-400 whitespace-nowrap">{s.concentration.toFixed(1)} M/mL</div>
+                        <div className="text-[8px] opacity-60 whitespace-nowrap">Mot: {s.motility}% (Prog: {s.progressive}%)</div>
                       </div>
                     </div>
                   ))}
