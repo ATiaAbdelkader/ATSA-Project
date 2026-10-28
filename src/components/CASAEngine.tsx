@@ -2520,7 +2520,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
             </div>
           ) : (
             <div className={cn(
-              "relative w-full max-w-6xl aspect-video rounded-xl border shadow-2xl overflow-hidden transition-all",
+              "relative w-full max-w-6xl aspect-video max-h-[calc(100%-1rem)] rounded-xl border shadow-2xl overflow-hidden transition-all m-auto",
               theme === 'dark' ? "bg-[#050505] border-white/10" : "bg-white border-slate-300 shadow-xl"
             )}>
             <div className="w-full h-full relative">
@@ -2786,228 +2786,246 @@ Digital Signature Verified - ATSA AI Engine v2.0
               <div className="text-[10px] font-mono text-center text-white/40 py-1">{canvasZoom.toFixed(1)}x</div>
             </div>
 
-            {/* Video Optimization Toolbox */}
-            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-[24px]">
-              <div className="flex items-center gap-1 border-r border-white/10 pr-3 mr-1">
-                <button 
-                  onClick={() => {
-                    setIsCalibrating(!isCalibrating);
-                    if (isManualAnnotating) setIsManualAnnotating(false);
-                  }}
-                  className={cn(
-                    "p-2 rounded-xl transition-all flex items-center gap-2",
-                    isCalibrating ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20" : "hover:bg-white/10 text-white/60"
-                  )}
-                  title="Calibrate Scale (Draw 100μm line)"
-                >
-                  <Ruler className="w-4 h-4" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">{t('calibrateBtn')}</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    setIsManualAnnotating(!isManualAnnotating);
-                    if (isCalibrating) setIsCalibrating(false);
-                  }}
-                  className={cn(
-                    "p-2 rounded-xl transition-all flex items-center gap-2 ml-1",
-                    isManualAnnotating ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" : "hover:bg-white/10 text-white/60"
-                  )}
-                  title="Manual Override & Point Annotation"
-                >
-                  <Tag className="w-4 h-4" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">{t('manualEditBtn')}</span>
-                </button>
-                <div className="relative group">
-                  <button className="p-2 hover:bg-white/10 text-white/60 hover:text-white rounded-xl transition-all">
-                    <Sliders className="w-4 h-4" />
+            {/* Unified Bottom Laboratory Control Dock */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-1.5 max-w-[96%] w-auto pointer-events-none select-none">
+              {/* Deck 1: Video Optics, Calibration & AI Models */}
+              <div className="pointer-events-auto flex items-center gap-1 sm:gap-1.5 px-3 py-1.5 bg-black/85 backdrop-blur-xl border border-white/15 rounded-xl shadow-xl overflow-x-auto max-w-full custom-scrollbar">
+                <div className="flex items-center gap-1 border-r border-white/10 pr-2 shrink-0">
+                  <button 
+                    onClick={() => {
+                      setIsCalibrating(!isCalibrating);
+                      if (isManualAnnotating) setIsManualAnnotating(false);
+                    }}
+                    className={cn(
+                      "px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
+                      isCalibrating ? "bg-blue-500 text-white shadow-md shadow-blue-500/30 font-bold" : "hover:bg-white/10 text-white/70 hover:text-white"
+                    )}
+                    title="Calibrate Scale (Draw 100μm line)"
+                  >
+                    <Ruler className="w-3.5 h-3.5" />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">{t('calibrateBtn')}</span>
                   </button>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 hidden group-hover:block w-56 p-4 bg-black/90 border border-white/10 rounded-2xl backdrop-blur-2xl">
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <span className="text-[10px] text-white/40 uppercase font-bold">{t('brightnessLabel')}</span>
-                          <span className="text-[10px] text-white font-mono">{videoFilters.brightness}x</span>
+                  <button 
+                    onClick={() => {
+                      setIsManualAnnotating(!isManualAnnotating);
+                      if (isCalibrating) setIsCalibrating(false);
+                    }}
+                    className={cn(
+                      "px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
+                      isManualAnnotating ? "bg-amber-500 text-white shadow-md shadow-amber-500/30 font-bold" : "hover:bg-white/10 text-white/70 hover:text-white"
+                    )}
+                    title="Manual Override & Point Annotation"
+                  >
+                    <Tag className="w-3.5 h-3.5" />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">{t('manualEditBtn')}</span>
+                  </button>
+                  <div className="relative group">
+                    <button className="p-1.5 hover:bg-white/10 text-white/70 hover:text-white rounded-lg transition-all cursor-pointer" title="Adjust Brightness, Contrast & Area Threshold">
+                      <Sliders className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block w-56 p-4 bg-black/95 border border-white/15 rounded-2xl backdrop-blur-2xl shadow-2xl z-40">
+                      <div className="space-y-4">
+                        <div>
+                          <div className="flex justify-between mb-1">
+                            <span className="text-[10px] text-white/50 uppercase font-bold">{t('brightnessLabel')}</span>
+                            <span className="text-[10px] text-white font-mono">{videoFilters.brightness}x</span>
+                          </div>
+                          <input 
+                            type="range" min="0.5" max="2" step="0.1" 
+                            value={videoFilters.brightness}
+                            onChange={(e) => setVideoFilters({...videoFilters, brightness: parseFloat(e.target.value)})}
+                            className="w-full accent-emerald-500 cursor-pointer"
+                          />
                         </div>
-                        <input 
-                          type="range" min="0.5" max="2" step="0.1" 
-                          value={videoFilters.brightness}
-                          onChange={(e) => setVideoFilters({...videoFilters, brightness: parseFloat(e.target.value)})}
-                          className="w-full accent-emerald-500"
-                        />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <span className="text-[10px] text-white/40 uppercase font-bold">{t('contrastLabel')}</span>
-                          <span className="text-[10px] text-white font-mono">{videoFilters.contrast}x</span>
+                        <div>
+                          <div className="flex justify-between mb-1">
+                            <span className="text-[10px] text-white/50 uppercase font-bold">{t('contrastLabel')}</span>
+                            <span className="text-[10px] text-white font-mono">{videoFilters.contrast}x</span>
+                          </div>
+                          <input 
+                            type="range" min="0.5" max="2" step="0.1" 
+                            value={videoFilters.contrast}
+                            onChange={(e) => setVideoFilters({...videoFilters, contrast: parseFloat(e.target.value)})}
+                            className="w-full accent-emerald-500 cursor-pointer"
+                          />
                         </div>
-                        <input 
-                          type="range" min="0.5" max="2" step="0.1" 
-                          value={videoFilters.contrast}
-                          onChange={(e) => setVideoFilters({...videoFilters, contrast: parseFloat(e.target.value)})}
-                          className="w-full accent-emerald-500"
-                        />
-                      </div>
-                      <div className="pt-2 border-t border-white/10">
-                        <div className="flex justify-between mb-1">
-                          <span className="text-[10px] text-white/40 uppercase font-bold">{t('cvAreaThresholdLabel')} (px²)</span>
-                          <span className="text-[10px] text-emerald-400 font-mono">{videoFilters.cvAreaThreshold}</span>
+                        <div className="pt-2 border-t border-white/10">
+                          <div className="flex justify-between mb-1">
+                            <span className="text-[10px] text-white/50 uppercase font-bold">{t('cvAreaThresholdLabel')} (px²)</span>
+                            <span className="text-[10px] text-emerald-400 font-mono">{videoFilters.cvAreaThreshold}</span>
+                          </div>
+                          <input 
+                            type="range" min="5" max="100" step="1" 
+                            value={videoFilters.cvAreaThreshold}
+                            onChange={(e) => setVideoFilters({...videoFilters, cvAreaThreshold: parseInt(e.target.value)})}
+                            className="w-full accent-emerald-500 cursor-pointer"
+                          />
                         </div>
-                        <input 
-                          type="range" min="5" max="100" step="1" 
-                          value={videoFilters.cvAreaThreshold}
-                          onChange={(e) => setVideoFilters({...videoFilters, cvAreaThreshold: parseInt(e.target.value)})}
-                          className="w-full accent-emerald-500"
-                        />
                       </div>
                     </div>
                   </div>
                 </div>
+
+                {/* Optical Modes */}
+                <div className="flex items-center gap-1 border-r border-white/10 pr-2 shrink-0">
+                  {(['normal', 'phase-contrast', 'negative', 'fluorescence'] as const).map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => setVideoFilters({...videoFilters, mode})}
+                      className={cn(
+                        "px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                        videoFilters.mode === mode 
+                          ? "bg-white text-black font-bold shadow-sm" 
+                          : "text-white/50 hover:bg-white/10 hover:text-white/80"
+                      )}
+                    >
+                      {mode === 'phase-contrast' ? 'Phase' : mode === 'fluorescence' ? 'Fluo' : mode === 'negative' ? 'Neg' : 'Norm'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Computer Vision filters */}
+                <div className="flex items-center gap-1 border-r border-white/10 pr-2 shrink-0">
+                  {(['none', 'edges', 'contours', 'threshold'] as const).map(cv => (
+                    <button
+                      key={cv}
+                      onClick={() => setVideoFilters({
+                        ...videoFilters, 
+                        cvMode: cv,
+                        aiModel: cv !== 'none' ? 'none' : videoFilters.aiModel
+                      })}
+                      className={cn(
+                        "p-1.5 rounded-md transition-all cursor-pointer",
+                        videoFilters.cvMode === cv 
+                          ? "bg-emerald-500 text-white shadow-sm" 
+                          : "text-white/40 hover:bg-white/10 hover:text-white/70"
+                      )}
+                      title={`Vision: ${cv.charAt(0).toUpperCase() + cv.slice(1)}`}
+                    >
+                      {cv === 'none' && <X className="w-3 h-3" />}
+                      {cv === 'edges' && <Wind className="w-3 h-3" />}
+                      {cv === 'contours' && <Layout className="w-3 h-3" />}
+                      {cv === 'threshold' && <LayoutGrid className="w-3 h-3" />}
+                    </button>
+                  ))}
+                </div>
+
+                {/* AI Models */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {(['none', 'yolov8', 'ssd', 'unet', 'vgg19'] as const).map(model => (
+                    <button
+                      key={model}
+                      onClick={() => setVideoFilters({
+                        ...videoFilters, 
+                        aiModel: model,
+                        cvMode: model !== 'none' ? 'none' : videoFilters.cvMode
+                      })}
+                      className={cn(
+                        "px-2 py-1 rounded-md text-[8px] font-bold uppercase transition-all tracking-wider font-mono cursor-pointer",
+                        videoFilters.aiModel === model 
+                          ? "bg-purple-500 text-white shadow-md shadow-purple-500/30 font-bold" 
+                          : "text-white/50 hover:bg-white/10 hover:text-white/80"
+                      )}
+                      title={`AI Network Model: ${model === 'none' ? 'None (Raw Tracking)' : model.toUpperCase()}`}
+                    >
+                      {model === 'none' ? 'RAW' : model.replace('v8', '').toUpperCase()}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex items-center gap-1 border-r border-white/10 pr-3 mr-1">
-                {(['normal', 'phase-contrast', 'negative', 'fluorescence'] as const).map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => setVideoFilters({...videoFilters, mode})}
-                    className={cn(
-                      "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
-                      videoFilters.mode === mode 
-                        ? "bg-white text-black" 
-                        : "text-white/40 hover:bg-white/5 hover:text-white/60"
-                    )}
-                  >
-                    {mode.replace('-', ' ')}
+              {/* Deck 2: Primary Execution & Quick Tools */}
+              <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 p-1.5 bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-x-auto max-w-full custom-scrollbar">
+                <button 
+                  onClick={toggleAnalysis}
+                  className={cn(
+                    "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-lg shrink-0",
+                    isAnalyzing ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/30" : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/30"
+                  )}
+                >
+                  {isAnalyzing ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                  <span>{isAnalyzing ? t('stopAnalysisBtn') : t('startCASAEngineBtn')}</span>
+                </button>
+
+                <div className="w-px h-6 bg-white/15 mx-0.5 shrink-0" />
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={startCamera} className="p-2 hover:bg-white/15 rounded-xl transition-colors text-white/70 hover:text-white cursor-pointer" title="Camera Optical Feed">
+                    <Camera className="w-4 h-4" />
                   </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-1 border-r border-white/10 pr-3 mr-1">
-                {(['none', 'edges', 'contours', 'threshold'] as const).map(cv => (
-                  <button
-                    key={cv}
-                    onClick={() => setVideoFilters({
-                      ...videoFilters, 
-                      cvMode: cv,
-                      aiModel: cv !== 'none' ? 'none' : videoFilters.aiModel
-                    })}
+                  <button 
+                    onClick={() => setSettings(prev => ({ ...prev, highContrast: !prev.highContrast }))}
                     className={cn(
-                      "p-1.5 rounded-lg transition-all",
-                      videoFilters.cvMode === cv 
-                        ? "bg-emerald-500 text-white" 
-                        : "text-white/40 hover:bg-white/5 hover:text-white/60"
+                      "p-2 rounded-xl transition-all cursor-pointer",
+                      settings.highContrast ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" : "hover:bg-white/15 text-white/70 hover:text-white"
                     )}
-                    title={`Vision: ${cv.charAt(0).toUpperCase() + cv.slice(1)}`}
+                    title="Toggle Field Mode (High Contrast)"
                   >
-                    {cv === 'none' && <X className="w-3.5 h-3.5" />}
-                    {cv === 'edges' && <Wind className="w-3.5 h-3.5" />}
-                    {cv === 'contours' && <Layout className="w-3.5 h-3.5" />}
-                    {cv === 'threshold' && <LayoutGrid className="w-3.5 h-3.5" />}
+                    <LayoutGrid className="w-4 h-4" />
                   </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-1 pl-1">
-                {(['none', 'yolov8', 'ssd', 'unet', 'vgg19'] as const).map(model => (
-                  <button
-                    key={model}
-                    onClick={() => setVideoFilters({
-                      ...videoFilters, 
-                      aiModel: model,
-                      cvMode: model !== 'none' ? 'none' : videoFilters.cvMode
-                    })}
+                  <button 
+                    onClick={() => setShowHeatmap(!showHeatmap)}
                     className={cn(
-                      "px-2 py-1 rounded-lg text-[8px] font-bold uppercase transition-all tracking-wider font-mono",
-                      videoFilters.aiModel === model 
-                        ? "bg-purple-500 text-white shadow-lg shadow-purple-500/20" 
-                        : "text-white/40 hover:bg-white/5 hover:text-white/60"
+                      "p-2 rounded-xl transition-all cursor-pointer",
+                      showHeatmap ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20" : "hover:bg-white/15 text-white/70 hover:text-white"
                     )}
-                    title={`AI Network Model: ${model === 'none' ? 'None (Raw Tracking)' : model.toUpperCase()}`}
+                    title="Toggle Heatmap"
                   >
-                    {model === 'none' ? 'RAW' : model.replace('v8', '').toUpperCase()}
+                    <Move className="w-4 h-4" />
                   </button>
-                ))}
-              </div>
-            </div>
+                  <button 
+                    onClick={() => setActiveTab('calculator')}
+                    className={cn(
+                      "p-2 rounded-xl transition-all cursor-pointer",
+                      activeTab === 'calculator' ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "hover:bg-white/15 text-white/70 hover:text-white"
+                    )}
+                    title="Dose & Dilution Calculator"
+                  >
+                    <Zap className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => setShowMultiFOVModal(true)}
+                    className={cn(
+                      "p-2 rounded-xl transition-all cursor-pointer",
+                      showMultiFOVModal ? "bg-teal-500 text-white shadow-lg shadow-teal-500/20" : "hover:bg-white/15 text-white/70 hover:text-white"
+                    )}
+                    title="Multi-Field of View (FOV) Aggregator & Chamber Calibration"
+                  >
+                    <Layers className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => setShowStats(!showStats)} 
+                    className={cn(
+                      "p-2 rounded-xl transition-colors cursor-pointer", 
+                      showStats ? "bg-white/20 text-white" : "hover:bg-white/15 text-white/70 hover:text-white"
+                    )}
+                    title="Toggle Analytics Sidebar"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                  </button>
+                </div>
 
-            {/* Controls Bar */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 p-1.5 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
-              <button 
-                onClick={toggleAnalysis}
-                className={cn(
-                  "flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all cursor-pointer",
-                  isAnalyzing ? "bg-red-500 hover:bg-red-600 text-white" : "bg-emerald-500 hover:bg-emerald-600 text-white"
-                )}
-              >
-                {isAnalyzing ? <Square className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
-                {isAnalyzing ? t('stopAnalysisBtn') : t('startCASAEngineBtn')}
-              </button>
-              <div className="w-px h-8 bg-white/10 mx-1" />
-              <button className="p-3 hover:bg-white/10 rounded-xl transition-colors text-white/60 cursor-pointer"><Camera className="w-5 h-5" /></button>
-              <button 
-                onClick={() => setSettings(prev => ({ ...prev, highContrast: !prev.highContrast }))}
-                className={cn(
-                  "p-3 rounded-xl transition-all cursor-pointer",
-                  settings.highContrast ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" : "bg-white/10 hover:bg-white/20 text-white"
-                )}
-                title="Toggle Field Mode (High Contrast)"
-              >
-                <LayoutGrid className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => setShowHeatmap(!showHeatmap)}
-                className={cn(
-                  "p-3 rounded-xl transition-all cursor-pointer",
-                  showHeatmap ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20" : "bg-white/10 hover:bg-white/20 text-white"
-                )}
-                title="Toggle Heatmap"
-              >
-                <Move className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => setActiveTab('calculator')}
-                className={cn(
-                  "p-3 rounded-xl transition-all cursor-pointer",
-                  activeTab === 'calculator' ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "bg-white/10 hover:bg-white/20 text-white"
-                )}
-                title="Dose & Dilution Calculator"
-              >
-                <Zap className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => setShowMultiFOVModal(true)}
-                className={cn(
-                  "p-3 rounded-xl transition-all cursor-pointer",
-                  showMultiFOVModal ? "bg-teal-500 text-white shadow-lg shadow-teal-500/20" : "bg-white/10 hover:bg-white/20 text-white"
-                )}
-                title="Multi-Field of View (FOV) Aggregator & Chamber Calibration"
-              >
-                <Layers className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => setShowStats(!showStats)} 
-                className={cn("p-3 rounded-xl transition-colors cursor-pointer", showStats ? "bg-white/10 text-white" : "hover:bg-white/10 text-white/60")}
-              >
-                <BarChart3 className="w-5 h-5" />
-              </button>
-              <div className="w-px h-8 bg-white/10 mx-1" />
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept="image/*,video/*"
-                onChange={handleFileUpload}
-              />
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all cursor-pointer",
-                  isUploading ? "bg-white/5 text-white/40" : "bg-white/10 hover:bg-white/20 text-white"
-                )}
-              >
-                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                <span className="text-xs uppercase tracking-widest font-bold">{t('aiUploadBtn')}</span>
-              </button>
+                <div className="w-px h-6 bg-white/15 mx-0.5 shrink-0" />
+
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept="image/*,video/*"
+                  onChange={handleFileUpload}
+                />
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className={cn(
+                    "flex items-center gap-2 px-3.5 py-2.5 rounded-xl font-medium transition-all cursor-pointer shrink-0",
+                    isUploading ? "bg-white/5 text-white/40" : "bg-white/10 hover:bg-white/20 text-white"
+                  )}
+                >
+                  {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  <span className="text-[11px] uppercase tracking-wider font-bold">{t('aiUploadBtn')}</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
