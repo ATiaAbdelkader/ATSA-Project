@@ -181,8 +181,7 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
     const q = query(
       collection(db, path),
       where('patientId', '==', searchId),
-      where('uid', '==', currentUser.uid),
-      orderBy('timestamp', 'asc')
+      where('uid', '==', currentUser.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -192,7 +191,13 @@ export const PatientHistoryView: React.FC<PatientHistoryProps> = ({ onBack, them
         return;
       }
 
-      const data: HistoricalDataPoint[] = snapshot.docs.map(doc => {
+      const docsSorted = [...snapshot.docs].sort((a, b) => {
+        const timeA = new Date(a.data().timestamp || 0).getTime();
+        const timeB = new Date(b.data().timestamp || 0).getTime();
+        return timeA - timeB;
+      });
+
+      const data: HistoricalDataPoint[] = docsSorted.map(doc => {
         const d = doc.data();
         return {
           date: new Date(d.timestamp).toISOString().split('T')[0],

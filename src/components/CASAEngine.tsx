@@ -359,6 +359,9 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   const [labelStorageLoc, setLabelStorageLoc] = useState('Dewar A / Canister 3 / Straw #12');
   const [labelWarning, setLabelWarning] = useState('Biohazard - Research Only');
   const [engineToast, setEngineToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
+  const [showOpticsPopover, setShowOpticsPopover] = useState(false);
+  const [showAiModelPopover, setShowAiModelPopover] = useState(false);
 
   useEffect(() => {
     if (engineToast) {
@@ -520,15 +523,18 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     const q = query(
       collection(db, 'analyses'),
       where('patientId', '==', patientData.id),
-      where('uid', '==', user.uid),
-      orderBy('timestamp', 'desc')
+      where('uid', '==', user.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const historyData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })).sort((a: any, b: any) => {
+        const timeA = new Date(a.timestamp || 0).getTime();
+        const timeB = new Date(b.timestamp || 0).getTime();
+        return timeB - timeA;
+      });
       setHistory(historyData);
     }, (error) => {
       console.error("Firestore History Error:", error);
@@ -536,6 +542,18 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
 
     return () => unsubscribe();
   }, [user, patientData.id]);
+
+  const handleCASASignIn = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (err: any) {
+      const code = err?.code;
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        return;
+      }
+      console.warn("CASA Google Sign-In notification:", code || err?.message);
+    }
+  };
 
   const createNotification = async (title: string, message: string, type: 'info' | 'warning' | 'error' | 'success', link?: string) => {
     if (!user) return;
@@ -1381,7 +1399,10 @@ Digital Signature Verified - ATSA AI Engine v2.0
 
     const printWindow = window.open('', '_blank', 'width=800,height=900');
     if (!printWindow) {
-      alert("Please allow popups to print clinical reports.");
+      setEngineToast({
+        message: 'Popup window blocked. Please use Export PDF or enable popups to print.',
+        type: 'error'
+      });
       return;
     }
 
@@ -2384,7 +2405,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
 
       <div className="flex flex-1 overflow-hidden">
         {/* Main Workspace */}
-        <main className={cn("flex-1 relative flex items-center justify-center overflow-hidden transition-colors", theme === 'dark' ? "bg-black" : "bg-slate-200")}>
+        <main className={cn("flex-1 relative flex flex-col min-w-0 min-h-0 overflow-hidden transition-colors", theme === 'dark' ? "bg-black" : "bg-slate-200")}>
           {activeTab === 'qc' ? (
             <div className="w-full h-full overflow-y-auto p-4 md:p-6 custom-scrollbar">
               <QualityControl currentAnalysis={results} theme={theme} />
@@ -2519,516 +2540,716 @@ Digital Signature Verified - ATSA AI Engine v2.0
               </div>
             </div>
           ) : (
-            <div className={cn(
-              "relative w-full max-w-6xl aspect-video max-h-[calc(100%-1rem)] rounded-xl border shadow-2xl overflow-hidden transition-all m-auto",
-              theme === 'dark' ? "bg-[#050505] border-white/10" : "bg-white border-slate-300 shadow-xl"
-            )}>
-            <div className="w-full h-full relative">
-              {isUploading && (
-                <div className={cn(
-                  "absolute z-50 transition-all duration-300",
-                  (stream || uploadedVideoUrl)
-                    ? "bottom-4 right-4 max-w-[340px] w-full p-0"
-                    : "inset-0 flex flex-col items-center justify-center p-8 bg-black/80 backdrop-blur-md rounded-xl"
-                )}>
-                  <motion.div 
-                    initial={{ scale: 0.95, opacity: 0 }} 
-                    animate={{ scale: 1, opacity: 1 }}
+            <div className="flex-1 flex flex-col min-w-0 min-h-0 w-full h-full overflow-hidden relative">
+              {/* Compact Neural Network & Telemetry Header Bar */}
+              <div className={cn(
+                "shrink-0 px-3 sm:px-4 py-2 border-b flex flex-wrap items-center justify-between gap-2 text-xs font-mono select-none z-20 transition-colors",
+                theme === 'dark' ? "bg-[#09090d] border-white/10 text-white" : "bg-slate-100 border-slate-200 text-slate-800"
+              )}>
+                {/* Left: Engine Status & Telemetry Metrics */}
+                <div className="flex items-center flex-wrap gap-2">
+                  <div className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border",
+                    isAnalyzing 
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
+                      : "bg-white/5 border-white/10 text-white/60"
+                  )}>
+                    <span className={cn(
+                      "w-2 h-2 rounded-full",
+                      isAnalyzing ? "bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500" : "bg-white/30"
+                    )} />
+                    <span>{isAnalyzing ? "CASA Engine Active" : "Optics Ready"}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-white/5 border border-white/5">
+                    <span className="text-white/40 uppercase font-sans">Speed:</span>
+                    <span className="font-bold text-white/90">3.2s / 500k</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                    <span className="text-emerald-500/70 uppercase font-sans">Accuracy:</span>
+                    <span className="font-bold text-emerald-400">95.2%</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">
+                    <span className="text-purple-400/70 uppercase font-sans">Model:</span>
+                    <span className="font-bold text-purple-300 font-mono">
+                      {videoFilters.aiModel === 'none' ? 'Classical CASA' : videoFilters.aiModel.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-white/5 border border-white/5">
+                    <span className="text-white/40 uppercase font-sans">Optics:</span>
+                    <span className="font-bold text-cyan-400 capitalize">{videoFilters.mode}</span>
+                  </div>
+
+                  {videoFilters.cvMode !== 'none' && (
+                    <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20">
+                      <span className="text-blue-400/70 uppercase font-sans">CV Count:</span>
+                      <span className="font-bold text-blue-300">
+                        {particles.current.filter(p => (Math.PI * 5 * 3) > videoFilters.cvAreaThreshold).length}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Calibration Alerts & Active Source Badge */}
+                <div className="flex items-center gap-2 ml-auto">
+                  {isCalibrating && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/20 border border-blue-500/40 rounded-full text-blue-300 text-[10px] font-bold animate-pulse">
+                      <Ruler className="w-3 h-3" />
+                      <span>Calibrating: Click 2 Points</span>
+                      <button onClick={() => setIsCalibrating(false)} className="ml-1 hover:text-white cursor-pointer" title="Cancel Calibration">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+
+                  {isManualAnnotating && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/20 border border-amber-500/40 rounded-full text-amber-300 text-[10px] font-bold animate-pulse">
+                      <Tag className="w-3 h-3" />
+                      <span>Manual Tag Active</span>
+                      <button onClick={() => setIsManualAnnotating(false)} className="ml-1 hover:text-white cursor-pointer" title="Exit Annotation">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-[10px] text-white/60">
+                    <Tv className="w-3 h-3 text-emerald-400" />
+                    <span>{stream ? "Live Microscope" : uploadedVideoUrl ? "Lab Video Feed" : `Specimen: ${results?.species || 'Bovine'}`}</span>
+                  </div>
+
+                  <button
+                    onClick={() => setIsControlsCollapsed(!isControlsCollapsed)}
                     className={cn(
-                      "w-full flex flex-col items-center relative overflow-hidden transition-all duration-300",
-                      (stream || uploadedVideoUrl)
-                        ? "gap-4 p-4 bg-[#0a0a0c]/95 backdrop-blur-md border border-purple-500/40 rounded-2xl shadow-2xl"
-                        : "max-w-md gap-6 p-8 bg-[#0a0a0c] border border-white/10 rounded-2xl shadow-2xl"
+                      "flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border cursor-pointer",
+                      isControlsCollapsed 
+                        ? "bg-purple-500 text-white border-purple-400 shadow-md shadow-purple-500/20" 
+                        : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
                     )}
+                    title={isControlsCollapsed ? "Show Control Dock" : "Zen View: Maximize Video Field"}
                   >
-                    {/* Glowing effects */}
-                    <div className="absolute -top-12 -left-12 w-28 h-28 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute -bottom-12 -right-12 w-28 h-28 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                    <Maximize2 className="w-3 h-3" />
+                    <span className="hidden sm:inline">{isControlsCollapsed ? "Show Controls" : "Zen View"}</span>
+                  </button>
+                </div>
+              </div>
 
+              {/* Hero Microscope Viewport (Completely Unobstructed) */}
+              <div className="flex-1 min-h-0 relative w-full flex items-center justify-center p-2 sm:p-3 overflow-hidden bg-black/90">
+                <div className={cn(
+                  "relative w-full h-full max-h-full aspect-video rounded-xl border shadow-2xl overflow-hidden bg-[#020204] flex items-center justify-center transition-all",
+                  theme === 'dark' ? "border-white/10" : "border-slate-300 shadow-xl"
+                )}>
+                  {/* Upload Progress Modal */}
+                  {isUploading && (
                     <div className={cn(
-                      "rounded-full bg-purple-500/10 flex items-center justify-center relative border border-purple-500/20",
-                      (stream || uploadedVideoUrl) ? "w-12 h-12" : "w-16 h-16"
+                      "absolute z-50 transition-all duration-300",
+                      (stream || uploadedVideoUrl)
+                        ? "bottom-4 right-4 max-w-[340px] w-full p-0"
+                        : "inset-0 flex flex-col items-center justify-center p-8 bg-black/80 backdrop-blur-md rounded-xl"
                     )}>
-                      <Upload className={cn("text-purple-400 animate-pulse", (stream || uploadedVideoUrl) ? "w-6 h-6" : "w-8 h-8")} />
+                      <motion.div 
+                        initial={{ scale: 0.95, opacity: 0 }} 
+                        animate={{ scale: 1, opacity: 1 }}
+                        className={cn(
+                          "w-full flex flex-col items-center relative overflow-hidden transition-all duration-300",
+                          (stream || uploadedVideoUrl)
+                            ? "gap-4 p-4 bg-[#0a0a0c]/95 backdrop-blur-md border border-purple-500/40 rounded-2xl shadow-2xl"
+                            : "max-w-md gap-6 p-8 bg-[#0a0a0c] border border-white/10 rounded-2xl shadow-2xl"
+                        )}
+                      >
+                        <div className="rounded-full bg-purple-500/10 flex items-center justify-center relative border border-purple-500/20 w-12 h-12">
+                          <Upload className="text-purple-400 animate-pulse w-6 h-6" />
+                        </div>
+
+                        <div className="text-center w-full">
+                          <h4 className="font-bold uppercase tracking-wider text-white mb-1 text-center text-xs">
+                            {uploadProgress !== null && uploadProgress < 100 
+                              ? "Uploading to Firebase Storage" 
+                              : "Processing Gemini AI Analysis"}
+                          </h4>
+                          <p className="text-white/40 max-w-sm mx-auto text-center animate-pulse text-[10px]">
+                            {uploadProgress !== null && uploadProgress < 100
+                              ? "Transferring high-definition microscopy feed..."
+                              : "Vision models analyzing track kinematics & morphometry..."}
+                          </p>
+                        </div>
+
+                        <div className="w-full">
+                          <div className="flex justify-between items-center mb-1 bg-white/[0.02] p-1.5 rounded-lg border border-white/5">
+                            <span className="text-[9px] font-mono text-purple-400 font-bold uppercase tracking-wider">
+                              {uploadProgress !== null && uploadProgress < 100 ? "Firebase Upload" : "CASA Inference"}
+                            </span>
+                            <span className="text-xs font-mono font-bold text-white">
+                              {uploadProgress !== null ? `${uploadProgress}%` : "In Progress..."}
+                            </span>
+                          </div>
+
+                          <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                            <motion.div 
+                              className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${uploadProgress ?? 0}%` }}
+                              transition={{ duration: 0.3, ease: "easeOut" }}
+                            />
+                          </div>
+                        </div>
+                      </motion.div>
+                    </div>
+                  )}
+
+                  {/* Optical Video Feed */}
+                  {stream || uploadedVideoUrl ? (
+                    <div className="w-full h-full relative overflow-hidden">
+                      <video 
+                        ref={videoRef} 
+                        src={uploadedVideoUrl || undefined}
+                        autoPlay 
+                        muted 
+                        loop={!!uploadedVideoUrl}
+                        playsInline
+                        className="w-full h-full object-cover transition-transform duration-200"
+                        style={{ 
+                          transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasZoom})`,
+                          transformOrigin: '0 0',
+                          filter: `
+                            brightness(${videoFilters.brightness}) 
+                            contrast(${videoFilters.contrast}) 
+                            ${videoFilters.mode === 'negative' ? 'invert(1)' : ''}
+                            ${videoFilters.mode === 'phase-contrast' ? 'contrast(1.5) brightness(1.1) grayscale(1)' : ''}
+                            ${videoFilters.mode === 'fluorescence' ? 'contrast(2) brightness(0.8) hue-rotate(90deg)' : ''}
+                          `
+                        }} 
+                      />
+                    </div>
+                  ) : null}
+
+                  {/* Active Sperm Tracking Canvas Layer (1280x720) */}
+                  <canvas 
+                    ref={canvasRef}
+                    width={1280}
+                    height={720}
+                    onClick={handleCanvasClick}
+                    onMouseDown={handleCanvasMouseDown}
+                    onMouseMove={handleCanvasMouseMove}
+                    onMouseUp={handleCanvasMouseUp}
+                    onMouseLeave={handleCanvasMouseUp}
+                    className={cn(
+                      "absolute inset-0 w-full h-full z-10 cursor-crosshair",
+                      isPanning && "cursor-grabbing"
+                    )}
+                  />
+
+                  {/* Scanline CRT overlay */}
+                  <div className="scanline pointer-events-none" />
+
+                  {/* Floating Zoom & Reset Corner Widget (Top-Right, Minimal & Readable) */}
+                  <div className="absolute top-3 right-3 z-20 flex items-center gap-1 p-1 bg-black/80 backdrop-blur-md border border-white/15 rounded-xl shadow-xl pointer-events-auto select-none">
+                    <button 
+                      onClick={() => handleZoom(-0.5)} 
+                      className="p-1.5 hover:bg-white/15 rounded-lg text-white/70 hover:text-white transition-colors cursor-pointer" 
+                      title="Zoom Out (-0.5x)"
+                    >
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <span className="text-[11px] font-mono font-bold text-emerald-400 px-1.5 min-w-[2.6rem] text-center">
+                      {canvasZoom.toFixed(1)}x
+                    </span>
+                    <button 
+                      onClick={() => handleZoom(0.5)} 
+                      className="p-1.5 hover:bg-white/15 rounded-lg text-white/70 hover:text-white transition-colors cursor-pointer" 
+                      title="Zoom In (+0.5x)"
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                    <div className="w-px h-4 bg-white/15 mx-0.5" />
+                    <button 
+                      onClick={resetZoom} 
+                      className="p-1.5 hover:bg-white/15 rounded-lg text-white/70 hover:text-white transition-colors cursor-pointer" 
+                      title="Reset View (1.0x Fit)"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Calibration Mode Target Helper (Floating Top-Left, Non-Obtrusive) */}
+                  {isCalibrating && (
+                    <div className="absolute top-3 left-3 z-20 pointer-events-none flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 border border-blue-500/40 rounded-full backdrop-blur-md text-blue-300 text-[11px] font-bold animate-pulse select-none">
+                      <Ruler className="w-3.5 h-3.5" />
+                      <span>Click two points on chamber graticule (100 μm reference)</span>
+                    </div>
+                  )}
+
+                  {/* Pre-Analysis Setup Overlay: Shown ONLY before CASA starts and when NO media is connected */}
+                  {(!stream && !uploadedVideoUrl && !isAnalyzing) && (
+                    <div 
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setIsDraggingFile(true);
+                      }}
+                      onDragLeave={() => setIsDraggingFile(false)}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        setIsDraggingFile(false);
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) {
+                          await processFile(file);
+                        }
+                      }}
+                      className={cn(
+                        "absolute inset-0 z-15 flex flex-col items-center justify-center p-6 text-center transition-all duration-200 bg-black/80 backdrop-blur-sm",
+                        isDraggingFile && "border-2 border-dashed border-purple-500 bg-purple-500/20"
+                      )}
+                    >
+                      {cameraError ? (
+                        <div className="max-w-md p-6 bg-red-950/60 border border-red-500/30 rounded-2xl">
+                          <p className="text-red-400 text-sm font-medium mb-2">Camera Access Error</p>
+                          <p className="text-xs leading-relaxed mb-6 text-white/60">{cameraError}</p>
+                          <button onClick={startCamera} className="px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-semibold transition-all cursor-pointer">Try Again</button>
+                        </div>
+                      ) : (
+                        <div className="max-w-xl w-full flex flex-col items-center gap-5" dir={dir}>
+                          <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 px-4 py-1.5 rounded-full">
+                            <BrainCircuit className="w-4 h-4 text-purple-400" />
+                            <span className="text-[10px] font-black text-purple-300 uppercase tracking-widest">{t('supportRealVideoLabel')}</span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                            {/* Live Camera Feed */}
+                            <div 
+                              onClick={startCamera}
+                              className="flex flex-col items-center justify-center p-5 rounded-2xl border text-center transition-all cursor-pointer group bg-white/[0.03] border-white/10 hover:border-emerald-500/50 hover:bg-emerald-500/[0.04]"
+                            >
+                              <Camera className="w-9 h-9 mb-2.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                              <h4 className="text-xs font-bold uppercase tracking-wider mb-1 text-white">{t('microscopeLiveLabel')}</h4>
+                              <p className="text-[10px] leading-relaxed text-white/50">{t('connectRealtimeOpticalFeed')}</p>
+                            </div>
+
+                            {/* Drag & Drop Upload */}
+                            <div 
+                              onClick={() => fileInputRef.current?.click()}
+                              className="flex flex-col items-center justify-center p-5 rounded-2xl border text-center transition-all cursor-pointer group bg-white/[0.03] border-white/10 hover:border-purple-500/50 hover:bg-purple-500/[0.04]"
+                            >
+                              <Upload className="w-9 h-9 mb-2.5 text-purple-400 group-hover:scale-110 transition-transform" />
+                              <h4 className="text-xs font-bold uppercase tracking-wider mb-1 text-white">{t('uploadLabFileLabel')}</h4>
+                              <p className="text-[10px] leading-relaxed text-white/50">{t('dragDropMicroscopy')}</p>
+                            </div>
+                          </div>
+
+                          {/* Quick Start with Simulation */}
+                          <button
+                            onClick={toggleAnalysis}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                            <span>Or Start With Virtual {results?.species || 'Bovine'} Specimen</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Dedicated Bottom Laboratory Control Dock (OUTSIDE the video canvas) */}
+              <div className={cn(
+                "shrink-0 w-full border-t z-20 transition-all select-none relative",
+                theme === 'dark' ? "bg-[#09090c] border-white/10 text-white" : "bg-white border-slate-200 text-slate-800"
+              )}>
+                {/* Click-away backdrop for popovers */}
+                {(showOpticsPopover || showAiModelPopover) && (
+                  <div 
+                    className="fixed inset-0 z-30" 
+                    onClick={() => {
+                      setShowOpticsPopover(false);
+                      setShowAiModelPopover(false);
+                    }} 
+                  />
+                )}
+
+                {/* Optics & Lighting Popover Menu */}
+                {showOpticsPopover && (
+                  <div className="absolute bottom-full left-4 sm:left-28 mb-2 z-40 w-80 p-4 bg-[#0d0d11] border border-white/20 rounded-2xl shadow-2xl backdrop-blur-2xl text-white space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <Sliders className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-bold uppercase tracking-wider">Optics & Filters</span>
+                      </div>
+                      <button onClick={() => setShowOpticsPopover(false)} className="text-white/40 hover:text-white cursor-pointer">
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
 
-                    <div className="text-center w-full">
-                      <h4 className={cn("font-bold uppercase tracking-wider text-white mb-1 text-center", (stream || uploadedVideoUrl) ? "text-xs" : "text-sm")}>
-                        {uploadProgress !== null && uploadProgress < 100 
-                          ? "Uploading to Firebase Storage" 
-                          : "Processing Gemini AI Analysis"}
-                      </h4>
-                      <p className={cn("text-white/40 max-w-sm mx-auto text-center animate-pulse", (stream || uploadedVideoUrl) ? "text-[10px]" : "text-xs")}>
-                        {uploadProgress !== null && uploadProgress < 100
-                          ? "Transferring high-definition microscopy feed..."
-                          : "Vision models analyzing track kinematics & morphometry..."}
-                      </p>
+                    {/* Presets */}
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-white/50 block mb-2">Microscopy Contrast Mode</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {(['normal', 'phase-contrast', 'fluorescence', 'negative'] as const).map(mode => (
+                          <button
+                            key={mode}
+                            onClick={() => setVideoFilters({...videoFilters, mode})}
+                            className={cn(
+                              "px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all text-left border cursor-pointer",
+                              videoFilters.mode === mode 
+                                ? "bg-emerald-500 text-white border-emerald-400 shadow-sm" 
+                                : "bg-white/5 border-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+                            )}
+                          >
+                            {mode === 'phase-contrast' ? 'Phase-Contrast' : mode === 'fluorescence' ? 'Fluorescence' : mode === 'negative' ? 'Negative Invert' : 'Brightfield'}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
-                    {/* Progress slider container */}
-                    <div className="w-full">
-                      <div className="flex justify-between items-center mb-1 bg-white/[0.02] p-1.5 rounded-lg border border-white/5">
-                        <span className="text-[9px] font-mono text-purple-400 font-bold uppercase tracking-wider">
-                          {uploadProgress !== null && uploadProgress < 100 ? "Firebase Upload" : "CASA Inference"}
-                        </span>
-                        <span className="text-xs font-mono font-bold text-white">
-                          {uploadProgress !== null ? `${uploadProgress}%` : "In Progress..."}
-                        </span>
+                    {/* Sliders */}
+                    <div className="space-y-3 pt-2 border-t border-white/10">
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[10px] text-white/60 uppercase font-bold">{t('brightnessLabel')}</span>
+                          <span className="text-[10px] text-emerald-400 font-mono font-bold">{videoFilters.brightness}x</span>
+                        </div>
+                        <input 
+                          type="range" min="0.5" max="2" step="0.1" 
+                          value={videoFilters.brightness}
+                          onChange={(e) => setVideoFilters({...videoFilters, brightness: parseFloat(e.target.value)})}
+                          className="w-full accent-emerald-500 cursor-pointer"
+                        />
                       </div>
 
-                      {/* Bar indicator */}
-                      <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                        <motion.div 
-                          className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
-                          initial={{ width: 0 }}
-                          animate={{ width: `${uploadProgress ?? 0}%` }}
-                          transition={{ duration: 0.3, ease: "easeOut" }}
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[10px] text-white/60 uppercase font-bold">{t('contrastLabel')}</span>
+                          <span className="text-[10px] text-emerald-400 font-mono font-bold">{videoFilters.contrast}x</span>
+                        </div>
+                        <input 
+                          type="range" min="0.5" max="2" step="0.1" 
+                          value={videoFilters.contrast}
+                          onChange={(e) => setVideoFilters({...videoFilters, contrast: parseFloat(e.target.value)})}
+                          className="w-full accent-emerald-500 cursor-pointer"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[10px] text-white/60 uppercase font-bold">{t('cvAreaThresholdLabel')}</span>
+                          <span className="text-[10px] text-emerald-400 font-mono font-bold">{videoFilters.cvAreaThreshold} px²</span>
+                        </div>
+                        <input 
+                          type="range" min="5" max="100" step="1" 
+                          value={videoFilters.cvAreaThreshold}
+                          onChange={(e) => setVideoFilters({...videoFilters, cvAreaThreshold: parseInt(e.target.value)})}
+                          className="w-full accent-emerald-500 cursor-pointer"
                         />
                       </div>
                     </div>
+                  </div>
+                )}
 
-                    {/* Quick status bullet points (Render only on full view) */}
-                    {!(stream || uploadedVideoUrl) && (
-                      <div className="w-full flex flex-col gap-1.5 border-t border-white/5 pt-4 text-left">
-                        <div className="flex items-center gap-2 text-[10px] font-medium text-white/60">
-                          <div className={cn("w-1.5 h-1.5 rounded-full", uploadProgress !== null && uploadProgress > 0 ? "bg-emerald-500" : "bg-white/20")} />
-                          <span>Establish secure cloud storage session</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] font-medium text-white/60">
-                          <div className={cn("w-1.5 h-1.5 rounded-full", uploadProgress === 100 ? "bg-emerald-500" : "bg-white/20")} />
-                          <span>Upload telemetry raw video data</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] font-medium text-white/60">
-                          <div className={cn("w-1.5 h-1.5 rounded-full", uploadProgress === 100 && aiAnalysis !== null ? "bg-emerald-500 animate-pulse" : "bg-white/20")} />
-                          <span>Run deep deep-learning vision inference</span>
-                        </div>
+                {/* AI Model & Computer Vision Popover Menu */}
+                {showAiModelPopover && (
+                  <div className="absolute bottom-full left-12 sm:left-64 mb-2 z-40 w-84 p-4 bg-[#0d0d11] border border-white/20 rounded-2xl shadow-2xl backdrop-blur-2xl text-white space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <BrainCircuit className="w-4 h-4 text-purple-400" />
+                        <span className="text-xs font-bold uppercase tracking-wider">AI Models & Vision Filters</span>
                       </div>
-                    )}
-                  </motion.div>
-                </div>
-              )}
-
-              {stream || uploadedVideoUrl ? (
-                <div className="w-full h-full relative overflow-hidden">
-                  <video 
-                    ref={videoRef} 
-                    src={uploadedVideoUrl || undefined}
-                    autoPlay 
-                    muted 
-                    loop={!!uploadedVideoUrl}
-                    playsInline
-                    className="w-full h-full object-cover transition-transform duration-200"
-                    style={{ 
-                      transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasZoom})`,
-                      transformOrigin: '0 0',
-                      filter: `
-                        brightness(${videoFilters.brightness}) 
-                        contrast(${videoFilters.contrast}) 
-                        ${videoFilters.mode === 'negative' ? 'invert(1)' : ''}
-                        ${videoFilters.mode === 'phase-contrast' ? 'contrast(1.5) brightness(1.1) grayscale(1)' : ''}
-                        ${videoFilters.mode === 'fluorescence' ? 'contrast(2) brightness(0.8) hue-rotate(90deg)' : ''}
-                      `
-                    }} 
-                  />
-                </div>
-              ) : (
-                <div 
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setIsDraggingFile(true);
-                  }}
-                  onDragLeave={() => setIsDraggingFile(false)}
-                  onDrop={async (e) => {
-                    e.preventDefault();
-                    setIsDraggingFile(false);
-                    const file = e.dataTransfer.files?.[0];
-                    if (file) {
-                      await processFile(file);
-                    }
-                  }}
-                  className={cn(
-                    "w-full h-full flex flex-col items-center justify-center p-8 text-center transition-all duration-200 border-2 border-dashed",
-                    isDraggingFile 
-                      ? "border-purple-500 bg-purple-500/10 scale-[0.98]" 
-                      : theme === 'dark' ? "border-white/10 bg-[#0a0a0a]" : "border-slate-200 bg-slate-50"
-                  )}
-                >
-                  {isDraggingFile ? (
-                    <motion.div 
-                      initial={{ scale: 0.9 }} 
-                      animate={{ scale: 1 }} 
-                      className="flex flex-col items-center gap-3"
-                    >
-                      <Upload className="w-16 h-16 text-purple-400 animate-bounce" />
-                      <p className="text-purple-400 font-bold text-sm tracking-wider uppercase">Drop Lab Video to Upload & Analyze</p>
-                      <p className="text-white/40 text-xs">Reconstructs paths & morphometry with Gemini 3.5 AI</p>
-                    </motion.div>
-                  ) : cameraError ? (
-                    <div className="max-w-md">
-                      <p className="text-red-400 text-sm font-medium mb-2">Camera Access Error</p>
-                      <p className={cn("text-xs leading-relaxed mb-6", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{cameraError}</p>
-                      <button onClick={startCamera} className="px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-semibold transition-all">Try Again</button>
+                      <button onClick={() => setShowAiModelPopover(false)} className="text-white/40 hover:text-white cursor-pointer">
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                  ) : (
-                    <div className="max-w-xl w-full flex flex-col items-center gap-6" dir={dir}>
-                      <div className="flex items-center gap-3 bg-purple-500/10 border border-purple-500/20 px-4 py-2 rounded-full backdrop-blur-md">
-                        <BrainCircuit className="w-5 h-5 text-purple-400" />
-                        <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">{t('supportRealVideoLabel')}</span>
+
+                    {/* Neural Network Model */}
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-white/50 block mb-2">Neural Network Architecture</span>
+                      <div className="grid grid-cols-1 gap-1.5">
+                        {[
+                          { id: 'none', label: 'Classical Centroid CASA', desc: 'Real-time morphological thresholding' },
+                          { id: 'yolov8', label: 'YOLOv8 Semen Pro', desc: 'Real-time multi-target tracking & head detection' },
+                          { id: 'ssd', label: 'Mobile SSD V2', desc: 'Edge-device low latency kinematic model' },
+                          { id: 'unet', label: 'U-Net Morphometry', desc: 'Pixel-level flagellar & acrosome segmentation' },
+                          { id: 'vgg19', label: 'VGG-19 Feature Extractor', desc: 'Deep viability classification' }
+                        ].map(model => (
+                          <button
+                            key={model.id}
+                            onClick={() => {
+                              setVideoFilters({
+                                ...videoFilters,
+                                aiModel: model.id as any,
+                                cvMode: model.id !== 'none' ? 'none' : videoFilters.cvMode
+                              });
+                            }}
+                            className={cn(
+                              "p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col",
+                              videoFilters.aiModel === model.id
+                                ? "bg-purple-500/20 border-purple-500/50 text-white"
+                                : "bg-white/5 border-white/5 text-white/70 hover:bg-white/10"
+                            )}
+                          >
+                            <span className="text-[11px] font-bold font-mono">{model.label}</span>
+                            <span className="text-[9px] text-white/40">{model.desc}</span>
+                          </button>
+                        ))}
                       </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-                        {/* Option 1: Live Stream */}
-                        <div 
-                          onClick={startCamera}
+                    </div>
+
+                    {/* CV Overlays */}
+                    <div className="pt-2 border-t border-white/10">
+                      <span className="text-[10px] uppercase font-bold text-white/50 block mb-2">Computer Vision Filter Overlays</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {(['none', 'edges', 'contours', 'threshold'] as const).map(cv => (
+                          <button
+                            key={cv}
+                            onClick={() => {
+                              setVideoFilters({
+                                ...videoFilters,
+                                cvMode: cv,
+                                aiModel: cv !== 'none' ? 'none' : videoFilters.aiModel
+                              });
+                            }}
+                            className={cn(
+                              "px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all text-left border cursor-pointer",
+                              videoFilters.cvMode === cv
+                                ? "bg-blue-500 text-white border-blue-400"
+                                : "bg-white/5 border-white/5 text-white/70 hover:bg-white/10"
+                            )}
+                          >
+                            {cv === 'none' ? 'None (Raw)' : cv.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Collapsible Zen Bar Handle */}
+                {isControlsCollapsed ? (
+                  <div 
+                    onClick={() => setIsControlsCollapsed(false)}
+                    className="h-8 flex items-center justify-center gap-2 cursor-pointer hover:bg-white/5 transition-colors text-white/60 hover:text-white text-[10px] font-bold uppercase tracking-widest"
+                    title="Expand Laboratory Controls"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 -rotate-90 text-emerald-400" />
+                    <span>Laboratory Control Dock Collapsed &mdash; Click to Expand</span>
+                    <ChevronLeft className="w-3.5 h-3.5 -rotate-90 text-emerald-400" />
+                  </div>
+                ) : (
+                  /* Expanded Grouped Toolbar */
+                  <div className="px-3 sm:px-5 py-2.5 flex items-center justify-between gap-3 overflow-x-auto custom-scrollbar">
+                    {/* Left: Primary Action & Settings Menus */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Big Start / Stop CASA Button */}
+                      <button 
+                        onClick={toggleAnalysis}
+                        className={cn(
+                          "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-lg shrink-0 select-none",
+                          isAnalyzing 
+                            ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/30 ring-2 ring-red-400/30" 
+                            : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/30 ring-2 ring-emerald-400/30"
+                        )}
+                      >
+                        {isAnalyzing ? <Square className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
+                        <span>{isAnalyzing ? t('stopAnalysisBtn') : t('startCASAEngineBtn')}</span>
+                      </button>
+
+                      <div className="w-px h-6 bg-white/15 mx-1 shrink-0" />
+
+                      {/* Optics & Lighting Menu Button */}
+                      <button 
+                        onClick={() => {
+                          setShowOpticsPopover(!showOpticsPopover);
+                          setShowAiModelPopover(false);
+                        }}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer shrink-0",
+                          showOpticsPopover || videoFilters.mode !== 'normal'
+                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
+                            : "bg-white/5 hover:bg-white/10 border-white/10 text-white/80 hover:text-white"
+                        )}
+                        title="Adjust Brightness, Contrast & Microscopy Filter Modes"
+                      >
+                        <Sliders className="w-3.5 h-3.5" />
+                        <span>Optics & Filters</span>
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-white/10 font-mono capitalize">
+                          {videoFilters.mode}
+                        </span>
+                      </button>
+
+                      {/* AI Model & Vision Menu Button */}
+                      <button 
+                        onClick={() => {
+                          setShowAiModelPopover(!showAiModelPopover);
+                          setShowOpticsPopover(false);
+                        }}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer shrink-0",
+                          showAiModelPopover || videoFilters.aiModel !== 'none'
+                            ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
+                            : "bg-white/5 hover:bg-white/10 border-white/10 text-white/80 hover:text-white"
+                        )}
+                        title="Select Neural Network Model & Computer Vision Filters"
+                      >
+                        <BrainCircuit className="w-3.5 h-3.5" />
+                        <span>AI Vision</span>
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-purple-500/20 font-mono text-purple-300">
+                          {videoFilters.aiModel === 'none' ? 'RAW' : videoFilters.aiModel.toUpperCase()}
+                        </span>
+                      </button>
+
+                      <div className="w-px h-6 bg-white/15 mx-1 shrink-0" />
+
+                      {/* Calibration & Manual Tagging */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button 
+                          onClick={() => {
+                            setIsCalibrating(!isCalibrating);
+                            if (isManualAnnotating) setIsManualAnnotating(false);
+                          }}
                           className={cn(
-                            "flex flex-col items-center justify-center p-6 rounded-2xl border text-center transition-all cursor-pointer group hover:scale-[1.02]",
-                            theme === 'dark' 
-                              ? "bg-white/[0.02] border-white/10 hover:border-emerald-500/40 hover:bg-emerald-500/[0.02]" 
-                              : "bg-white border-slate-200 hover:border-emerald-500/40 hover:bg-emerald-50"
+                            "px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer text-xs font-semibold border",
+                            isCalibrating 
+                              ? "bg-blue-500 text-white border-blue-400 shadow-md shadow-blue-500/30" 
+                              : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
                           )}
+                          title="Calibrate Scale (Draw 100μm line on chamber)"
                         >
-                          <Camera className="w-10 h-10 mb-3 text-emerald-500 group-hover:scale-110 transition-transform" />
-                          <h4 className={cn("text-xs font-bold uppercase tracking-wider mb-1", theme === 'dark' ? "text-white" : "text-slate-800")}>{t('microscopeLiveLabel')}</h4>
-                          <p className={cn("text-[10px] leading-relaxed", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('connectRealtimeOpticalFeed')}</p>
-                        </div>
+                          <Ruler className="w-3.5 h-3.5" />
+                          <span>{t('calibrateBtn')}</span>
+                        </button>
 
-                        {/* Option 2: Drag & Drop / Upload */}
-                        <div 
-                          onClick={() => fileInputRef.current?.click()}
+                        <button 
+                          onClick={() => {
+                            setIsManualAnnotating(!isManualAnnotating);
+                            if (isCalibrating) setIsCalibrating(false);
+                          }}
                           className={cn(
-                            "flex flex-col items-center justify-center p-6 rounded-2xl border text-center transition-all cursor-pointer group hover:scale-[1.02]",
-                            theme === 'dark' 
-                              ? "bg-white/[0.02] border-white/10 hover:border-purple-500/40 hover:bg-purple-500/[0.02]" 
-                              : "bg-white border-slate-200 hover:border-purple-500/40 hover:bg-purple-50"
+                            "px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer text-xs font-semibold border",
+                            isManualAnnotating 
+                              ? "bg-amber-500 text-white border-amber-400 shadow-md shadow-amber-500/30" 
+                              : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
                           )}
+                          title="Manual Override & Cell Annotation"
                         >
-                          <Upload className="w-10 h-10 mb-3 text-purple-400 group-hover:scale-110 transition-transform" />
-                          <h4 className={cn("text-xs font-bold uppercase tracking-wider mb-1", theme === 'dark' ? "text-white" : "text-slate-800")}>{t('uploadLabFileLabel')}</h4>
-                          <p className={cn("text-[10px] leading-relaxed", theme === 'dark' ? "text-white/40" : "text-slate-500")}>{t('dragDropMicroscopy')}</p>
-                        </div>
+                          <Tag className="w-3.5 h-3.5" />
+                          <span>{t('manualEditBtn')}</span>
+                        </button>
                       </div>
 
-                      <div className="w-full flex items-center justify-center gap-3">
-                        <div className="h-px flex-1 bg-white/5" />
-                        <span className={cn("text-[9px] font-mono uppercase tracking-widest", theme === 'dark' ? "text-white/20" : "text-slate-400")}>{t('supportedFormats')}</span>
-                        <div className="h-px flex-1 bg-white/5" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="scanline" />
-              
-              {/* Neural Network Status Overlay */}
-              <div className="absolute top-6 left-6 z-30 flex flex-col gap-2 pointer-events-none" dir={dir}>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full backdrop-blur-md">
-                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{t('neuralNetworkActive')}</span>
-                </div>
-                {isCalibrating && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 border border-blue-500/40 rounded-full backdrop-blur-md animate-bounce">
-                    <Ruler className="w-3 h-3 text-blue-400" />
-                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{t('calibrationPickPoints')}</span>
-                  </div>
-                )}
-                {isManualAnnotating && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 border border-amber-500/40 rounded-full backdrop-blur-md animate-bounce">
-                    <Tag className="w-3 h-3 text-amber-400" />
-                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">{t('manualAnnotationActive')}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-4 px-4 py-2 bg-black/40 border border-white/10 rounded-2xl backdrop-blur-md">
-                  <div>
-                    <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">{t('processingSpeed')}</p>
-                    <p className="text-xs font-mono font-bold text-white/90">3.2s / 500k cells</p>
-                  </div>
-                  <div className="w-px h-6 bg-white/10" />
-                  <div>
-                    <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">{t('aiAccuracy')}</p>
-                    <p className="text-xs font-mono font-bold text-emerald-500">95.2%</p>
-                  </div>
-                  {videoFilters.cvMode !== 'none' && (
-                    <>
-                      <div className="w-px h-6 bg-white/10" />
-                      <div>
-                        <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">CV Count (Dilation)</p>
-                        <p className="text-xs font-mono font-bold text-blue-400">
-                          {particles.current.filter(p => (Math.PI * 5 * 3) > videoFilters.cvAreaThreshold).length}
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
+                      <div className="w-px h-6 bg-white/15 mx-1 shrink-0" />
 
-              <canvas 
-                ref={canvasRef}
-                width={1280}
-                height={720}
-                onClick={handleCanvasClick}
-                onMouseDown={handleCanvasMouseDown}
-                onMouseMove={handleCanvasMouseMove}
-                onMouseUp={handleCanvasMouseUp}
-                onMouseLeave={handleCanvasMouseUp}
-                className={cn(
-                  "absolute inset-0 w-full h-full z-20 cursor-crosshair",
-                  isPanning && "cursor-grabbing"
-                )}
-              />
-            </div>
+                      {/* Lab Utilities Group */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button 
+                          onClick={() => setSettings(prev => ({ ...prev, highContrast: !prev.highContrast }))}
+                          className={cn(
+                            "p-2 rounded-xl transition-all cursor-pointer border",
+                            settings.highContrast 
+                              ? "bg-amber-500/20 border-amber-500/40 text-amber-300" 
+                              : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
+                          )}
+                          title="Toggle High Contrast Graticule Field"
+                        >
+                          <LayoutGrid className="w-4 h-4" />
+                        </button>
 
-            {/* Zoom Controls */}
-            <div className="absolute top-6 right-6 z-30 flex flex-col gap-2 p-1.5 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
-              <button onClick={() => handleZoom(0.5)} className="p-2.5 hover:bg-white/10 rounded-xl transition-colors text-white/60 hover:text-white" title="Zoom In"><ZoomIn className="w-5 h-5" /></button>
-              <button onClick={() => handleZoom(-0.5)} className="p-2.5 hover:bg-white/10 rounded-xl transition-colors text-white/60 hover:text-white" title="Zoom Out"><ZoomOut className="w-5 h-5" /></button>
-              <div className="h-px bg-white/10 mx-2" />
-              <button onClick={resetZoom} className="p-2.5 hover:bg-white/10 rounded-xl transition-colors text-white/60 hover:text-white" title="Reset View"><Maximize2 className="w-5 h-5" /></button>
-              <div className="text-[10px] font-mono text-center text-white/40 py-1">{canvasZoom.toFixed(1)}x</div>
-            </div>
+                        <button 
+                          onClick={() => setShowHeatmap(!showHeatmap)}
+                          className={cn(
+                            "p-2 rounded-xl transition-all cursor-pointer border",
+                            showHeatmap 
+                              ? "bg-blue-500/20 border-blue-500/40 text-blue-300" 
+                              : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
+                          )}
+                          title="Toggle Motility Trajectory Heatmap"
+                        >
+                          <Move className="w-4 h-4" />
+                        </button>
 
-            {/* Unified Bottom Laboratory Control Dock */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-1.5 max-w-[96%] w-auto pointer-events-none select-none">
-              {/* Deck 1: Video Optics, Calibration & AI Models */}
-              <div className="pointer-events-auto flex items-center gap-1 sm:gap-1.5 px-3 py-1.5 bg-black/85 backdrop-blur-xl border border-white/15 rounded-xl shadow-xl overflow-x-auto max-w-full custom-scrollbar">
-                <div className="flex items-center gap-1 border-r border-white/10 pr-2 shrink-0">
-                  <button 
-                    onClick={() => {
-                      setIsCalibrating(!isCalibrating);
-                      if (isManualAnnotating) setIsManualAnnotating(false);
-                    }}
-                    className={cn(
-                      "px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
-                      isCalibrating ? "bg-blue-500 text-white shadow-md shadow-blue-500/30 font-bold" : "hover:bg-white/10 text-white/70 hover:text-white"
-                    )}
-                    title="Calibrate Scale (Draw 100μm line)"
-                  >
-                    <Ruler className="w-3.5 h-3.5" />
-                    <span className="text-[9px] font-bold uppercase tracking-wider">{t('calibrateBtn')}</span>
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setIsManualAnnotating(!isManualAnnotating);
-                      if (isCalibrating) setIsCalibrating(false);
-                    }}
-                    className={cn(
-                      "px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
-                      isManualAnnotating ? "bg-amber-500 text-white shadow-md shadow-amber-500/30 font-bold" : "hover:bg-white/10 text-white/70 hover:text-white"
-                    )}
-                    title="Manual Override & Point Annotation"
-                  >
-                    <Tag className="w-3.5 h-3.5" />
-                    <span className="text-[9px] font-bold uppercase tracking-wider">{t('manualEditBtn')}</span>
-                  </button>
-                  <div className="relative group">
-                    <button className="p-1.5 hover:bg-white/10 text-white/70 hover:text-white rounded-lg transition-all cursor-pointer" title="Adjust Brightness, Contrast & Area Threshold">
-                      <Sliders className="w-3.5 h-3.5" />
-                    </button>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block w-56 p-4 bg-black/95 border border-white/15 rounded-2xl backdrop-blur-2xl shadow-2xl z-40">
-                      <div className="space-y-4">
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-[10px] text-white/50 uppercase font-bold">{t('brightnessLabel')}</span>
-                            <span className="text-[10px] text-white font-mono">{videoFilters.brightness}x</span>
-                          </div>
-                          <input 
-                            type="range" min="0.5" max="2" step="0.1" 
-                            value={videoFilters.brightness}
-                            onChange={(e) => setVideoFilters({...videoFilters, brightness: parseFloat(e.target.value)})}
-                            className="w-full accent-emerald-500 cursor-pointer"
-                          />
-                        </div>
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-[10px] text-white/50 uppercase font-bold">{t('contrastLabel')}</span>
-                            <span className="text-[10px] text-white font-mono">{videoFilters.contrast}x</span>
-                          </div>
-                          <input 
-                            type="range" min="0.5" max="2" step="0.1" 
-                            value={videoFilters.contrast}
-                            onChange={(e) => setVideoFilters({...videoFilters, contrast: parseFloat(e.target.value)})}
-                            className="w-full accent-emerald-500 cursor-pointer"
-                          />
-                        </div>
-                        <div className="pt-2 border-t border-white/10">
-                          <div className="flex justify-between mb-1">
-                            <span className="text-[10px] text-white/50 uppercase font-bold">{t('cvAreaThresholdLabel')} (px²)</span>
-                            <span className="text-[10px] text-emerald-400 font-mono">{videoFilters.cvAreaThreshold}</span>
-                          </div>
-                          <input 
-                            type="range" min="5" max="100" step="1" 
-                            value={videoFilters.cvAreaThreshold}
-                            onChange={(e) => setVideoFilters({...videoFilters, cvAreaThreshold: parseInt(e.target.value)})}
-                            className="w-full accent-emerald-500 cursor-pointer"
-                          />
-                        </div>
+                        <button 
+                          onClick={() => setActiveTab('calculator')}
+                          className={cn(
+                            "p-2 rounded-xl transition-all cursor-pointer border",
+                            activeTab === 'calculator' 
+                              ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-300" 
+                              : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
+                          )}
+                          title="Open Dose & Dilution Cryo Calculator"
+                        >
+                          <Zap className="w-4 h-4" />
+                        </button>
+
+                        <button 
+                          onClick={() => setShowMultiFOVModal(true)}
+                          className={cn(
+                            "p-2 rounded-xl transition-all cursor-pointer border",
+                            showMultiFOVModal 
+                              ? "bg-teal-500/20 border-teal-500/40 text-teal-300" 
+                              : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
+                          )}
+                          title="Multi-Field of View (FOV) Aggregator & Chamber Calibration"
+                        >
+                          <Layers className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
+
+                    {/* Right: Optical Media Ingest & View Controls */}
+                    <div className="flex items-center gap-2 shrink-0 ml-auto">
+                      <button 
+                        onClick={startCamera} 
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer",
+                          stream 
+                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300" 
+                            : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
+                        )}
+                        title="Connect Live Optical USB / C-Mount Microscope"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Live Microscope</span>
+                      </button>
+
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept="image/*,video/*"
+                        onChange={handleFileUpload}
+                      />
+                      <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer",
+                          isUploading 
+                            ? "bg-white/5 border-white/5 text-white/30 cursor-not-allowed" 
+                            : uploadedVideoUrl 
+                              ? "bg-purple-500/20 border-purple-500/40 text-purple-300" 
+                              : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
+                        )}
+                        title="Upload Microscopy Video File (MP4, AVI, WebM)"
+                      >
+                        {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                        <span>Upload Lab File</span>
+                      </button>
+
+                      <div className="w-px h-6 bg-white/15 mx-1 shrink-0" />
+
+                      {/* Zen Collapse Button */}
+                      <button 
+                        onClick={() => setIsControlsCollapsed(true)} 
+                        className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white rounded-xl transition-all cursor-pointer"
+                        title="Collapse Dock (Zen View)"
+                      >
+                        <ChevronLeft className="w-4 h-4 rotate-90" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-
-                {/* Optical Modes */}
-                <div className="flex items-center gap-1 border-r border-white/10 pr-2 shrink-0">
-                  {(['normal', 'phase-contrast', 'negative', 'fluorescence'] as const).map(mode => (
-                    <button
-                      key={mode}
-                      onClick={() => setVideoFilters({...videoFilters, mode})}
-                      className={cn(
-                        "px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                        videoFilters.mode === mode 
-                          ? "bg-white text-black font-bold shadow-sm" 
-                          : "text-white/50 hover:bg-white/10 hover:text-white/80"
-                      )}
-                    >
-                      {mode === 'phase-contrast' ? 'Phase' : mode === 'fluorescence' ? 'Fluo' : mode === 'negative' ? 'Neg' : 'Norm'}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Computer Vision filters */}
-                <div className="flex items-center gap-1 border-r border-white/10 pr-2 shrink-0">
-                  {(['none', 'edges', 'contours', 'threshold'] as const).map(cv => (
-                    <button
-                      key={cv}
-                      onClick={() => setVideoFilters({
-                        ...videoFilters, 
-                        cvMode: cv,
-                        aiModel: cv !== 'none' ? 'none' : videoFilters.aiModel
-                      })}
-                      className={cn(
-                        "p-1.5 rounded-md transition-all cursor-pointer",
-                        videoFilters.cvMode === cv 
-                          ? "bg-emerald-500 text-white shadow-sm" 
-                          : "text-white/40 hover:bg-white/10 hover:text-white/70"
-                      )}
-                      title={`Vision: ${cv.charAt(0).toUpperCase() + cv.slice(1)}`}
-                    >
-                      {cv === 'none' && <X className="w-3 h-3" />}
-                      {cv === 'edges' && <Wind className="w-3 h-3" />}
-                      {cv === 'contours' && <Layout className="w-3 h-3" />}
-                      {cv === 'threshold' && <LayoutGrid className="w-3 h-3" />}
-                    </button>
-                  ))}
-                </div>
-
-                {/* AI Models */}
-                <div className="flex items-center gap-1 shrink-0">
-                  {(['none', 'yolov8', 'ssd', 'unet', 'vgg19'] as const).map(model => (
-                    <button
-                      key={model}
-                      onClick={() => setVideoFilters({
-                        ...videoFilters, 
-                        aiModel: model,
-                        cvMode: model !== 'none' ? 'none' : videoFilters.cvMode
-                      })}
-                      className={cn(
-                        "px-2 py-1 rounded-md text-[8px] font-bold uppercase transition-all tracking-wider font-mono cursor-pointer",
-                        videoFilters.aiModel === model 
-                          ? "bg-purple-500 text-white shadow-md shadow-purple-500/30 font-bold" 
-                          : "text-white/50 hover:bg-white/10 hover:text-white/80"
-                      )}
-                      title={`AI Network Model: ${model === 'none' ? 'None (Raw Tracking)' : model.toUpperCase()}`}
-                    >
-                      {model === 'none' ? 'RAW' : model.replace('v8', '').toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Deck 2: Primary Execution & Quick Tools */}
-              <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 p-1.5 bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-x-auto max-w-full custom-scrollbar">
-                <button 
-                  onClick={toggleAnalysis}
-                  className={cn(
-                    "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-lg shrink-0",
-                    isAnalyzing ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/30" : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/30"
-                  )}
-                >
-                  {isAnalyzing ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                  <span>{isAnalyzing ? t('stopAnalysisBtn') : t('startCASAEngineBtn')}</span>
-                </button>
-
-                <div className="w-px h-6 bg-white/15 mx-0.5 shrink-0" />
-
-                <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={startCamera} className="p-2 hover:bg-white/15 rounded-xl transition-colors text-white/70 hover:text-white cursor-pointer" title="Camera Optical Feed">
-                    <Camera className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => setSettings(prev => ({ ...prev, highContrast: !prev.highContrast }))}
-                    className={cn(
-                      "p-2 rounded-xl transition-all cursor-pointer",
-                      settings.highContrast ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" : "hover:bg-white/15 text-white/70 hover:text-white"
-                    )}
-                    title="Toggle Field Mode (High Contrast)"
-                  >
-                    <LayoutGrid className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => setShowHeatmap(!showHeatmap)}
-                    className={cn(
-                      "p-2 rounded-xl transition-all cursor-pointer",
-                      showHeatmap ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20" : "hover:bg-white/15 text-white/70 hover:text-white"
-                    )}
-                    title="Toggle Heatmap"
-                  >
-                    <Move className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('calculator')}
-                    className={cn(
-                      "p-2 rounded-xl transition-all cursor-pointer",
-                      activeTab === 'calculator' ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "hover:bg-white/15 text-white/70 hover:text-white"
-                    )}
-                    title="Dose & Dilution Calculator"
-                  >
-                    <Zap className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => setShowMultiFOVModal(true)}
-                    className={cn(
-                      "p-2 rounded-xl transition-all cursor-pointer",
-                      showMultiFOVModal ? "bg-teal-500 text-white shadow-lg shadow-teal-500/20" : "hover:bg-white/15 text-white/70 hover:text-white"
-                    )}
-                    title="Multi-Field of View (FOV) Aggregator & Chamber Calibration"
-                  >
-                    <Layers className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => setShowStats(!showStats)} 
-                    className={cn(
-                      "p-2 rounded-xl transition-colors cursor-pointer", 
-                      showStats ? "bg-white/20 text-white" : "hover:bg-white/15 text-white/70 hover:text-white"
-                    )}
-                    title="Toggle Analytics Sidebar"
-                  >
-                    <BarChart3 className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="w-px h-6 bg-white/15 mx-0.5 shrink-0" />
-
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  accept="image/*,video/*"
-                  onChange={handleFileUpload}
-                />
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  className={cn(
-                    "flex items-center gap-2 px-3.5 py-2.5 rounded-xl font-medium transition-all cursor-pointer shrink-0",
-                    isUploading ? "bg-white/5 text-white/40" : "bg-white/10 hover:bg-white/20 text-white"
-                  )}
-                >
-                  {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                  <span className="text-[11px] uppercase tracking-wider font-bold">{t('aiUploadBtn')}</span>
-                </button>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          )}
         </main>
 
         {/* Sidebar Stats */}
@@ -3264,8 +3485,8 @@ Digital Signature Verified - ATSA AI Engine v2.0
                         <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{t('historyTrackerTitle')}</h3>
                         {!user && (
                           <button 
-                            onClick={() => signInWithPopup(auth, googleProvider)}
-                            className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-[8px] font-bold uppercase tracking-widest text-white transition-all"
+                            onClick={handleCASASignIn}
+                            className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-[8px] font-bold uppercase tracking-widest text-white transition-all cursor-pointer"
                           >
                             {t('signInButton')}
                           </button>

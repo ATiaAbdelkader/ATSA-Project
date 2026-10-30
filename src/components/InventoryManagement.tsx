@@ -47,6 +47,8 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
   const { t, dir } = useLanguage();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null);
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [formData, setFormData] = useState({
@@ -113,12 +115,20 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
     }
   };
 
-  const handleDeleteItem = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this item?")) return;
+  const handleDeleteItem = async (item: InventoryItem) => {
+    setItemToDelete(item);
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!itemToDelete) return;
+    setIsDeletingItem(true);
     try {
-      await deleteDoc(doc(db, 'inventory', id));
+      await deleteDoc(doc(db, 'inventory', itemToDelete.id));
+      setItemToDelete(null);
     } catch (err) {
       console.error("Failed to delete item:", err);
+    } finally {
+      setIsDeletingItem(false);
     }
   };
 
@@ -305,8 +315,9 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button 
-                      onClick={() => handleDeleteItem(item.id)}
+                      onClick={() => handleDeleteItem(item)}
                       className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-colors cursor-pointer"
+                      title="Delete Item"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -449,6 +460,59 @@ export const InventoryManagement: React.FC<InventoryManagementProps> = ({ onBack
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {itemToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setItemToDelete(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className={cn(
+                "relative w-full max-w-md border rounded-[28px] p-6 shadow-2xl",
+                theme === 'dark' ? "bg-[#0f0f0f] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+              )}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center mb-4">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold mb-2">Delete Inventory Item</h3>
+              <p className={cn("text-xs leading-relaxed mb-6", theme === 'dark' ? "text-white/60" : "text-slate-600")}>
+                Are you sure you want to remove <span className="font-bold text-red-400">{itemToDelete.name}</span> from the lab inventory registry? This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setItemToDelete(null)}
+                  disabled={isDeletingItem}
+                  className={cn(
+                    "flex-1 py-3 text-xs font-bold rounded-xl transition-all cursor-pointer",
+                    theme === 'dark' ? "bg-white/5 text-white hover:bg-white/10" : "bg-slate-100 text-slate-800 hover:bg-slate-200"
+                  )}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteItem}
+                  disabled={isDeletingItem}
+                  className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-red-500/20 cursor-pointer"
+                >
+                  {isDeletingItem ? 'Deleting...' : 'Confirm Delete'}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

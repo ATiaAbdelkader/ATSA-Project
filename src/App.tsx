@@ -662,8 +662,14 @@ export default function App() {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
-      console.error("Login failed:", error);
       const code = error?.code || 'auth/unknown';
+      
+      // User cancelled or closed the sign-in popup - gracefully abort without logging an error
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        return;
+      }
+
+      console.warn("Auth login notice:", code, error?.message || error);
       const host = typeof window !== 'undefined' ? window.location.hostname : 'unknown-host';
       let message = error?.message || 'Authentication process encountered an unexpected issue.';
       let suggestion = 'Please check your connection and retry.';
@@ -674,12 +680,6 @@ export default function App() {
       } else if (code === 'auth/popup-blocked') {
         message = 'Authentication pop-up was blocked by your browser settings.';
         suggestion = 'Please allow pop-ups for this website in your browser address bar and click "Authenticate with Google" again.';
-      } else if (code === 'auth/popup-closed-by-user') {
-        message = 'Google sign-in window was closed before completing authentication.';
-        suggestion = 'Click the button again and proceed through the Google account selection.';
-      } else if (code === 'auth/cancelled-popup-request') {
-        message = 'Another sign-in request is already in progress.';
-        suggestion = 'Wait a moment or refresh the page before initiating sign-in.';
       } else if (code === 'auth/operation-not-allowed') {
         message = 'Google Sign-In provider is disabled in Firebase.';
         suggestion = 'In Firebase Console, navigate to Authentication > Sign-in method and enable Google provider.';
@@ -718,7 +718,7 @@ export default function App() {
       setUser(null);
       setAppState('landing');
     } catch (error) {
-      console.error("Logout failed:", error);
+      console.warn("Logout notification:", error);
       localStorage.removeItem('atsa_guest_session');
       setUser(null);
       setAppState('landing');
@@ -1704,8 +1704,8 @@ export default function App() {
                           <span className={cn("text-[10px] font-medium uppercase tracking-wider", theme === 'dark' ? "text-white/40" : "text-slate-400")}>
                             Analyzed Cohort
                           </span>
-                          <div className="flex items-baseline gap-1.5 font-mono shrink-0">
-                            <span className="text-2xl font-black tracking-tight text-teal-500 dark:text-teal-400">
+                          <div className="flex items-baseline gap-1.5 font-mono shrink-0 whitespace-nowrap">
+                            <span className="text-xl sm:text-2xl font-black tracking-tight text-teal-500 dark:text-teal-400 tabular-nums">
                               <CountUpNumber 
                                 value={
                                   recentAnalyses.length > 0 
@@ -1718,7 +1718,7 @@ export default function App() {
                                 duration={1400}
                               />
                             </span>
-                            <span className="text-[11px] font-bold text-teal-600 dark:text-teal-300 font-sans">M/ml</span>
+                            <span className="text-[10px] font-bold text-teal-600 dark:text-teal-300 font-mono">M/ml</span>
                           </div>
                         </div>
                       </div>

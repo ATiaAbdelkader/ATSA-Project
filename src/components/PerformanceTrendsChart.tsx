@@ -763,12 +763,12 @@ export const PerformanceTrendsChart: React.FC<PerformanceTrendsChartProps> = ({
                   </span>
                 </div>
 
-                <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5 my-1 min-w-0">
+                <div className="flex items-baseline gap-1.5 my-1 min-w-0">
                   <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-500 dark:text-emerald-400 tabular-nums">
                     {activeFocusDay.concentration.toFixed(2)}
                   </span>
-                  <span className="text-xs font-semibold text-slate-400 dark:text-white/50 font-sans whitespace-nowrap">
-                    Million / mL
+                  <span className="text-[11px] font-bold text-slate-400 dark:text-white/60 font-mono shrink-0">
+                    M / mL
                   </span>
                 </div>
 
@@ -795,12 +795,12 @@ export const PerformanceTrendsChart: React.FC<PerformanceTrendsChartProps> = ({
                   </span>
                 </div>
 
-                <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5 my-1 min-w-0">
+                <div className="flex items-baseline gap-1.5 my-1 min-w-0">
                   <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-cyan-500 dark:text-cyan-400 tabular-nums">
                     {activeFocusDay.count}
                   </span>
-                  <span className="text-xs font-semibold text-slate-400 dark:text-white/50 font-sans whitespace-nowrap">
-                    {activeFocusDay.count === 1 ? 'Patient Specimen' : 'Patient Specimens'}
+                  <span className="text-[11px] font-bold text-slate-400 dark:text-white/60 font-mono shrink-0">
+                    {activeFocusDay.count === 1 ? 'Specimen' : 'Specimens'}
                   </span>
                 </div>
 
