@@ -46,7 +46,14 @@ import {
   User as UserIcon,
   BookOpen,
   Award,
-  Layers
+  Layers,
+  Waves,
+  Video,
+  Pause,
+  StepForward,
+  StepBack,
+  Share2,
+  Package
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -72,6 +79,9 @@ import { HelpCenter } from './HelpCenter';
 import { QualityControl } from './QualityControl';
 import { MultiFOVModal } from './MultiFOVModal';
 import { PDFDossier } from './PDFDossier';
+import { FlagellarWaveformAnalyzer } from './FlagellarWaveformAnalyzer';
+import { DewarTankVisualMap } from './DewarTankVisualMap';
+import { TeleAndrologyShareModal } from './TeleAndrologyShareModal';
 import { VIRTUAL_ANIMALS, VIRTUAL_ANIMAL_KEYS, type VirtualAnimalRecord } from '../data/virtualAnimalDatasets';
 
 import { Sperm3DPath } from './Sperm3DPath';
@@ -95,6 +105,9 @@ import {
 } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 import { onAuthStateChanged, User, signInWithPopup } from 'firebase/auth';
+import { queueOfflineAnalysis } from '../services/offlineSyncService';
+import { OfflineFieldIndicator } from './OfflineFieldIndicator';
+import { PWAInstallButton } from './PWAInstallButton';
 
 const SpermZoom: React.FC<{ sperm: SpermData; isAnalyzing: boolean; highContrast?: boolean; theme?: 'light' | 'dark' }> = ({ sperm, isAnalyzing, highContrast, theme = 'dark' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -233,9 +246,18 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showStats, setShowStats] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
-  const [activeTab, setActiveTab] = useState<'live' | 'kinematics' | 'morphology' | 'vitality' | 'sdf' | 'ai' | 'report' | 'validation' | 'history' | 'calculator' | 'about' | 'qc'>('live');
+  const [activeTab, setActiveTab] = useState<'live' | 'kinematics' | 'flagellar' | 'morphology' | 'vitality' | 'sdf' | 'ai' | 'report' | 'dewar' | 'validation' | 'history' | 'calculator' | 'about' | 'qc'>('live');
   const [showMultiFOVModal, setShowMultiFOVModal] = useState(false);
   const [showPDFDossier, setShowPDFDossier] = useState(false);
+  const [showTeleAndrologyModal, setShowTeleAndrologyModal] = useState(false);
+  const [targetCaptureFps, setTargetCaptureFps] = useState<30 | 60 | 120>(60);
+  const [isRecordingStream, setIsRecordingStream] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<any>(null);
   const [multiFOVFields, setMultiFOVFields] = useState<FieldOfViewData[]>([
     {
       fieldIndex: 1,
@@ -600,8 +622,9 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       
       const constraints = {
         video: {
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 480 },
+          width: { ideal: 1920, min: 640 },
+          height: { ideal: 1080, min: 480 },
+          frameRate: { ideal: targetCaptureFps, min: 30 },
           facingMode: "environment"
         }
       };
@@ -611,7 +634,9 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
         mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (e) {
         console.warn("Failed to get camera with ideal constraints, trying fallback", e);
-        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { frameRate: { ideal: targetCaptureFps, min: 30 } } 
+        });
       }
 
       setStream(mediaStream);
@@ -632,6 +657,85 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
+  };
+
+  const handleStartRecording = () => {
+    try {
+      let recStream: MediaStream | null = stream;
+      if (!recStream && canvasRef.current) {
+        recStream = (canvasRef.current as any).captureStream ? (canvasRef.current as any).captureStream(targetCaptureFps) : null;
+      }
+      if (!recStream) {
+        setEngineToast({ message: "No active microscope stream or canvas to record.", type: "error" });
+        return;
+      }
+
+      recordedChunksRef.current = [];
+      const options = { mimeType: 'video/webm;codecs=vp9,opus' };
+      let recorder: MediaRecorder;
+      try {
+        recorder = new MediaRecorder(recStream, options);
+      } catch (e) {
+        recorder = new MediaRecorder(recStream);
+      }
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        setRecordedVideoUrl(url);
+        setUploadedVideoUrl(url); // Mount to player immediately for slow-motion review!
+        setEngineToast({
+          message: `Microscope clip recorded (${(blob.size / (1024 * 1024)).toFixed(2)} MB). Slow-motion review ready!`,
+          type: "success"
+        });
+      };
+
+      recorder.start(100);
+      mediaRecorderRef.current = recorder;
+      setIsRecordingStream(true);
+      setRecordingSeconds(0);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds(prev => prev + 1);
+      }, 1000);
+    } catch (err: any) {
+      console.error("Recording error:", err);
+      setEngineToast({ message: "Could not start video recording: " + err.message, type: "error" });
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecordingStream(false);
+  };
+
+  const handleStepFrame = (delta: -1 | 1) => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      const frameDuration = 1 / (settings.fps || targetCaptureFps || 60);
+      videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime + (delta * frameDuration));
+    }
+  };
+
+  const handleDownloadRecordedClip = () => {
+    const url = recordedVideoUrl || uploadedVideoUrl;
+    if (!url) return;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `CASA-Microscope-${patientData.id || 'Clip'}-${new Date().toISOString().split('T')[0]}.webm`;
+    a.click();
   };
 
   const toggleAnalysis = async () => {
@@ -1172,32 +1276,50 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   const saveToHistory = async () => {
     if (!results || !user) return;
     setIsSaving(true);
+    const analysisPayload = {
+      patientId: patientData.id,
+      species: patientData.species,
+      timestamp: new Date().toISOString(),
+      concentration: results.summary.concentration,
+      motility: {
+        total: results.summary.motility.total,
+        progressive: results.summary.motility.progressive
+      },
+      morphology: {
+        normal: results.summary.morphology.normal
+      },
+      vitality: {
+        live: results.summary.vitality.live
+      },
+      sdf: {
+        dfi: results.summary.sdf.dfi
+      },
+      interpretation: results.summary.interpretation || (aiAnalysis ? {
+        status: aiAnalysis.toLowerCase().includes('normal') ? 'normal' : 'abnormal',
+        comments: [aiAnalysis]
+      } : null),
+      uid: user.uid
+    };
+
+    // If offline, queue in IndexedDB immediately
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      try {
+        await queueOfflineAnalysis(analysisPayload);
+        setEngineToast({
+          message: `Field Mode (Offline): Analysis for ${patientData.id} queued in IndexedDB. Will auto-sync when online.`,
+          type: 'info'
+        });
+        setActiveTab('history');
+        setIsSaving(false);
+        return;
+      } catch (err) {
+        console.warn('Could not queue analysis offline:', err);
+      }
+    }
+
     const path = 'analyses';
     try {
-      await addDoc(collection(db, path), {
-        patientId: patientData.id,
-        species: patientData.species,
-        timestamp: new Date().toISOString(),
-        concentration: results.summary.concentration,
-        motility: {
-          total: results.summary.motility.total,
-          progressive: results.summary.motility.progressive
-        },
-        morphology: {
-          normal: results.summary.morphology.normal
-        },
-        vitality: {
-          live: results.summary.vitality.live
-        },
-        sdf: {
-          dfi: results.summary.sdf.dfi
-        },
-        interpretation: results.summary.interpretation || (aiAnalysis ? {
-          status: aiAnalysis.toLowerCase().includes('normal') ? 'normal' : 'abnormal',
-          comments: [aiAnalysis]
-        } : null),
-        uid: user.uid
-      });
+      await addDoc(collection(db, path), analysisPayload);
 
       // Trigger notification for abnormal results
       const status = results.summary.interpretation?.status || (aiAnalysis?.toLowerCase().includes('normal') ? 'normal' : 'abnormal');
@@ -1215,9 +1337,23 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
         );
       }
 
+      setEngineToast({
+        message: `Analysis for ${patientData.id} saved to Cloud Workstation.`,
+        type: 'success'
+      });
       setActiveTab('history');
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, path);
+      // If Firestore failed due to offline / connectivity drop, queue in IndexedDB
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        await queueOfflineAnalysis(analysisPayload);
+        setEngineToast({
+          message: `Network offline: Analysis saved to local Field Queue. Will sync on reconnection.`,
+          type: 'info'
+        });
+        setActiveTab('history');
+      } else {
+        handleFirestoreError(err, OperationType.WRITE, path);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -1540,6 +1676,12 @@ Digital Signature Verified - ATSA AI Engine v2.0
       }
     }
   }, [stream, uploadedVideoUrl]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = playbackSpeed;
+    }
+  }, [playbackSpeed]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -2194,6 +2336,14 @@ Digital Signature Verified - ATSA AI Engine v2.0
             <span className="text-[10px] font-medium text-emerald-500 uppercase tracking-wider">Engine Active</span>
           </div>
           <button 
+            onClick={() => setShowTeleAndrologyModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            title="Open Tele-Andrology Peer Review Sharing Portal"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Tele-Andrology</span>
+          </button>
+          <button 
             onClick={() => setShowSettings(true)}
             className={cn("p-2 rounded-lg transition-colors", theme === 'dark' ? "text-white/40 hover:bg-white/5 hover:text-white" : "text-slate-400 hover:bg-slate-100 hover:text-slate-900")}
           >
@@ -2222,11 +2372,13 @@ Digital Signature Verified - ATSA AI Engine v2.0
             {/* Display active tab icon */}
             {activeTab === 'live' && <Tv className="w-3.5 h-3.5 animate-pulse" />}
             {activeTab === 'kinematics' && <Activity className="w-3.5 h-3.5" />}
+            {activeTab === 'flagellar' && <Waves className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />}
             {activeTab === 'morphology' && <Compass className="w-3.5 h-3.5" />}
             {activeTab === 'vitality' && <Heart className="w-3.5 h-3.5" />}
             {activeTab === 'sdf' && <Dna className="w-3.5 h-3.5" />}
             {activeTab === 'ai' && <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" />}
             {activeTab === 'report' && <FileText className="w-3.5 h-3.5" />}
+            {activeTab === 'dewar' && <Package className="w-3.5 h-3.5 text-cyan-400" />}
             {activeTab === 'history' && <Clock className="w-3.5 h-3.5" />}
             {activeTab === 'calculator' && <Calculator className="w-3.5 h-3.5" />}
             {activeTab === 'validation' && <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -2240,11 +2392,13 @@ Digital Signature Verified - ATSA AI Engine v2.0
             <div className={cn("text-xs font-bold capitalize mt-0.5", theme === 'dark' ? "text-white" : "text-slate-900")}>
               {activeTab === 'live' ? t('tabLive') :
                activeTab === 'kinematics' ? t('tabKinematics') :
+               activeTab === 'flagellar' ? t('tabFlagellar') :
                activeTab === 'morphology' ? t('tabMorphology') :
                activeTab === 'vitality' ? t('tabVitality') :
                activeTab === 'sdf' ? t('tabSdf') :
                activeTab === 'ai' ? t('tabAi') :
                activeTab === 'report' ? t('tabReport') :
+               activeTab === 'dewar' ? t('tabDewar') :
                activeTab === 'qc' ? t('tabQc') :
                activeTab === 'history' ? t('tabHistory') :
                activeTab === 'calculator' ? t('tabCalculator') :
@@ -2262,11 +2416,13 @@ Digital Signature Verified - ATSA AI Engine v2.0
           {([
             { id: 'live', labelKey: 'tabLive', icon: Tv, color: 'text-red-500', pulsing: true, glowing: false },
             { id: 'kinematics', labelKey: 'tabKinematics', icon: Activity, color: 'text-emerald-500', pulsing: false, glowing: false },
+            { id: 'flagellar', labelKey: 'tabFlagellar', icon: Waves, color: 'text-cyan-400', pulsing: false, glowing: false },
             { id: 'morphology', labelKey: 'tabMorphology', icon: Compass, color: 'text-purple-500', pulsing: false, glowing: false },
             { id: 'vitality', labelKey: 'tabVitality', icon: Heart, color: 'text-rose-500', pulsing: false, glowing: false },
             { id: 'sdf', labelKey: 'tabSdf', icon: Dna, color: 'text-sky-500', pulsing: false, glowing: false },
             { id: 'ai', labelKey: 'tabAi', icon: Sparkles, color: 'text-purple-400', pulsing: false, glowing: true },
             { id: 'report', labelKey: 'tabReport', icon: FileText, color: 'text-blue-500', pulsing: false, glowing: false },
+            { id: 'dewar', labelKey: 'tabDewar', icon: Package, color: 'text-cyan-400', pulsing: false, glowing: false },
             { id: 'qc', labelKey: 'tabQc', icon: ShieldCheck, color: 'text-teal-400', pulsing: false, glowing: false },
             { id: 'history', labelKey: 'tabHistory', icon: Clock, color: 'text-amber-500', pulsing: false, glowing: false },
             { id: 'calculator', labelKey: 'tabCalculator', icon: Calculator, color: 'text-indigo-500', pulsing: false, glowing: false },
@@ -2406,7 +2562,27 @@ Digital Signature Verified - ATSA AI Engine v2.0
       <div className="flex flex-1 overflow-hidden">
         {/* Main Workspace */}
         <main className={cn("flex-1 relative flex flex-col min-w-0 min-h-0 overflow-hidden transition-colors", theme === 'dark' ? "bg-black" : "bg-slate-200")}>
-          {activeTab === 'qc' ? (
+          {activeTab === 'flagellar' ? (
+            <div className="w-full h-full overflow-y-auto p-4 md:p-6 custom-scrollbar">
+              <FlagellarWaveformAnalyzer
+                spermatozoa={results?.spermatozoa || []}
+                selectedSpermId={selectedSperm?.id}
+                onSelectSperm={(id) => {
+                  const s = results?.spermatozoa.find(x => x.id === id);
+                  if (s) setSelectedSperm(s);
+                }}
+                theme={theme}
+              />
+            </div>
+          ) : activeTab === 'dewar' ? (
+            <div className="w-full h-full overflow-y-auto p-4 md:p-6 custom-scrollbar">
+              <DewarTankVisualMap
+                currentAnalysis={results}
+                theme={theme}
+                onLinkSpecimen={(straw) => setEngineToast({ message: `Linked specimen ${straw.patientId} to Dewar ${straw.tankId.toUpperCase()} (Canister #${straw.canisterId})`, type: 'success' })}
+              />
+            </div>
+          ) : activeTab === 'qc' ? (
             <div className="w-full h-full overflow-y-auto p-4 md:p-6 custom-scrollbar">
               <QualityControl currentAnalysis={results} theme={theme} />
             </div>
@@ -2615,6 +2791,58 @@ Digital Signature Verified - ATSA AI Engine v2.0
                     </div>
                   )}
 
+                  <OfflineFieldIndicator 
+                    userId={user?.uid} 
+                    theme={theme} 
+                    onSyncCompleted={(msg) => setEngineToast({ message: msg, type: 'success' })}
+                  />
+
+                  <PWAInstallButton theme={theme} variant="compact" />
+
+                  {/* High-FPS Sampling Selector */}
+                  <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-0.5">
+                    <span className="text-[9px] text-white/40 uppercase px-1 font-bold">FPS:</span>
+                    {([30, 60, 120] as const).map(fpsVal => (
+                      <button
+                        key={fpsVal}
+                        onClick={() => {
+                          setTargetCaptureFps(fpsVal);
+                          setSettings(prev => ({ ...prev, fps: fpsVal }));
+                        }}
+                        className={cn(
+                          "px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition-all cursor-pointer",
+                          targetCaptureFps === fpsVal
+                            ? "bg-blue-500 text-white"
+                            : "text-white/50 hover:text-white"
+                        )}
+                        title={`Set microscope optical sampling target to ${fpsVal} FPS`}
+                      >
+                        {fpsVal}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Stream Recording Button */}
+                  {isRecordingStream ? (
+                    <button
+                      onClick={handleStopRecording}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500 text-white text-[10px] font-bold uppercase tracking-wider animate-pulse shadow-md shadow-red-500/30 cursor-pointer"
+                      title="Stop video recording"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                      <span>● REC {Math.floor(recordingSeconds / 60)}:{String(recordingSeconds % 60).padStart(2, '0')}</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleStartRecording}
+                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+                      title="Record live microscope feed to high-speed video"
+                    >
+                      <Video className="w-3 h-3 text-red-400" />
+                      <span className="hidden md:inline">Record Feed</span>
+                    </button>
+                  )}
+
                   <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-[10px] text-white/60">
                     <Tv className="w-3 h-3 text-emerald-400" />
                     <span>{stream ? "Live Microscope" : uploadedVideoUrl ? "Lab Video Feed" : `Specimen: ${results?.species || 'Bovine'}`}</span>
@@ -2642,6 +2870,94 @@ Digital Signature Verified - ATSA AI Engine v2.0
                   "relative w-full h-full max-h-full aspect-video rounded-xl border shadow-2xl overflow-hidden bg-[#020204] flex items-center justify-center transition-all",
                   theme === 'dark' ? "border-white/10" : "border-slate-300 shadow-xl"
                 )}>
+                  {/* Floating Slow-Motion & Frame Scrubber Dock */}
+                  {(uploadedVideoUrl || recordedVideoUrl) && (
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 bg-[#0c0c14]/90 border border-cyan-500/30 rounded-2xl p-2 px-4 shadow-2xl backdrop-blur-md flex items-center gap-3 text-white text-xs select-none animate-in fade-in slide-in-from-top-2">
+                      <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-cyan-300">
+                        <Waves className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                        <span>Slow-Mo</span>
+                      </div>
+
+                      <div className="h-4 w-px bg-white/20" />
+
+                      {/* Play / Pause */}
+                      <button
+                        onClick={() => {
+                          if (videoRef.current) {
+                            if (videoRef.current.paused) videoRef.current.play();
+                            else videoRef.current.pause();
+                          }
+                        }}
+                        className="p-1 rounded-lg bg-white/10 hover:bg-white/20 transition-all cursor-pointer"
+                        title="Play / Pause"
+                      >
+                        <Play className="w-3 h-3 fill-current" />
+                      </button>
+
+                      {/* Frame Step -1 and +1 */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleStepFrame(-1)}
+                          className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[9px] font-mono font-bold flex items-center gap-0.5 cursor-pointer"
+                          title="Step backward 1 frame"
+                        >
+                          <StepBack className="w-3 h-3" />
+                          <span>-1F</span>
+                        </button>
+                        <button
+                          onClick={() => handleStepFrame(1)}
+                          className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[9px] font-mono font-bold flex items-center gap-0.5 cursor-pointer"
+                          title="Step forward 1 frame"
+                        >
+                          <span>+1F</span>
+                          <StepForward className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      <div className="h-4 w-px bg-white/20" />
+
+                      {/* Speed Selector */}
+                      <div className="flex items-center gap-1">
+                        {[0.1, 0.25, 0.5, 1.0].map(rate => (
+                          <button
+                            key={rate}
+                            onClick={() => setPlaybackSpeed(rate)}
+                            className={cn(
+                              "px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition-all cursor-pointer",
+                              playbackSpeed === rate
+                                ? "bg-cyan-500 text-black font-black"
+                                : "bg-white/5 text-white/60 hover:text-white"
+                            )}
+                          >
+                            {rate}x
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="h-4 w-px bg-white/20" />
+
+                      {/* Download Clip */}
+                      <button
+                        onClick={handleDownloadRecordedClip}
+                        className="p-1 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-[9px] font-bold flex items-center gap-1 text-white/80 hover:text-white cursor-pointer"
+                        title="Download high-speed video clip"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span className="hidden sm:inline">Save</span>
+                      </button>
+
+                      {/* Jump to Flagellar Kymograph Analysis */}
+                      <button
+                        onClick={() => setActiveTab('flagellar')}
+                        className="px-2 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-300 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                        title="Open Flagellar Waveform Kymograph Analyzer"
+                      >
+                        <Waves className="w-3 h-3" />
+                        <span>Waves (SpermQ)</span>
+                      </button>
+                    </div>
+                  )}
+
                   {/* Upload Progress Modal */}
                   {isUploading && (
                     <div className={cn(
@@ -6867,6 +7183,14 @@ Digital Signature Verified - ATSA AI Engine v2.0
           theme={theme}
         />
       )}
+
+      {/* Tele-Andrology Consulting Modal */}
+      <TeleAndrologyShareModal
+        isOpen={showTeleAndrologyModal}
+        onClose={() => setShowTeleAndrologyModal(false)}
+        analysis={results}
+        theme={theme}
+      />
 
       {/* Engine Action Feedback Toast */}
       <AnimatePresence>

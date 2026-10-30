@@ -739,6 +739,16 @@ export const translations: TranslationDict = {
     fr: "Référence VISEM",
     ar: "معيار VISEM"
   },
+  tabDewar: {
+    en: "Dewar Cryo Map",
+    fr: "Carte Cryo Dewar",
+    ar: "خريطة ديوار للتجميد"
+  },
+  tabTeleAndrology: {
+    en: "Tele-Andrology",
+    fr: "Télé-Andrologie",
+    ar: "استشارة عن بعد"
+  },
   tabQc: {
     en: "IQC & QC",
     fr: "CIQ & CQ",

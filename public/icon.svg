@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050508"/>
+      <stop offset="50%" stop-color="#0b1310"/>
+      <stop offset="100%" stop-color="#030805"/>
+    </linearGradient>
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="#10b981" stroke-width="3" stroke-opacity="0.3"/>
+
+  <!-- Optical Ring & Crosshair Graticule -->
+  <circle cx="256" cy="256" r="176" fill="none" stroke="#10b981" stroke-width="2" stroke-opacity="0.15" stroke-dasharray="8 6"/>
+  <circle cx="256" cy="256" r="112" fill="none" stroke="#10b981" stroke-width="1.5" stroke-opacity="0.2"/>
+  <line x1="256" y1="64" x2="256" y2="448" stroke="#10b981" stroke-width="1.5" stroke-opacity="0.15"/>
+  <line x1="64" y1="256" x2="448" y2="256" stroke="#10b981" stroke-width="1.5" stroke-opacity="0.15"/>
+
+  <!-- Microscope Body Silhouette -->
+  <g filter="url(#glow)">
+    <!-- Microscope Eyepiece & Barrel -->
+    <path d="M 196 160 L 280 244 L 254 270 L 170 186 Z" fill="url(#emeraldGrad)"/>
+    <!-- Stage Platform -->
+    <rect x="180" y="300" width="130" height="18" rx="6" fill="#34d399"/>
+    <!-- Objective Turret -->
+    <circle cx="270" cy="254" r="16" fill="#06b6d4"/>
+    <!-- Stand Neck & Base -->
+    <path d="M 230 190 Q 320 200 320 300 Q 320 370 270 380 L 330 380 Q 340 380 340 395 L 340 404 Q 340 410 330 410 L 160 410 Q 150 410 150 404 L 150 395 Q 150 380 160 380 L 220 380 Q 280 370 280 310 Q 280 230 210 210 Z" fill="url(#emeraldGrad)"/>
+    <!-- Motility Wave Trail -->
+    <path d="M 130 130 Q 155 110 170 135 T 205 130 T 235 145" fill="none" stroke="#34d399" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="240" cy="148" r="8" fill="#ffffff"/>
+  </g>
+
+  <!-- Brand Title Monogram -->
+  <text x="256" y="462" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="900" fill="#34d399" letter-spacing="4">ATSA CASA</text>
+</svg>

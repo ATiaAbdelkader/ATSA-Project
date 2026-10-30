@@ -40,6 +40,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils';
 import { useLanguage } from '../context/LanguageContext';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -485,6 +486,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
+
+            {/* PWA Install Button */}
+            <PWAInstallButton theme={theme} variant="compact" />
 
             {/* Reviewer Pass Button */}
             <button

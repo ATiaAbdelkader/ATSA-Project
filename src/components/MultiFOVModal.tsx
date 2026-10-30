@@ -10,7 +10,9 @@ import {
   X, 
   Download,
   Info,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  Compass
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils';
@@ -26,6 +28,14 @@ interface MultiFOVModalProps {
   theme?: 'light' | 'dark';
 }
 
+const CHAMBER_POSITIONS = [
+  { index: 1, name: 'Position 1: Top-Left', x: 20, y: 20 },
+  { index: 2, name: 'Position 2: Top-Right', x: 80, y: 20 },
+  { index: 3, name: 'Position 3: Center Core', x: 50, y: 50 },
+  { index: 4, name: 'Position 4: Bottom-Left', x: 20, y: 80 },
+  { index: 5, name: 'Position 5: Bottom-Right', x: 80, y: 80 }
+];
+
 export const MultiFOVModal: React.FC<MultiFOVModalProps> = ({
   isOpen,
   onClose,
@@ -36,6 +46,7 @@ export const MultiFOVModal: React.FC<MultiFOVModalProps> = ({
 }) => {
   const isDark = theme === 'dark';
   const [selectedField, setSelectedField] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'table' | 'stitching'>('stitching');
 
   if (!isOpen) return null;
 
@@ -57,8 +68,29 @@ export const MultiFOVModal: React.FC<MultiFOVModalProps> = ({
     onClose();
   };
 
+  const handleSampleNextField = () => {
+    const nextIdx = fields.length + 1;
+    const baseConc = fields.length > 0 ? fields[0].concentration : 120.0;
+    const varianceFactor = 1 + (Math.random() - 0.5) * 0.12; // Realistic ~6% variance
+    const nextConc = Math.max(10, Math.round(baseConc * varianceFactor * 10) / 10);
+    const nextProg = Math.min(95, Math.max(20, Math.round((64 + (Math.random() - 0.5) * 8) * 10) / 10));
+
+    const newField: FieldOfViewData = {
+      fieldIndex: nextIdx,
+      timestamp: new Date().toISOString(),
+      spermCount: Math.round(nextConc * 2.2),
+      concentration: nextConc,
+      totalMotility: Math.min(100, nextProg + 18),
+      progressiveMotility: nextProg,
+      normalMorphology: 5.6,
+      avgVcl: Math.round((82 + (Math.random() - 0.5) * 10) * 10) / 10
+    };
+
+    onFieldsChange([...fields, newField]);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -70,7 +102,7 @@ export const MultiFOVModal: React.FC<MultiFOVModalProps> = ({
       >
         {/* Modal Header */}
         <div className={cn(
-          "p-6 border-b flex items-center justify-between",
+          "p-5 md:p-6 border-b flex items-center justify-between",
           isDark ? "border-white/10 bg-white/[0.02]" : "border-slate-200 bg-slate-50"
         )}>
           <div className="flex items-center gap-3">
@@ -81,28 +113,51 @@ export const MultiFOVModal: React.FC<MultiFOVModalProps> = ({
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-black tracking-tight uppercase">Multi-Field of View (FOV) Aggregator</h3>
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  WHO 6th Ed. §2.4
+                  WHO 6th Ed. §2.4 Standard
                 </span>
               </div>
               <p className={cn("text-xs mt-0.5", isDark ? "text-white/40" : "text-slate-500")}>
-                Multi-field slide scanning for specimen homogeneity verification and representative sampling
+                5-Position automated chamber scanning &amp; inter-field coefficient of variation (CV%)
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className={cn(
-              "p-2 rounded-xl border transition-all cursor-pointer",
-              isDark ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-900"
-            )}
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex bg-white/5 border border-white/10 rounded-xl p-1">
+              <button
+                onClick={() => setActiveTab('stitching')}
+                className={cn(
+                  "px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer",
+                  activeTab === 'stitching' ? "bg-emerald-500 text-white" : "text-white/60 hover:text-white"
+                )}
+              >
+                Chamber Map
+              </button>
+              <button
+                onClick={() => setActiveTab('table')}
+                className={cn(
+                  "px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer",
+                  activeTab === 'table' ? "bg-emerald-500 text-white" : "text-white/60 hover:text-white"
+                )}
+              >
+                Fields ({fields.length})
+              </button>
+            </div>
+
+            <button
+              onClick={onClose}
+              className={cn(
+                "p-2 rounded-xl border transition-all cursor-pointer",
+                isDark ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-900"
+              )}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
           {/* Summary / Composite Banner */}
           <div className={cn(
             "p-5 rounded-2xl border transition-all",
@@ -174,88 +229,198 @@ export const MultiFOVModal: React.FC<MultiFOVModalProps> = ({
             </div>
           </div>
 
-          {/* Captured Fields Table / List */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                <Microscope className="w-4 h-4 text-emerald-500" />
-                Individual Microscopic Fields ({fields.length})
-              </h4>
-              <span className={cn("text-[9px] font-mono", isDark ? "text-white/40" : "text-slate-400")}>
-                Min recommended: 3-5 fields
-              </span>
-            </div>
+          {/* Stitching & Chamber Map View */}
+          {activeTab === 'stitching' && (
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+              {/* Left: 5-Position Counting Chamber Visual Layout */}
+              <div className="md:col-span-7 p-5 rounded-2xl bg-black/40 border border-white/10 flex flex-col items-center justify-center relative min-h-[280px]">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/40 absolute top-3 left-4 flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Counting Chamber 5-Field Graticule (Leja / Makler)</span>
+                </div>
 
-            {fields.length === 0 ? (
-              <div className={cn(
-                "p-12 text-center rounded-2xl border border-dashed flex flex-col items-center justify-center gap-3",
-                isDark ? "border-white/10 bg-white/[0.01]" : "border-slate-200 bg-slate-50"
-              )}>
-                <Microscope className="w-8 h-8 opacity-20 text-emerald-500" />
-                <p className={cn("text-xs font-medium", isDark ? "text-white/40" : "text-slate-500")}>
-                  No optical fields captured yet. Click "Capture Current Field (FOV)" in the live microscope viewport to aggregate fields.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {fields.map((f, idx) => (
-                  <div
-                    key={idx}
-                    className={cn(
-                      "p-4 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4",
-                      isDark ? "bg-white/[0.02] border-white/5 hover:border-white/15" : "bg-slate-50 border-slate-200 hover:border-slate-300"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center font-mono font-bold text-emerald-400 text-xs">
-                        #{f.fieldIndex}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold font-mono">Field {f.fieldIndex}</span>
-                          <span className={cn("text-[8px] font-mono", isDark ? "text-white/30" : "text-slate-400")}>
-                            {new Date(f.timestamp).toLocaleTimeString()}
-                          </span>
-                        </div>
-                        <p className={cn("text-[10px]", isDark ? "text-white/50" : "text-slate-500")}>
-                          {f.spermCount} spermatozoa tracked • VCL: {f.avgVcl.toFixed(1)} µm/s
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-6 self-end sm:self-center">
-                      <div className="text-right">
-                        <span className={cn("text-[8px] uppercase font-bold block", isDark ? "text-white/30" : "text-slate-400")}>Concentration</span>
-                        <span className="text-sm font-mono font-bold">{f.concentration.toFixed(1)} <span className="text-[9px] opacity-60">M/ml</span></span>
-                      </div>
-                      <div className="text-right">
-                        <span className={cn("text-[8px] uppercase font-bold block", isDark ? "text-white/30" : "text-slate-400")}>Progressive</span>
-                        <span className="text-sm font-mono font-bold text-emerald-400">{f.progressiveMotility.toFixed(1)}%</span>
-                      </div>
-                      <div className="text-right">
-                        <span className={cn("text-[8px] uppercase font-bold block", isDark ? "text-white/30" : "text-slate-400")}>Total Motility</span>
-                        <span className="text-sm font-mono font-bold text-blue-400">{f.totalMotility.toFixed(1)}%</span>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteField(idx)}
-                        className="p-2 rounded-xl text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
-                        title="Delete Field"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                {/* Hemocytometer / Chamber outline */}
+                <div className="w-64 h-64 border-2 border-emerald-500/40 rounded-xl relative bg-emerald-950/10 shadow-inner mt-4">
+                  {/* Grid lines */}
+                  <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-20 pointer-events-none">
+                    {Array.from({ length: 9 }).map((_, i) => (
+                      <div key={i} className="border border-emerald-400" />
+                    ))}
                   </div>
-                ))}
+
+                  {/* 5 Standard Field Markers */}
+                  {CHAMBER_POSITIONS.map((pos) => {
+                    const isCaptured = fields.some(f => f.fieldIndex === pos.index);
+                    const matchingField = fields.find(f => f.fieldIndex === pos.index);
+
+                    return (
+                      <div
+                        key={pos.index}
+                        style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                        className={cn(
+                          "absolute -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer border shadow-lg",
+                          isCaptured
+                            ? "bg-emerald-500/30 border-emerald-400 text-emerald-300 scale-105"
+                            : "bg-white/10 border-white/20 text-white/50 hover:bg-white/20"
+                        )}
+                        title={pos.name}
+                      >
+                        <span className="text-[10px] font-mono font-black">F{pos.index}</span>
+                        {isCaptured && (
+                          <span className="text-[7px] font-mono font-bold text-emerald-400 leading-none">
+                            {matchingField?.concentration.toFixed(0)}M
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-4 mt-4 text-[10px] text-white/50">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded bg-emerald-500/40 border border-emerald-400" />
+                    <span>Captured Field</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded bg-white/10 border border-white/20" />
+                    <span>Pending Position</span>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
+
+              {/* Right: Automated Sequence Actions */}
+              <div className="md:col-span-5 p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-white">Automated Step-and-Repeat</h4>
+                  <p className="text-[10px] text-white/50 mt-1 leading-relaxed">
+                    Capture each quadrant in sequence to satisfy WHO 2010/2021 multi-field homogeneity protocols and eliminate meniscus bias.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-white/60">Sequence Progress:</span>
+                    <span className="font-bold text-emerald-400">{fields.length} / 5 Positions</span>
+                  </div>
+                  <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300"
+                      style={{ width: `${Math.min(100, (fields.length / 5) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-white/10">
+                  <button
+                    onClick={handleSampleNextField}
+                    disabled={fields.length >= 10}
+                    className="w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Capture Next Field Position (#{fields.length + 1})</span>
+                  </button>
+
+                  <button
+                    onClick={() => onFieldsChange([])}
+                    disabled={fields.length === 0}
+                    className="w-full py-2 px-3 bg-white/5 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white/60 hover:text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Clear &amp; Restart Sequence</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Table View of Fields */}
+          {activeTab === 'table' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                  <Microscope className="w-4 h-4 text-emerald-500" />
+                  Individual Microscopic Fields ({fields.length})
+                </h4>
+                <button
+                  onClick={handleSampleNextField}
+                  className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 font-bold cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Field</span>
+                </button>
+              </div>
+
+              {fields.length === 0 ? (
+                <div className={cn(
+                  "p-12 text-center rounded-2xl border border-dashed flex flex-col items-center justify-center gap-3",
+                  isDark ? "border-white/10 bg-white/[0.01]" : "border-slate-200 bg-slate-50"
+                )}>
+                  <Microscope className="w-8 h-8 opacity-20 text-emerald-500" />
+                  <p className={cn("text-xs font-medium", isDark ? "text-white/40" : "text-slate-500")}>
+                    No optical fields captured yet. Click "Capture Next Field Position" to aggregate fields.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {fields.map((f, idx) => (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "p-4 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4",
+                        isDark ? "bg-white/[0.02] border-white/5 hover:border-white/15" : "bg-slate-50 border-slate-200 hover:border-slate-300"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center font-mono font-bold text-emerald-400 text-xs">
+                          #{f.fieldIndex}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold font-mono">Field {f.fieldIndex}</span>
+                            <span className={cn("text-[8px] font-mono", isDark ? "text-white/30" : "text-slate-400")}>
+                              {new Date(f.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <p className={cn("text-[10px]", isDark ? "text-white/50" : "text-slate-500")}>
+                            {f.spermCount} spermatozoa tracked &bull; VCL: {f.avgVcl.toFixed(1)} µm/s
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-6 self-end sm:self-center">
+                        <div className="text-right">
+                          <span className={cn("text-[8px] uppercase font-bold block", isDark ? "text-white/30" : "text-slate-400")}>Concentration</span>
+                          <span className="text-sm font-mono font-bold">{f.concentration.toFixed(1)} <span className="text-[9px] opacity-60">M/ml</span></span>
+                        </div>
+                        <div className="text-right">
+                          <span className={cn("text-[8px] uppercase font-bold block", isDark ? "text-white/30" : "text-slate-400")}>Progressive</span>
+                          <span className="text-sm font-mono font-bold text-emerald-400">{f.progressiveMotility.toFixed(1)}%</span>
+                        </div>
+                        <div className="text-right">
+                          <span className={cn("text-[8px] uppercase font-bold block", isDark ? "text-white/30" : "text-slate-400")}>Total Motility</span>
+                          <span className="text-sm font-mono font-bold text-blue-400">{f.totalMotility.toFixed(1)}%</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteField(idx)}
+                          className="p-2 rounded-xl text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
+                          title="Delete Field"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Modal Footer */}
         <div className={cn(
-          "p-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4",
+          "p-5 md:p-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4",
           isDark ? "border-white/10 bg-white/[0.02]" : "border-slate-200 bg-slate-50"
         )}>
           <div className="flex items-center gap-2 text-xs">

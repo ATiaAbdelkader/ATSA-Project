@@ -67,6 +67,9 @@ import { signInWithPopup, onAuthStateChanged, signOut, User } from 'firebase/aut
 import { collection, addDoc, query, where, orderBy, limit, onSnapshot, Timestamp, doc, updateDoc, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from './lib/firestore-utils';
 import { useLanguage } from './context/LanguageContext';
+import { PWAInstallButton } from './components/PWAInstallButton';
+import { OfflineFieldIndicator } from './components/OfflineFieldIndicator';
+import { queueOfflineSample } from './services/offlineSyncService';
 
 const DEFAULT_USER_PROFILE: UserProfileData = {
   displayName: 'Dr. Theriogenology Specialist',
@@ -728,6 +731,31 @@ export default function App() {
   const handleRegisterSample = async (data: any) => {
     if (!user) return;
     
+    // Offline Field Mode: if no internet, queue in IndexedDB
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      try {
+        await queueOfflineSample({
+          patientId: data.patientId,
+          species: data.species,
+          collectionTime: data.collectionTime,
+          abstinenceDays: data.abstinenceDays,
+          notes: data.notes,
+          uid: user.uid,
+          timestamp: new Date().toISOString()
+        });
+        setActionToast({
+          message: `Specimen ${data.patientId} queued in Field Mode (Offline).`,
+          type: 'info'
+        });
+        setActivePatient({ id: data.patientId, species: data.species, profile: data.profile });
+        setIsRegModalOpen(false);
+        setAppState('analysis');
+        return;
+      } catch (e) {
+        console.warn('Failed to queue sample offline:', e);
+      }
+    }
+
     const path = 'samples';
     try {
       // Save sample registration to Firestore
@@ -738,14 +766,34 @@ export default function App() {
         abstinenceDays: data.abstinenceDays,
         notes: data.notes,
         uid: user.uid,
-        timestamp: Timestamp.now()
+        timestamp: new Date().toISOString()
       });
 
       setActivePatient({ id: data.patientId, species: data.species, profile: data.profile });
       setIsRegModalOpen(false);
       setAppState('analysis');
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, path);
+      // If Firestore failed due to offline connectivity, queue locally as fallback
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        await queueOfflineSample({
+          patientId: data.patientId,
+          species: data.species,
+          collectionTime: data.collectionTime,
+          abstinenceDays: data.abstinenceDays,
+          notes: data.notes,
+          uid: user.uid,
+          timestamp: new Date().toISOString()
+        });
+        setActionToast({
+          message: `Saved offline in Field Mode. Will auto-sync when online.`,
+          type: 'info'
+        });
+        setActivePatient({ id: data.patientId, species: data.species, profile: data.profile });
+        setIsRegModalOpen(false);
+        setAppState('analysis');
+      } else {
+        handleFirestoreError(error, OperationType.WRITE, path);
+      }
     }
   };
 
@@ -1390,7 +1438,13 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <OfflineFieldIndicator 
+              userId={user?.uid} 
+              theme={theme} 
+              onSyncCompleted={(msg) => setActionToast({ message: msg, type: 'success' })}
+            />
+            <PWAInstallButton theme={theme} />
             <LanguageSelect />
             <button 
               onClick={toggleTheme}
