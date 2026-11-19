@@ -180,8 +180,21 @@ export const PDFDossier: React.FC<PDFDossierProps> = ({
     const docElement = document.getElementById('clinical-dossier-document');
     if (!docElement) return;
 
-    const printWindow = window.open('', '_blank', 'width=950,height=1050');
-    if (!printWindow) return;
+    let printWindow: Window | null = null;
+    try {
+      printWindow = window.open('', '_blank', 'width=950,height=1050');
+    } catch (e) {
+      printWindow = null;
+    }
+
+    if (!printWindow) {
+      window.print();
+      setDossierToast({
+        message: `Direct print dialog opened for sample ${results.patientId}.`,
+        type: 'success'
+      });
+      return;
+    }
 
     const stylesheets = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
       .map(node => node.outerHTML)

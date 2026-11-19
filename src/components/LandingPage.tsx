@@ -41,6 +41,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils';
 import { useLanguage } from '../context/LanguageContext';
 import { PWAInstallButton } from './PWAInstallButton';
+import { ConferencePosterModal } from './ConferencePosterModal';
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -56,6 +57,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onToggleTheme,
 }) => {
   const { language, setLanguage, t, dir } = useLanguage();
+  const [showPosterModal, setShowPosterModal] = useState<boolean>(false);
   const [activeSpeciesTab, setActiveSpeciesTab] = useState<'human' | 'bovine' | 'equine' | 'canine' | 'porcine'>('human');
   const [activeSimulationPreset, setActiveSimulationPreset] = useState<'normo' | 'hyper' | 'astheno' | 'bovine'>('normo');
   const [simPlaying, setSimPlaying] = useState<boolean>(true);
@@ -489,6 +491,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
             {/* PWA Install Button */}
             <PWAInstallButton theme={theme} variant="compact" />
+
+            {/* Conference Poster Button */}
+            <button
+              onClick={() => setShowPosterModal(true)}
+              className={cn(
+                "hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono font-bold border transition-all cursor-pointer",
+                theme === 'dark' 
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20" 
+                  : "bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
+              )}
+              title="Official Conference Poster - Univ of El Oued"
+            >
+              <Award className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Conference Poster</span>
+            </button>
 
             {/* Reviewer Pass Button */}
             <button
@@ -1265,6 +1282,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </footer>
 
+      {/* Conference Poster Modal */}
+      <ConferencePosterModal
+        isOpen={showPosterModal}
+        onClose={() => setShowPosterModal(false)}
+        theme={theme}
+      />
     </div>
   );
 };

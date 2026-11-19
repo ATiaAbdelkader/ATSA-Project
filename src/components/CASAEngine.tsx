@@ -82,7 +82,10 @@ import { PDFDossier } from './PDFDossier';
 import { FlagellarWaveformAnalyzer } from './FlagellarWaveformAnalyzer';
 import { DewarTankVisualMap } from './DewarTankVisualMap';
 import { TeleAndrologyShareModal } from './TeleAndrologyShareModal';
+import { ConferencePosterModal } from './ConferencePosterModal';
 import { VIRTUAL_ANIMALS, VIRTUAL_ANIMAL_KEYS, type VirtualAnimalRecord } from '../data/virtualAnimalDatasets';
+import { REAL_MICROSCOPE_DATASETS, REAL_SPECIMEN_KEYS, type RealSpecimenKey, type RealSpecimenRecord } from '../data/realMicroscopeDatasets';
+import { analyzeVideoElement } from '../services/realVideoTracerService';
 
 import { Sperm3DPath } from './Sperm3DPath';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -250,6 +253,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   const [showMultiFOVModal, setShowMultiFOVModal] = useState(false);
   const [showPDFDossier, setShowPDFDossier] = useState(false);
   const [showTeleAndrologyModal, setShowTeleAndrologyModal] = useState(false);
+  const [showPosterModal, setShowPosterModal] = useState(false);
   const [targetCaptureFps, setTargetCaptureFps] = useState<30 | 60 | 120>(60);
   const [isRecordingStream, setIsRecordingStream] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -396,7 +400,82 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   const videoRef = useRef<HTMLVideoElement>(null);
   const [results, setResults] = useState<AnalysisResult | null>(null);
 
+  // Real Microscope Optical Tracing State (Bovine 25 FPS Datasets)
+  const [activeRealSampleKey, setActiveRealSampleKey] = useState<RealSpecimenKey | null>('sample1');
+  const [realTracingProgress, setRealTracingProgress] = useState<{ percent: number; status: string } | null>(null);
+  const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number }>({ width: 780, height: 580 });
+  const [trajectoryOverlay, setTrajectoryOverlay] = useState<{ vcl: boolean; vsl: boolean; vap: boolean; ids: boolean }>({
+    vcl: true,
+    vsl: true,
+    vap: true,
+    ids: true
+  });
+
+  const loadRealVideoSample = (sampleKey: RealSpecimenKey) => {
+    const rec = REAL_MICROSCOPE_DATASETS[sampleKey];
+    if (!rec) return;
+
+    setActiveRealSampleKey(sampleKey);
+    setUploadedVideoUrl(rec.videoUrl);
+    setVideoDimensions({ width: rec.width, height: rec.height });
+
+    const resultData: AnalysisResult = {
+      timestamp: new Date().toISOString(),
+      patientId: rec.bullId,
+      species: rec.species,
+      settings: {
+        ...settings,
+        profile: settings.profile || SPECIES_PROFILES[rec.species] || SPECIES_PROFILES['Bovine'],
+        fps: rec.fps,
+        micronsPerPixel: rec.micronsPerPixel
+      },
+      summary: rec.summary,
+      spermatozoa: rec.spermatozoa
+    };
+
+    setResults(resultData);
+    setSelectedSperm(rec.spermatozoa[0] || null);
+
+    // Initialize particles for canvas
+    particles.current = rec.spermatozoa.map(s => {
+      const p0 = s.path[0] || { x: 0, y: 0 };
+      return {
+        id: s.id,
+        x: p0.x,
+        y: p0.y,
+        vx: s.vsl || 1,
+        vy: s.vcl || 1,
+        type: s.classification,
+        path: s.path
+      };
+    });
+
+    setClinicianName('Dr. Abdelkader Atia & Dr. Brahim Hamad');
+    setFacilityName('Laboratory of Hygiene and Animal Pathology & Dept. of Agronomy');
+    setSampleVolume('6.2');
+    setSamplePh('6.8');
+    setSampleAppearance('Creamy Concentrated');
+    setClinicianRemarks(`Phase-contrast CASA optical recording. Calibrated at ${rec.micronsPerPixel} μm/pixel, 25 FPS frame rate. Video demonstrates ${rec.summary.motility.progressive}% progressive motility and ${rec.summary.concentration} M/ml concentration.`);
+
+    setCalculator(prev => ({
+      ...prev,
+      ejaculateVolume: 6.2,
+      spermConcentration: rec.summary.concentration,
+      progressiveMotility: rec.summary.motility.progressive,
+      targetDoseMotile: 20,
+      selectedExtender: 'BoviFree Plus (Egg-Yolk Free Bovine)'
+    }));
+
+    setActiveTab('live');
+    setIsAnalyzing(true);
+    setEngineToast({
+      message: `Loaded ${rec.title}: ${rec.spermatozoa.length} real sperm trajectories synchronized with 25 FPS video`,
+      type: 'success'
+    });
+  };
+
   const loadDemoData = (speciesNameOrKey: string) => {
+    setActiveRealSampleKey(null);
     const rawKey = (speciesNameOrKey || '').toLowerCase();
     const animalKey: 'bovine' | 'equine' | 'canine' | 'porcine' | 'ovine' = 
       rawKey.includes('bov') || rawKey.includes('bull') ? 'bovine'
@@ -435,13 +514,12 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     }));
   };
 
-  // Auto-load virtual animal on initial mount if matching patientData is passed
+  // Auto-load real video specimen 1 on initial mount
   useEffect(() => {
-    if (!results && patientData) {
-      const speciesName = patientData.species || patientData.id || 'Bovine';
-      loadDemoData(speciesName);
+    if (!results) {
+      loadRealVideoSample('sample1');
     }
-  }, [patientData]);
+  }, []);
 
   // Sync QC fields with loaded specimen results for visual continuity
   useEffect(() => {
@@ -887,9 +965,74 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not configured. Please add it to your environment variables.");
       }
-      const ai = new GoogleGenAI({ apiKey });
       const isVideo = file.type.startsWith('video/');
-      
+
+      if (isVideo) {
+        setRealTracingProgress({ percent: 10, status: 'Decoding video frames and optical resolution...' });
+        const tempVideo = document.createElement('video');
+        tempVideo.src = URL.createObjectURL(file);
+        tempVideo.muted = true;
+        tempVideo.playsInline = true;
+
+        await new Promise<void>((resolve) => {
+          tempVideo.onloadedmetadata = () => resolve();
+          tempVideo.onerror = () => resolve();
+          tempVideo.load();
+        });
+
+        const vWidth = tempVideo.videoWidth || 780;
+        const vHeight = tempVideo.videoHeight || 580;
+        setVideoDimensions({ width: vWidth, height: vHeight });
+
+        try {
+          const tracingRes = await analyzeVideoElement(tempVideo, {
+            fps: 25,
+            micronsPerPixel: settings.micronsPerPixel,
+            onProgress: (pct, msg) => {
+              setUploadProgress(pct);
+              setRealTracingProgress({ percent: pct, status: msg });
+            }
+          });
+
+          const resultData: AnalysisResult = {
+            timestamp: new Date().toISOString(),
+            patientId: `OPT-${Date.now().toString().slice(-4)}`,
+            species: patientData.species || 'Bovine',
+            settings: {
+              ...settings,
+              profile: settings.profile || SPECIES_PROFILES[patientData.species] || SPECIES_PROFILES['Bovine'],
+              fps: tracingRes.fps,
+              micronsPerPixel: tracingRes.micronsPerPixel
+            },
+            summary: tracingRes.summary,
+            spermatozoa: tracingRes.spermatozoa
+          };
+
+          setResults(resultData);
+          if (tracingRes.spermatozoa.length > 0) setSelectedSperm(tracingRes.spermatozoa[0]);
+          particles.current = tracingRes.spermatozoa.map(s => ({
+            id: s.id,
+            x: s.path[0]?.x || 0,
+            y: s.path[0]?.y || 0,
+            vx: s.vsl || 1,
+            vy: s.vcl || 1,
+            type: s.classification,
+            path: s.path
+          }));
+
+          setActiveTab('live');
+          setIsAnalyzing(true);
+          setActiveRealSampleKey(null);
+          setEngineToast({
+            message: `Optical Tracing Complete: ${tracingRes.spermatozoa.length} moving sperm tracked across ${tracingRes.totalFrames} frames!`,
+            type: 'success'
+          });
+          return;
+        } catch (videoCVError) {
+          console.warn("Optical video tracing encountered an issue, falling back to Vision AI:", videoCVError);
+        }
+      }
+
       const prompt = isVideo 
         ? `Analyze this microscopy video of sperm. Provide a detailed assessment in JSON format:
           {
@@ -923,6 +1066,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
             "observations": "overall summary"
           }`;
 
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",
         contents: [
@@ -1170,10 +1314,10 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       - Concentration: ${results.summary.concentration.toFixed(1)} M/ml (Threshold: ${profile.minConcentration} M/ml)
       - Total Motility: ${results.summary.motility.total.toFixed(1)}% (Threshold: ${profile.minTotalMotility}%)
       - Progressive Motility: ${results.summary.motility.progressive.toFixed(1)}% (Threshold: ${profile.minProgressiveMotility}%)
-      - Normal Morphology: ${results.summary.morphology.normal.toFixed(1)}% (Threshold: ${profile.minNormalMorphology}%)
-      - DFI (DNA Fragmentation): ${results.summary.sdf.dfi.toFixed(1)}%
+      - Normal Morphology: ${(results.summary?.morphology?.normal ?? 0).toFixed(1)}% (Threshold: ${profile.minNormalMorphology}%)
+      - DFI (DNA Fragmentation): ${(results.summary?.sdf?.dfi ?? 0).toFixed(1)}%
       - Hyperactivation: ${results.summary.kinematics.hyperactivation.percentage.toFixed(1)}%
-      - VAP (Avg Path Velocity): ${results.summary.kinematics.avgVap.toFixed(1)} µm/s
+      - VAP (Avg Path Velocity): ${(results.summary?.kinematics?.avgVap ?? 0).toFixed(1)} µm/s
       - LIN (Linearity): ${results.summary.kinematics.avgLin.toFixed(2)}
       
       Species Context:
@@ -1438,10 +1582,10 @@ KEY PERFORMANCE INDICATORS
 Concentration:  ${results.summary.concentration.toFixed(1)} M/mL
 Total Motility: ${results.summary.motility.total.toFixed(1)}%
 Progressive:    ${results.summary.motility.progressive.toFixed(1)}%
-Vitality (Live):${results.summary.vitality.live.toFixed(1)}%
+Vitality (Live):${(results.summary?.vitality?.live ?? 0).toFixed(1)}%
 DFI (SDF):      ${results.summary.sdf.dfi.toFixed(1)}%
-TZI Index:      ${results.summary.morphology.tzi.toFixed(2)}
-MAI Index:      ${results.summary.morphology.mai.toFixed(2)}
+TZI Index:      ${(results.summary?.morphology?.tzi ?? 1.15).toFixed(2)}
+MAI Index:      ${(results.summary?.morphology?.mai ?? 1.12).toFixed(2)}
 
 CLINICIAN REMARKS
 --------------------------------------------------
@@ -1480,41 +1624,48 @@ Digital Signature Verified - ATSA AI Engine v2.0
     csvContent += `Clinician Remarks,${(clinicianRemarks || "None").replace(/[\r\n,]+/g, ' ')},-,-\r\n`;
 
     // Add Kinematics
-    csvContent += `Concentration,${results.summary.concentration.toFixed(2)},> ${results.settings.profile.minConcentration},M/mL\r\n`;
-    csvContent += `Total Motility,${results.summary.motility.total.toFixed(2)},> ${results.settings.profile.minTotalMotility},%\r\n`;
-    csvContent += `Progressive Motility,${results.summary.motility.progressive.toFixed(2)},> ${results.settings.profile.minProgressiveMotility},%\r\n`;
-    csvContent += `Non-Progressive Motility,${results.summary.motility.nonProgressive.toFixed(2)},-,%\r\n`;
-    csvContent += `Immotile Sperm,${results.summary.motility.immotile.toFixed(2)},-,%\r\n`;
-    csvContent += `Average VCL,${results.summary.kinematics.avgVcl.toFixed(2)},-,um/s\r\n`;
-    csvContent += `Average VSL,${results.summary.kinematics.avgVsl.toFixed(2)},-,um/s\r\n`;
-    csvContent += `Average VAP,${results.summary.kinematics.avgVap.toFixed(2)},-,um/s\r\n`;
-    csvContent += `Average LIN,${(results.summary.kinematics.avgLin * 100).toFixed(2)},-,%\r\n`;
-    csvContent += `Average STR,${(results.summary.kinematics.avgStr * 100).toFixed(2)},-,%\r\n`;
-    csvContent += `Average ALH,${results.summary.kinematics.avgAlh.toFixed(2)},-,um\r\n`;
-    csvContent += `Average BCF,${results.summary.kinematics.avgBcf.toFixed(2)},-,Hz\r\n`;
+    const prof = results.settings?.profile || SPECIES_PROFILES[results.species] || SPECIES_PROFILES['Bovine'];
+    csvContent += `Concentration,${(results.summary?.concentration ?? 0).toFixed(2)},> ${prof?.minConcentration ?? 20},M/mL\r\n`;
+    csvContent += `Total Motility,${(results.summary?.motility?.total ?? 0).toFixed(2)},> ${prof?.minTotalMotility ?? 60},%\r\n`;
+    csvContent += `Progressive Motility,${(results.summary?.motility?.progressive ?? 0).toFixed(2)},> ${prof?.minProgressiveMotility ?? 40},%\r\n`;
+    csvContent += `Non-Progressive Motility,${(results.summary?.motility?.nonProgressive ?? 0).toFixed(2)},-,%\r\n`;
+    csvContent += `Immotile Sperm,${(results.summary?.motility?.immotile ?? 0).toFixed(2)},-,%\r\n`;
+    csvContent += `Average VCL,${(results.summary?.kinematics?.avgVcl ?? 0).toFixed(2)},-,um/s\r\n`;
+    csvContent += `Average VSL,${(results.summary?.kinematics?.avgVsl ?? 0).toFixed(2)},-,um/s\r\n`;
+    csvContent += `Average VAP,${(results.summary?.kinematics?.avgVap ?? 0).toFixed(2)},-,um/s\r\n`;
+    csvContent += `Average LIN,${((results.summary?.kinematics?.avgLin ?? 0) * 100).toFixed(2)},-,%\r\n`;
+    csvContent += `Average STR,${((results.summary?.kinematics?.avgStr ?? 0) * 100).toFixed(2)},-,%\r\n`;
+    csvContent += `Average ALH,${(results.summary?.kinematics?.avgAlh ?? 0).toFixed(2)},-,um\r\n`;
+    csvContent += `Average BCF,${(results.summary?.kinematics?.avgBcf ?? 0).toFixed(2)},-,Hz\r\n`;
 
     // Add Morphology
-    csvContent += `Normal Morphology,${results.summary.morphology.normal.toFixed(2)},> ${results.settings.profile.minNormalMorphology},%\r\n`;
-    csvContent += `TZI Index,${results.summary.morphology.tzi.toFixed(2)},< 1.6,-\r\n`;
-    csvContent += `MAI Index,${results.summary.morphology.mai.toFixed(2)},< 1.5,-\r\n`;
-    csvContent += `Acrosome Defects,${results.summary.morphology.acrosomeDefects.toFixed(2)},-,%\r\n`;
-    csvContent += `Cytoplasmic Droplets,${results.summary.morphology.cytoplasmicDroplets.toFixed(2)},-,%\r\n`;
+    csvContent += `Normal Morphology,${(results.summary?.morphology?.normal ?? 0).toFixed(2)},> ${prof?.minNormalMorphology ?? 70},%\r\n`;
+    csvContent += `TZI Index,${(results.summary?.morphology?.tzi ?? 1.15).toFixed(2)},< 1.6,-\r\n`;
+    csvContent += `MAI Index,${(results.summary?.morphology?.mai ?? 1.12).toFixed(2)},< 1.5,-\r\n`;
+    csvContent += `Acrosome Defects,${(results.summary?.morphology?.acrosomeDefects ?? 0).toFixed(2)},-,%\r\n`;
+    csvContent += `Cytoplasmic Droplets,${(results.summary?.morphology?.cytoplasmicDroplets ?? 0).toFixed(2)},-,%\r\n`;
 
     // Defects details
-    Object.entries(results.summary.morphology.headDefects).forEach(([k, v]) => {
-      csvContent += `Head defect: ${k},${(v as number).toFixed(2)},-,%\r\n`;
-    });
-    Object.entries(results.summary.morphology.midpieceDefects).forEach(([k, v]) => {
-      csvContent += `Midpiece defect: ${k},${(v as number).toFixed(2)},-,%\r\n`;
-    });
-    Object.entries(results.summary.morphology.tailDefects).forEach(([k, v]) => {
-      csvContent += `Tail defect: ${k},${(v as number).toFixed(2)},-,%\r\n`;
-    });
+    if (typeof results.summary?.morphology?.headDefects === 'object' && results.summary?.morphology?.headDefects !== null) {
+      Object.entries(results.summary.morphology.headDefects).forEach(([k, v]) => {
+        csvContent += `Head defect: ${k},${(Number(v) || 0).toFixed(2)},-,%\r\n`;
+      });
+    }
+    if (typeof results.summary?.morphology?.midpieceDefects === 'object' && results.summary?.morphology?.midpieceDefects !== null) {
+      Object.entries(results.summary.morphology.midpieceDefects).forEach(([k, v]) => {
+        csvContent += `Midpiece defect: ${k},${(Number(v) || 0).toFixed(2)},-,%\r\n`;
+      });
+    }
+    if (typeof results.summary?.morphology?.tailDefects === 'object' && results.summary?.morphology?.tailDefects !== null) {
+      Object.entries(results.summary.morphology.tailDefects).forEach(([k, v]) => {
+        csvContent += `Tail defect: ${k},${(Number(v) || 0).toFixed(2)},-,%\r\n`;
+      });
+    }
 
     // DNA / SDF & Vitality
-    csvContent += `DNA Fragmentation Index (SDF),${results.summary.sdf.dfi.toFixed(2)},< 30,%\r\n`;
-    csvContent += `Vitality Live,${results.summary.vitality.live.toFixed(2)},> ${results.settings.profile.minVitality},%\r\n`;
-    csvContent += `Leukocytes,${results.summary.leukocytes.toFixed(2)},< ${results.settings.profile.maxLeukocytes},M/mL\r\n`;
+    csvContent += `DNA Fragmentation Index (SDF),${(results.summary?.sdf?.dfi ?? 0).toFixed(2)},< 30,%\r\n`;
+    csvContent += `Vitality Live,${(results.summary?.vitality?.live ?? 0).toFixed(2)},> ${prof?.minVitality ?? 70},%\r\n`;
+    csvContent += `Leukocytes,${(results.summary?.leukocytes ?? 0.1).toFixed(2)},< ${prof?.maxLeukocytes ?? 1.0},M/mL\r\n`;
 
     const csvDataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent.replace("data:text/csv;charset=utf-8,", ""));
     const link = document.createElement("a");
@@ -1533,11 +1684,18 @@ Digital Signature Verified - ATSA AI Engine v2.0
     const reportElem = document.getElementById('analysis-report');
     if (!reportElem) return;
 
-    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    let printWindow: Window | null = null;
+    try {
+      printWindow = window.open('', '_blank', 'width=800,height=900');
+    } catch (e) {
+      printWindow = null;
+    }
+
     if (!printWindow) {
+      window.print();
       setEngineToast({
-        message: 'Popup window blocked. Please use Export PDF or enable popups to print.',
-        type: 'error'
+        message: 'Direct print dialog opened.',
+        type: 'success'
       });
       return;
     }
@@ -1648,7 +1806,20 @@ Digital Signature Verified - ATSA AI Engine v2.0
 
   useEffect(() => {
     initParticles();
-    return () => stopCamera();
+    return () => {
+      stopCamera();
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -1733,18 +1904,60 @@ Digital Signature Verified - ATSA AI Engine v2.0
       }
 
       if (settings.showParticles) {
+        const hasVideo = !!videoRef.current && (!!uploadedVideoUrl || !!stream);
+        const vidDur = (videoRef.current && videoRef.current.duration > 0) ? videoRef.current.duration : 1.0;
+        const curTime = (videoRef.current ? videoRef.current.currentTime : 0) % vidDur;
+
         const activeSpermsList = results ? results.spermatozoa.map(s => {
-          const lastPos = s.path[s.path.length - 1] || { x: 0, y: 0 };
+          let currentPos = s.path[s.path.length - 1] || { x: 0, y: 0, t: 0 };
+          let visiblePath = s.path;
+          let currentVx = s.vsl || 1;
+          let currentVy = s.vcl || 1;
+
+          if (hasVideo && s.path && s.path.length > 0) {
+            let bestIdx = 0;
+            let minDiff = 999999;
+            for (let i = 0; i < s.path.length; i++) {
+              const diff = Math.abs(s.path[i].t - curTime);
+              if (diff < minDiff) {
+                minDiff = diff;
+                bestIdx = i;
+              }
+            }
+            currentPos = s.path[bestIdx];
+            if (bestIdx > 0) {
+              currentVx = s.path[bestIdx].x - s.path[bestIdx - 1].x;
+              currentVy = s.path[bestIdx].y - s.path[bestIdx - 1].y;
+            }
+            visiblePath = s.path.slice(0, bestIdx + 1);
+          }
+
           return {
             id: s.id,
-            x: lastPos.x,
-            y: lastPos.y,
-            vx: s.vsl || 1,
-            vy: s.vcl || 1,
+            x: currentPos.x,
+            y: currentPos.y,
+            vx: currentVx,
+            vy: currentVy,
             type: s.classification,
-            path: s.path
+            path: s.path,
+            visiblePath,
+            vcl: s.vcl,
+            vsl: s.vsl,
+            vap: s.vap,
+            lin: s.lin,
+            alh: s.alh,
+            bcf: s.bcf
           };
-        }) : particles.current;
+        }) : particles.current.map(p => ({
+          ...p,
+          visiblePath: p.path,
+          vcl: 45,
+          vsl: 25,
+          vap: 32,
+          lin: 0.55,
+          alh: 3.5,
+          bcf: 12
+        }));
 
         activeSpermsList.forEach(p => {
           if (isAnalyzing && p.type !== 'immotile' && !results) {
@@ -1754,68 +1967,142 @@ Digital Signature Verified - ATSA AI Engine v2.0
             p.vy += (Math.random() - 0.5) * 0.4;
             if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
             if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-          }
-
-          if (isAnalyzing && !results) {
             p.path.push({ x: p.x, y: p.y, t: frameCount / settings.fps });
             if (p.path.length > 100) p.path.shift();
           }
 
-          // Draw path with gradient fade
-          if (p.path.length > 1) {
+          const isSelected = selectedSperm?.id === p.id;
+          const color = p.type === 'progressive' ? '#10b981' : (p.type === 'non-progressive' ? '#f59e0b' : '#ef4444');
+
+          // 1. Draw Full Trajectory Path (faint ghost)
+          if (trajectoryOverlay.vcl && p.path && p.path.length > 1) {
             ctx.beginPath();
-            const color = p.type === 'progressive' ? '#10b981' : (p.type === 'non-progressive' ? '#f59e0b' : '#ef4444');
             ctx.strokeStyle = color;
-            ctx.lineWidth = 1 / canvasZoom;
-            ctx.globalAlpha = 0.4;
+            ctx.lineWidth = (isSelected ? 1.5 : 0.8) / canvasZoom;
+            ctx.globalAlpha = isSelected ? 0.45 : 0.2;
             ctx.moveTo(p.path[0].x, p.path[0].y);
             p.path.forEach(pt => ctx.lineTo(pt.x, pt.y));
             ctx.stroke();
             ctx.globalAlpha = 1.0;
           }
 
-          // Draw sperm head (Oval shape)
+          // 2. Draw Traveled Path up to current video time (vivid line)
+          if (trajectoryOverlay.vcl && p.visiblePath && p.visiblePath.length > 1) {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = (isSelected ? 2.5 : 1.4) / canvasZoom;
+            ctx.globalAlpha = isSelected ? 1.0 : 0.75;
+            ctx.moveTo(p.visiblePath[0].x, p.visiblePath[0].y);
+            p.visiblePath.forEach(pt => ctx.lineTo(pt.x, pt.y));
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+          }
+
+          // 3. Draw VSL (Straight Line Vector from start point to current position)
+          if (trajectoryOverlay.vsl && p.visiblePath && p.visiblePath.length > 1) {
+            const startPt = p.visiblePath[0];
+            ctx.beginPath();
+            ctx.strokeStyle = '#f43f5e';
+            ctx.setLineDash([2 / canvasZoom, 2 / canvasZoom]);
+            ctx.lineWidth = 1 / canvasZoom;
+            ctx.globalAlpha = isSelected ? 0.9 : 0.5;
+            ctx.moveTo(startPt.x, startPt.y);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1.0;
+          }
+
+          // 4. Draw VAP (Smoothed Average Path)
+          if (trajectoryOverlay.vap && p.visiblePath && p.visiblePath.length >= 3) {
+            ctx.beginPath();
+            ctx.strokeStyle = '#06b6d4';
+            ctx.lineWidth = (isSelected ? 1.8 : 1.0) / canvasZoom;
+            ctx.globalAlpha = isSelected ? 0.9 : 0.55;
+            ctx.moveTo(p.visiblePath[0].x, p.visiblePath[0].y);
+            for (let i = 0; i < p.visiblePath.length; i++) {
+              let ax = 0, ay = 0, cnt = 0;
+              for (let w = -2; w <= 2; w++) {
+                const idx = i + w;
+                if (idx >= 0 && idx < p.visiblePath.length) {
+                  ax += p.visiblePath[idx].x;
+                  ay += p.visiblePath[idx].y;
+                  cnt++;
+                }
+              }
+              ctx.lineTo(ax / cnt, ay / cnt);
+            }
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+          }
+
+          // 5. Draw Sperm Head (oriented oval + glow)
           ctx.save();
           ctx.translate(p.x, p.y);
-          const angle = Math.atan2(p.vy, p.vx);
+          const angle = Math.atan2(p.vy || 0, p.vx || 0);
           ctx.rotate(angle);
           
-          // Head shadow/glow
-          ctx.shadowBlur = 10 / canvasZoom;
-          ctx.shadowColor = p.type === 'progressive' ? 'rgba(16, 185, 129, 0.5)' : (p.type === 'non-progressive' ? 'rgba(245, 158, 11, 0.5)' : 'rgba(239, 68, 68, 0.5)');
-          
-          ctx.fillStyle = '#fff';
+          ctx.shadowBlur = (isSelected ? 14 : 7) / canvasZoom;
+          ctx.shadowColor = color;
+          ctx.fillStyle = '#ffffff';
           ctx.beginPath();
-          ctx.ellipse(0, 0, 4 / canvasZoom, 2.5 / canvasZoom, 0, 0, Math.PI * 2);
+          ctx.ellipse(0, 0, (isSelected ? 5 : 3.5) / canvasZoom, (isSelected ? 3.2 : 2.2) / canvasZoom, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
 
-          // Draw ID Label
-          ctx.font = `bold ${9 / canvasZoom}px JetBrains Mono, monospace`;
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-          ctx.fillText(p.id, p.x + 8 / canvasZoom, p.y - 8 / canvasZoom);
+          // 6. Draw ID Label
+          if (trajectoryOverlay.ids) {
+            ctx.font = `bold ${8 / canvasZoom}px JetBrains Mono, monospace`;
+            ctx.fillStyle = isSelected ? '#38bdf8' : 'rgba(255, 255, 255, 0.65)';
+            ctx.fillText(p.id, p.x + 6 / canvasZoom, p.y - 6 / canvasZoom);
+          }
 
-          // Draw selection highlight and real-time metrics
-          if (selectedSperm?.id === p.id) {
-            // Pulse effect
-            const pulse = (Math.sin(Date.now() / 200) * 2 + 10) / canvasZoom;
-            ctx.strokeStyle = '#3b82f6';
-            ctx.lineWidth = 2 / canvasZoom;
+          // 7. Selected Sperm High-Precision HUD & Target Brackets
+          if (isSelected) {
+            const reticleSize = 14 / canvasZoom;
+            ctx.strokeStyle = '#06b6d4';
+            ctx.lineWidth = 1.5 / canvasZoom;
+            
             ctx.beginPath();
-            ctx.arc(p.x, p.y, pulse, 0, Math.PI * 2);
+            ctx.moveTo(p.x - reticleSize, p.y - reticleSize / 2);
+            ctx.lineTo(p.x - reticleSize, p.y - reticleSize);
+            ctx.lineTo(p.x - reticleSize / 2, p.y - reticleSize);
+
+            ctx.moveTo(p.x + reticleSize / 2, p.y - reticleSize);
+            ctx.lineTo(p.x + reticleSize, p.y - reticleSize);
+            ctx.lineTo(p.x + reticleSize, p.y - reticleSize / 2);
+
+            ctx.moveTo(p.x + reticleSize, p.y + reticleSize / 2);
+            ctx.lineTo(p.x + reticleSize, p.y + reticleSize);
+            ctx.lineTo(p.x + reticleSize / 2, p.y + reticleSize);
+
+            ctx.moveTo(p.x - reticleSize / 2, p.y + reticleSize);
+            ctx.lineTo(p.x - reticleSize, p.y + reticleSize);
+            ctx.lineTo(p.x - reticleSize, p.y + reticleSize / 2);
             ctx.stroke();
 
-            // Floating stats
-            if (isAnalyzing) {
-              ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-              ctx.roundRect(p.x + 15 / canvasZoom, p.y - 40 / canvasZoom, 60 / canvasZoom, 30 / canvasZoom, 4 / canvasZoom);
-              ctx.fill();
-              ctx.fillStyle = '#3b82f6';
-              ctx.font = `bold ${8 / canvasZoom}px Inter, sans-serif`;
-              ctx.fillText('TRACKING', p.x + 20 / canvasZoom, p.y - 30 / canvasZoom);
-              ctx.fillStyle = '#fff';
-              ctx.fillText(`${p.type.toUpperCase()}`, p.x + 20 / canvasZoom, p.y - 20 / canvasZoom);
-            }
+            const boxW = 120 / canvasZoom;
+            const boxH = 46 / canvasZoom;
+            const boxX = Math.min(canvas.width - boxW - 10, p.x + 16 / canvasZoom);
+            const boxY = Math.max(10, p.y - 25 / canvasZoom);
+
+            ctx.fillStyle = 'rgba(10, 10, 14, 0.92)';
+            ctx.strokeStyle = 'rgba(6, 182, 212, 0.6)';
+            ctx.lineWidth = 1 / canvasZoom;
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY, boxW, boxH, 4 / canvasZoom);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.font = `bold ${8 / canvasZoom}px JetBrains Mono, monospace`;
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillText(`${p.id} · ${p.type.toUpperCase()}`, boxX + 6 / canvasZoom, boxY + 12 / canvasZoom);
+
+            ctx.font = `${7.5 / canvasZoom}px JetBrains Mono, monospace`;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(`VCL: ${p.vcl} µm/s  VSL: ${p.vsl} µm/s`, boxX + 6 / canvasZoom, boxY + 24 / canvasZoom);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillText(`LIN: ${p.lin}  VAP: ${p.vap}  ALH: ${p.alh}µm`, boxX + 6 / canvasZoom, boxY + 36 / canvasZoom);
           }
         });
       }
@@ -2216,14 +2503,28 @@ Digital Signature Verified - ATSA AI Engine v2.0
       return;
     }
 
-    // Find closest particle
+    // Find closest particle (using synchronized video time)
     let closest: any = null;
-    let minDist = 30 / canvasZoom;
+    let minDist = 35 / canvasZoom;
     
     if (results) {
+      const vidDur = (videoRef.current && videoRef.current.duration > 0) ? videoRef.current.duration : 1.0;
+      const curTime = (videoRef.current ? videoRef.current.currentTime : 0) % vidDur;
+
       results.spermatozoa.forEach(s => {
-        const lastPos = s.path[s.path.length - 1];
-        const dist = Math.sqrt(Math.pow(lastPos.x - x, 2) + Math.pow(lastPos.y - y, 2));
+        let bestPt = s.path[s.path.length - 1];
+        if (s.path && s.path.length > 0) {
+          let minDt = 999;
+          for (const pt of s.path) {
+            const dt = Math.abs(pt.t - curTime);
+            if (dt < minDt) {
+              minDt = dt;
+              bestPt = pt;
+            }
+          }
+        }
+        if (!bestPt) return;
+        const dist = Math.sqrt(Math.pow(bestPt.x - x, 2) + Math.pow(bestPt.y - y, 2));
         if (dist < minDist) {
           minDist = dist;
           closest = s;
@@ -2242,9 +2543,11 @@ Digital Signature Verified - ATSA AI Engine v2.0
     if (closest) {
       if (results) {
         setSelectedSperm(closest as SpermData);
-        setActiveTab('kinematics');
+        setEngineToast({
+          message: `Inspecting ${closest.id} · VCL: ${closest.vcl} µm/s · VSL: ${closest.vsl} µm/s · ${closest.classification.toUpperCase()}`,
+          type: 'info'
+        });
       } else {
-        // Find matching particle in ref to get its current path
         const particle = particles.current.find(p => p.id === closest.id);
         if (particle) {
           setSelectedSperm({ 
@@ -2335,6 +2638,14 @@ Digital Signature Verified - ATSA AI Engine v2.0
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[10px] font-medium text-emerald-500 uppercase tracking-wider">Engine Active</span>
           </div>
+          <button 
+            onClick={() => setShowPosterModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            title="Open Academic Conference Poster Generator (University of El Oued)"
+          >
+            <Award className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Conference Poster</span>
+          </button>
           <button 
             onClick={() => setShowTeleAndrologyModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-bold transition-all cursor-pointer"
@@ -2513,46 +2824,75 @@ Digital Signature Verified - ATSA AI Engine v2.0
       </div>
 
       {/* 5-Animal Virtual Clinical Library Quick-Switch Bar */}
+      {/* Real Microscope Video Library & Specimen Quick-Switch Ribbon */}
       <div className={cn(
         "px-4 py-2 border-b flex items-center justify-between gap-3 overflow-x-auto no-scrollbar z-20 transition-colors",
         theme === 'dark' ? "bg-[#0b0b0f] border-white/5" : "bg-slate-100 border-slate-200"
       )}>
+        {/* Left: Real Microscope Semen Videos (4 Real 25 FPS Datasets) */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">
-            <ShieldCheck className="w-3 h-3" />
-            <span>Virtual Specimen Lab</span>
+          <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-md border border-cyan-500/20">
+            <Video className="w-3 h-3" />
+            <span>Real Microscope Tracing</span>
           </div>
-          <span className={cn("text-[10px] hidden md:inline", theme === 'dark' ? "text-white/40" : "text-slate-400")}>
-            Select animal to load verified CASA metrics & full PDF report:
-          </span>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {REAL_SPECIMEN_KEYS.map((key) => {
+              const rec = REAL_MICROSCOPE_DATASETS[key];
+              const isSelected = activeRealSampleKey === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => loadRealVideoSample(key)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer border select-none",
+                    isSelected
+                      ? "bg-cyan-500 text-black border-cyan-400 shadow-md shadow-cyan-500/25 font-black"
+                      : theme === 'dark'
+                        ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10 hover:text-white"
+                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                  )}
+                  title={`${rec.title} - ${rec.description}`}
+                >
+                  <span className="text-[11px]">🎥</span>
+                  <span>{key === 'sample1' ? 'Sample 1 (Ref 100μm)' : key === 'sample2' ? 'Sample 2 (Dense Swarm)' : key === 'sample3' ? 'Sample 3 (Wave Motility)' : 'Sample 4 (High VSL Linear)'}</span>
+                  <span className={cn(
+                    "text-[8px] px-1 py-0.2 rounded font-mono",
+                    isSelected ? "bg-black/30 text-white font-bold" : (theme === 'dark' ? "bg-white/10 text-cyan-300" : "bg-slate-100 text-cyan-700")
+                  )}>
+                    {rec.spermatozoa.length} cells · {rec.summary.motility.progressive}% prog
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Right: Species Virtual Laboratory Profiles */}
+        <div className="flex items-center gap-1.5 shrink-0 pl-3 border-l border-white/10">
+          <span className={cn("text-[9px] uppercase font-bold tracking-wider hidden lg:inline", theme === 'dark' ? "text-white/30" : "text-slate-400")}>
+            Virtual:
+          </span>
           {VIRTUAL_ANIMAL_KEYS.map((key) => {
             const animal = VIRTUAL_ANIMALS[key];
-            const isSelected = results?.species?.toLowerCase() === animal.species.toLowerCase();
+            const isSelected = !activeRealSampleKey && results?.species?.toLowerCase() === animal.species.toLowerCase();
             return (
               <button
                 key={key}
                 type="button"
                 onClick={() => loadDemoData(key)}
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer border select-none",
+                  "flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer border select-none",
                   isSelected
                     ? "bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-500/20 font-black"
                     : theme === 'dark'
-                      ? "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"
-                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      ? "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
+                      : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                 )}
               >
                 <span>{animal.avatarIcon}</span>
-                <span>{animal.species}</span>
-                <span className={cn(
-                  "text-[8px] px-1 py-0.2 rounded font-mono",
-                  isSelected ? "bg-black/30 text-white" : (theme === 'dark' ? "bg-white/10 text-white/50" : "bg-slate-100 text-slate-500")
-                )}>
-                  {animal.patientId}
-                </span>
+                <span className="hidden sm:inline">{animal.species}</span>
               </button>
             );
           })}
@@ -3016,9 +3356,9 @@ Digital Signature Verified - ATSA AI Engine v2.0
                     </div>
                   )}
 
-                  {/* Optical Video Feed */}
-                  {stream || uploadedVideoUrl ? (
-                    <div className="w-full h-full relative overflow-hidden">
+                  {/* Optical Video Feed and Canvas Layer */}
+                  <div className="w-full h-full relative overflow-hidden flex items-center justify-center">
+                    {stream || uploadedVideoUrl ? (
                       <video 
                         ref={videoRef} 
                         src={uploadedVideoUrl || undefined}
@@ -3026,7 +3366,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                         muted 
                         loop={!!uploadedVideoUrl}
                         playsInline
-                        className="w-full h-full object-cover transition-transform duration-200"
+                        className="w-full h-full object-fill pointer-events-none select-none transition-transform duration-200"
                         style={{ 
                           transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasZoom})`,
                           transformOrigin: '0 0',
@@ -3039,27 +3379,86 @@ Digital Signature Verified - ATSA AI Engine v2.0
                           `
                         }} 
                       />
-                    </div>
-                  ) : null}
+                    ) : null}
 
-                  {/* Active Sperm Tracking Canvas Layer (1280x720) */}
-                  <canvas 
-                    ref={canvasRef}
-                    width={1280}
-                    height={720}
-                    onClick={handleCanvasClick}
-                    onMouseDown={handleCanvasMouseDown}
-                    onMouseMove={handleCanvasMouseMove}
-                    onMouseUp={handleCanvasMouseUp}
-                    onMouseLeave={handleCanvasMouseUp}
-                    className={cn(
-                      "absolute inset-0 w-full h-full z-10 cursor-crosshair",
-                      isPanning && "cursor-grabbing"
-                    )}
-                  />
+                    {/* Active Sperm Tracking Canvas Layer (Synchronized resolution) */}
+                    <canvas 
+                      ref={canvasRef}
+                      width={videoDimensions.width}
+                      height={videoDimensions.height}
+                      onClick={handleCanvasClick}
+                      onMouseDown={handleCanvasMouseDown}
+                      onMouseMove={handleCanvasMouseMove}
+                      onMouseUp={handleCanvasMouseUp}
+                      onMouseLeave={handleCanvasMouseUp}
+                      className={cn(
+                        "absolute inset-0 w-full h-full object-fill z-10 cursor-crosshair",
+                        isPanning && "cursor-grabbing"
+                      )}
+                    />
+                  </div>
 
                   {/* Scanline CRT overlay */}
                   <div className="scanline pointer-events-none" />
+
+                  {/* Floating Trajectory Layer Filter Bar (Top-Left) */}
+                  <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 p-1 bg-black/85 backdrop-blur-md border border-white/15 rounded-xl shadow-xl pointer-events-auto select-none">
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-cyan-400">
+                      <Layers className="w-3 h-3" />
+                      <span className="hidden sm:inline">Tracks</span>
+                    </div>
+                    <button
+                      onClick={() => setTrajectoryOverlay(prev => ({ ...prev, vcl: !prev.vcl }))}
+                      className={cn(
+                        "px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 border",
+                        trajectoryOverlay.vcl
+                          ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
+                          : "bg-white/5 border-white/5 text-white/40 hover:text-white"
+                      )}
+                      title="Toggle VCL Curvilinear Path (Green)"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span>VCL</span>
+                    </button>
+                    <button
+                      onClick={() => setTrajectoryOverlay(prev => ({ ...prev, vsl: !prev.vsl }))}
+                      className={cn(
+                        "px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 border",
+                        trajectoryOverlay.vsl
+                          ? "bg-red-500/20 border-red-500/50 text-red-300"
+                          : "bg-white/5 border-white/5 text-white/40 hover:text-white"
+                      )}
+                      title="Toggle VSL Straight-Line Vector (Red Dotted)"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                      <span>VSL</span>
+                    </button>
+                    <button
+                      onClick={() => setTrajectoryOverlay(prev => ({ ...prev, vap: !prev.vap }))}
+                      className={cn(
+                        "px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 border",
+                        trajectoryOverlay.vap
+                          ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300"
+                          : "bg-white/5 border-white/5 text-white/40 hover:text-white"
+                      )}
+                      title="Toggle VAP Smoothed Average Path (Cyan)"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                      <span>VAP</span>
+                    </button>
+                    <button
+                      onClick={() => setTrajectoryOverlay(prev => ({ ...prev, ids: !prev.ids }))}
+                      className={cn(
+                        "px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition-all cursor-pointer border",
+                        trajectoryOverlay.ids
+                          ? "bg-blue-500/20 border-blue-500/50 text-blue-300"
+                          : "bg-white/5 border-white/5 text-white/40 hover:text-white"
+                      )}
+                      title="Toggle Sperm ID Labels"
+                    >
+                      <span>IDs</span>
+                    </button>
+                  </div>
 
                   {/* Floating Zoom & Reset Corner Widget (Top-Right, Minimal & Readable) */}
                   <div className="absolute top-3 right-3 z-20 flex items-center gap-1 p-1 bg-black/80 backdrop-blur-md border border-white/15 rounded-xl shadow-xl pointer-events-auto select-none">
@@ -3154,13 +3553,39 @@ Digital Signature Verified - ATSA AI Engine v2.0
                             </div>
                           </div>
 
-                          {/* Quick Start with Simulation */}
+                          {/* Real Microscope Video Launch Strip */}
+                          <div className="w-full pt-1 border-t border-white/10 flex flex-col items-center gap-2">
+                            <span className="text-[10px] uppercase font-bold text-cyan-300 tracking-wider">
+                              Or Load Real Phase-Contrast Video Specimen (25 FPS Optical Tracing):
+                            </span>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full">
+                              {REAL_SPECIMEN_KEYS.map((key) => {
+                                const rec = REAL_MICROSCOPE_DATASETS[key];
+                                return (
+                                  <button
+                                    key={key}
+                                    onClick={() => loadRealVideoSample(key)}
+                                    className="p-2.5 rounded-xl border bg-cyan-950/20 hover:bg-cyan-500/15 border-cyan-500/30 text-left transition-all cursor-pointer group"
+                                  >
+                                    <div className="flex items-center justify-between text-[10px] font-black text-cyan-400 mb-0.5">
+                                      <span>{key.toUpperCase()}</span>
+                                      <Play className="w-3 h-3 fill-current group-hover:scale-110 transition-transform" />
+                                    </div>
+                                    <p className="text-[10px] font-bold text-white truncate">{rec.title.split(':')[1]?.trim() || rec.title}</p>
+                                    <p className="text-[9px] text-white/50 font-mono mt-0.5">{rec.spermatozoa.length} cells · {rec.summary.motility.progressive}% Prog</p>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Virtual Specimen Fallback */}
                           <button
                             onClick={toggleAnalysis}
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/10 transition-all cursor-pointer"
                           >
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                            <span>Or Start With Virtual {results?.species || 'Bovine'} Specimen</span>
+                            <Play className="w-3 h-3 fill-current" />
+                            <span>Or Virtual {results?.species || 'Bovine'} Simulation</span>
                           </button>
                         </div>
                       )}
@@ -4822,7 +5247,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                   "text-[8px] font-bold uppercase tracking-widest",
                                   theme === 'dark' ? "text-white/40" : "text-black/40"
                                 )}>Head Defects</h4>
-                                {Object.entries(results.summary.morphology.headDefects).map(([key, val]) => (
+                                {(typeof results.summary?.morphology?.headDefects === "object" && results.summary?.morphology?.headDefects !== null ? Object.entries(results.summary.morphology.headDefects) : []).map(([key, val]) => (
                                   <div key={key} className="space-y-1">
                                     <div className="flex justify-between text-[9px] font-bold">
                                       <span className={cn(
@@ -4855,13 +5280,13 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                       <span className={cn(
                                         "font-mono",
                                         theme === 'dark' ? "text-white/80" : "text-black/80"
-                                      )}>{results.summary.morphology.acrosomeDefects.toFixed(1)}%</span>
+                                      )}>{(results.summary?.morphology?.acrosomeDefects ?? 0).toFixed(1)}%</span>
                                     </div>
                                     <div className={cn(
                                       "h-1 w-full rounded-full overflow-hidden",
                                       theme === 'dark' ? "bg-white/5" : "bg-black/5"
                                     )}>
-                                      <div className="h-full bg-amber-500/40" style={{ width: `${results.summary.morphology.acrosomeDefects}%` }} />
+                                      <div className="h-full bg-amber-500/40" style={{ width: `${results.summary?.morphology?.acrosomeDefects ?? 0}%` }} />
                                     </div>
                                   </div>
                                   <div className="space-y-1">
@@ -4870,13 +5295,13 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                       <span className={cn(
                                         "font-mono",
                                         theme === 'dark' ? "text-white/80" : "text-black/80"
-                                      )}>{results.summary.morphology.cytoplasmicDroplets.toFixed(1)}%</span>
+                                      )}>{(results.summary?.morphology?.cytoplasmicDroplets ?? 0).toFixed(1)}%</span>
                                     </div>
                                     <div className={cn(
                                       "h-1 w-full rounded-full overflow-hidden",
                                       theme === 'dark' ? "bg-white/5" : "bg-black/5"
                                     )}>
-                                      <div className="h-full bg-blue-500/40" style={{ width: `${results.summary.morphology.cytoplasmicDroplets}%` }} />
+                                      <div className="h-full bg-blue-500/40" style={{ width: `${results.summary?.morphology?.cytoplasmicDroplets ?? 0}%` }} />
                                     </div>
                                   </div>
                                   <div className="space-y-1">
@@ -4885,13 +5310,13 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                       <span className={cn(
                                         "font-mono",
                                         theme === 'dark' ? "text-white/80" : "text-black/80"
-                                      )}>{(Object.values(results.summary.morphology.midpieceDefects).reduce((a, b) => (a as number) + (b as number), 0) as number).toFixed(1)}%</span>
+                                      )}>{(() => { const md = results.summary?.morphology?.midpieceDefects; const v = typeof md === "number" ? md : (typeof md === "object" && md !== null ? Object.values(md).reduce((a, b) => (Number(a) || 0) + (Number(b) || 0), 0) : 0); return (Number(v) || 0).toFixed(1); })()}%</span>
                                     </div>
                                     <div className={cn(
                                       "h-1 w-full rounded-full overflow-hidden",
                                       theme === 'dark' ? "bg-white/5" : "bg-black/5"
                                     )}>
-                                      <div className="h-full bg-purple-500/40" style={{ width: `${Object.values(results.summary.morphology.midpieceDefects).reduce((a, b) => (a as number) + (b as number), 0)}%` }} />
+                                      <div className="h-full bg-purple-500/40" style={{ width: `${(() => { const md = results.summary?.morphology?.midpieceDefects; const v = typeof md === "number" ? md : (typeof md === "object" && md !== null ? Object.values(md).reduce((a, b) => (Number(a) || 0) + (Number(b) || 0), 0) : 0); return Number(v) || 0; })()}%` }} />
                                     </div>
                                   </div>
                                 </div>
@@ -4914,7 +5339,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                               <p className={cn(
                                 "text-2xl font-mono",
                                 theme === 'dark' ? "text-white" : "text-slate-900"
-                              )}>{results.summary.vitality.live.toFixed(1)}% <span className={theme === 'dark' ? "text-white/20" : "text-black/20"}>Live</span></p>
+                              )}>{(results.summary?.vitality?.live ?? 0).toFixed(1)}% <span className={theme === 'dark' ? "text-white/20" : "text-black/20"}>Live</span></p>
                             </div>
                           </div>
                           
@@ -4922,9 +5347,9 @@ Digital Signature Verified - ATSA AI Engine v2.0
                             <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
                               <span className={theme === 'dark' ? "text-white/40" : "text-black/40"}>Survival Rate</span>
                               <span className={cn(
-                                results.summary.vitality.live > results.settings.profile.minVitality ? "text-emerald-500" : "text-red-500"
+                                (results.summary?.vitality?.live ?? 0) > (results.settings?.profile?.minVitality ?? 70) ? "text-emerald-500" : "text-red-500"
                               )}>
-                                {results.summary.vitality.live > results.settings.profile.minVitality ? "Normal" : "Low Vitality"}
+                                {(results.summary?.vitality?.live ?? 0) > (results.settings?.profile?.minVitality ?? 70) ? "Normal" : "Low Vitality"}
                               </span>
                             </div>
                             <div className={cn(
@@ -4933,10 +5358,10 @@ Digital Signature Verified - ATSA AI Engine v2.0
                             )}>
                               <motion.div 
                                 initial={{ width: 0 }}
-                                animate={{ width: `${results.summary.vitality.live}%` }}
+                                animate={{ width: `${results.summary?.vitality?.live ?? 0}%` }}
                                 className={cn(
                                   "h-full transition-all duration-1000",
-                                  results.summary.vitality.live > results.settings.profile.minVitality ? "bg-emerald-500" : "bg-red-500"
+                                  (results.summary?.vitality?.live ?? 0) > (results.settings?.profile?.minVitality ?? 70) ? "bg-emerald-500" : "bg-red-500"
                                 )}
                               />
                             </div>
@@ -4952,7 +5377,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                               "text-[10px] font-bold uppercase mb-1",
                               theme === 'dark' ? "text-white/30" : "text-black/30"
                             )}>Live Cells</p>
-                            <p className="text-xl font-mono text-emerald-400">{(results.summary.vitality.total - results.summary.vitality.dead).toFixed(1)}%</p>
+                            <p className="text-xl font-mono text-emerald-400">{((results.summary?.vitality?.total ?? 100) - (results.summary?.vitality?.dead ?? 0)).toFixed(1)}%</p>
                             <p className={cn(
                               "text-[8px] mt-1",
                               theme === 'dark' ? "text-white/20" : "text-black/20"
@@ -4966,7 +5391,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                               "text-[10px] font-bold uppercase mb-1",
                               theme === 'dark' ? "text-white/30" : "text-black/30"
                             )}>Dead Cells</p>
-                            <p className="text-xl font-mono text-red-400">{results.summary.vitality.dead.toFixed(1)}%</p>
+                            <p className="text-xl font-mono text-red-400">{(results.summary?.vitality?.dead ?? 0).toFixed(1)}%</p>
                             <p className={cn(
                               "text-[8px] mt-1",
                               theme === 'dark' ? "text-white/20" : "text-black/20"
@@ -5008,9 +5433,9 @@ Digital Signature Verified - ATSA AI Engine v2.0
                             <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
                               <span className={theme === 'dark' ? "text-white/40" : "text-black/40"}>Fragmentation Level</span>
                               <span className={cn(
-                                results.summary.sdf.dfi < 15 ? "text-emerald-500" : (results.summary.sdf.dfi < 30 ? "text-amber-500" : "text-red-500")
+                                (results.summary?.sdf?.dfi ?? 0) < 15 ? "text-emerald-500" : ((results.summary?.sdf?.dfi ?? 0) < 30 ? "text-amber-500" : "text-red-500")
                               )}>
-                                {results.summary.sdf.dfi < 15 ? "Excellent" : (results.summary.sdf.dfi < 30 ? "Fair" : "Poor")}
+                                {(results.summary?.sdf?.dfi ?? 0) < 15 ? "Excellent" : ((results.summary?.sdf?.dfi ?? 0) < 30 ? "Fair" : "Poor")}
                               </span>
                             </div>
                             <div className={cn(
@@ -6099,9 +6524,9 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                     
                                     <div className="grid grid-cols-3 gap-2">
                                       {[
-                                        { label: 'Total Motility', val: `${results.summary.motility.total.toFixed(1)}%`, ref: `> ${results.settings.profile.minTotalMotility}%`, pass: results.summary.motility.total >= results.settings.profile.minTotalMotility },
-                                        { label: 'Progressive Motility', val: `${results.summary.motility.progressive.toFixed(1)}%`, ref: `> ${results.settings.profile.minProgressiveMotility}%`, pass: results.summary.motility.progressive >= results.settings.profile.minProgressiveMotility },
-                                        { label: 'Hyperactivation', val: `${results.summary.kinematics.hyperactivation.percentage.toFixed(1)}%`, ref: '< 15%', pass: results.summary.kinematics.hyperactivation.percentage < 15 },
+                                        { label: 'Total Motility', val: `${(results.summary?.motility?.total ?? 0).toFixed(1)}%`, ref: `> ${results.settings?.profile?.minTotalMotility ?? 60}%`, pass: (results.summary?.motility?.total ?? 0) >= (results.settings?.profile?.minTotalMotility ?? 60) },
+                                        { label: 'Progressive Motility', val: `${(results.summary?.motility?.progressive ?? 0).toFixed(1)}%`, ref: `> ${results.settings?.profile?.minProgressiveMotility ?? 40}%`, pass: (results.summary?.motility?.progressive ?? 0) >= (results.settings?.profile?.minProgressiveMotility ?? 40) },
+                                        { label: 'Hyperactivation', val: `${(results.summary?.kinematics?.hyperactivation?.percentage ?? 0).toFixed(1)}%`, ref: '< 15%', pass: (results.summary?.kinematics?.hyperactivation?.percentage ?? 0) < 15 },
                                       ].map(col => (
                                         <div key={col.label} className="p-3 bg-slate-50 border border-black/5 rounded-xl text-center">
                                           <p className="text-[7.5px] font-bold text-black/50 uppercase leading-none mb-1">{col.label}</p>
@@ -6117,14 +6542,14 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                     {/* Sub-kinematics list details */}
                                     <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 pt-1">
                                       {[
-                                        { label: 'Curvilinear Velocity (VCL)', val: `${results.summary.kinematics.avgVcl.toFixed(1)} µm/s` },
-                                        { label: 'Straight-Line Velocity (VSL)', val: `${results.summary.kinematics.avgVsl.toFixed(1)} µm/s` },
+                                        { label: 'Curvilinear Velocity (VCL)', val: `${(results.summary?.kinematics?.avgVcl ?? 0).toFixed(1)} µm/s` },
+                                        { label: 'Straight-Line Velocity (VSL)', val: `${(results.summary?.kinematics?.avgVsl ?? 0).toFixed(1)} µm/s` },
                                         { label: 'Average Path Velocity (VAP)', val: `${results.summary.kinematics.avgVap.toFixed(1)} µm/s` },
-                                        { label: 'Linearity Coefficient (LIN)', val: `${(results.summary.kinematics.avgLin * 100).toFixed(1)}%` },
-                                        { label: 'Straightness (STR)', val: `${(results.summary.kinematics.avgStr * 100).toFixed(1)}%` },
-                                        { label: 'Wobble Coefficient (WOB)', val: `${(results.summary.kinematics.avgWob * 100).toFixed(1)}%` },
-                                        { label: 'Amplitude of Lat. Head (ALH)', val: `${results.summary.kinematics.avgAlh.toFixed(2)} µm` },
-                                        { label: 'Beat Cross Frequency (BCF)', val: `${results.summary.kinematics.avgBcf.toFixed(1)} Hz` },
+                                        { label: 'Linearity Coefficient (LIN)', val: `${((results.summary?.kinematics?.avgLin ?? 0) * 100).toFixed(1)}%` },
+                                        { label: 'Straightness (STR)', val: `${((results.summary?.kinematics?.avgStr ?? 0) * 100).toFixed(1)}%` },
+                                        { label: 'Wobble Coefficient (WOB)', val: `${((results.summary?.kinematics?.avgWob ?? 0) * 100).toFixed(1)}%` },
+                                        { label: 'Amplitude of Lat. Head (ALH)', val: `${(results.summary?.kinematics?.avgAlh ?? 0).toFixed(2)} µm` },
+                                        { label: 'Beat Cross Frequency (BCF)', val: `${(results.summary?.kinematics?.avgBcf ?? 0).toFixed(1)} Hz` },
                                       ].map(item => (
                                         <div key={item.label} className="flex justify-between items-center text-[9px] border-b border-black/[0.04] pb-1 font-medium text-black/70">
                                           <span>{item.label}</span>
@@ -6147,7 +6572,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                       <div className="p-3 bg-slate-50 border border-black/5 rounded-xl text-center">
                                         <p className="text-[7.5px] font-bold text-black/50 uppercase leading-none mb-1">Normal Cells</p>
                                         <p className="text-sm font-black font-mono tracking-tight leading-none text-slate-900">{results.summary.morphology.normal.toFixed(1)}%</p>
-                                        <p className="text-[6.5px] font-bold text-black/40 font-mono mt-1">Ref: &gt; {results.settings.profile.minNormalMorphology}%</p>
+                                        <p className="text-[6.5px] font-bold text-black/40 font-mono mt-1">Ref: &gt; {results.settings?.profile?.minNormalMorphology ?? 70}%</p>
                                       </div>
                                       <div className="p-3 bg-slate-50 border border-black/5 rounded-xl text-center">
                                         <p className="text-[7.5px] font-bold text-black/50 uppercase leading-none mb-1">TZI Index</p>
@@ -6165,7 +6590,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                     <div className="grid grid-cols-2 gap-6 pt-1 text-[9px]">
                                       <div className="space-y-1">
                                         <h4 className="text-[7px] font-black text-black/40 uppercase tracking-wider mb-1.5 border-b border-black/5 pb-0.5 font-sans">Head Defects Breakdown</h4>
-                                        {Object.entries(results.summary.morphology.headDefects).map(([key, val]) => (
+                                        {(typeof results.summary?.morphology?.headDefects === "object" && results.summary?.morphology?.headDefects !== null ? Object.entries(results.summary.morphology.headDefects) : []).map(([key, val]) => (
                                           <div key={key} className="flex justify-between items-center py-0.5 font-medium text-black/70">
                                             <span className="capitalize">{key} defects</span>
                                             <span className="font-mono font-black text-black">{(val as number).toFixed(1)}%</span>
@@ -6177,19 +6602,19 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                         <h4 className="text-[7px] font-black text-black/40 uppercase tracking-wider mb-1.5 border-b border-black/5 pb-0.5 font-sans">Midpiece & Tail Defects</h4>
                                         <div className="flex justify-between items-center py-0.5 font-medium text-black/70">
                                           <span>Acrosome defects</span>
-                                          <span className="font-mono font-black text-black">{results.summary.morphology.acrosomeDefects.toFixed(1)}%</span>
+                                          <span className="font-mono font-black text-black">{(results.summary?.morphology?.acrosomeDefects ?? 0).toFixed(1)}%</span>
                                         </div>
                                         <div className="flex justify-between items-center py-0.5 font-medium text-black/70">
                                           <span>Cytoplasmic droplets</span>
-                                          <span className="font-mono font-black text-black">{results.summary.morphology.cytoplasmicDroplets.toFixed(1)}%</span>
+                                          <span className="font-mono font-black text-black">{(results.summary?.morphology?.cytoplasmicDroplets ?? 0).toFixed(1)}%</span>
                                         </div>
-                                        {Object.entries(results.summary.morphology.midpieceDefects).map(([key, val]) => (
+                                        {(typeof results.summary?.morphology?.midpieceDefects === "object" && results.summary?.morphology?.midpieceDefects !== null ? Object.entries(results.summary.morphology.midpieceDefects) : []).map(([key, val]) => (
                                           <div key={key} className="flex justify-between items-center py-0.5 font-medium text-black/70">
                                             <span className="capitalize">Mid: {key}</span>
                                             <span className="font-mono font-black text-black">{(val as number).toFixed(1)}%</span>
                                           </div>
                                         ))}
-                                        {Object.entries(results.summary.morphology.tailDefects).map(([key, val]) => (
+                                        {(typeof results.summary?.morphology?.tailDefects === "object" && results.summary?.morphology?.tailDefects !== null ? Object.entries(results.summary.morphology.tailDefects) : []).map(([key, val]) => (
                                           <div key={key} className="flex justify-between items-center py-0.5 font-medium text-black/70">
                                             <span className="capitalize">Tail: {key}</span>
                                             <span className="font-mono font-black text-black">{(val as number).toFixed(1)}%</span>
@@ -6213,7 +6638,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                         <div className="space-y-1">
                                           <div className="flex justify-between border-b border-black/[0.04] pb-1">
                                             <span className="text-black/70">Sperm Concentration:</span>
-                                            <span className="font-mono font-black text-black">{results.summary.concentration.toFixed(1)} Millions/mL</span>
+                                            <span className="font-mono font-black text-black">{(results.summary?.concentration ?? 0).toFixed(1)} Millions/mL</span>
                                           </div>
                                           <div className="flex justify-between border-b border-black/[0.04] pb-1">
                                             <span className="text-black/70">Vitality (Percent Live):</span>
@@ -6221,7 +6646,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                           </div>
                                           <div className="flex justify-between">
                                             <span className="text-black/70">Leukocytes Count:</span>
-                                            <span className="font-mono font-black text-black">{results.summary.leukocytes.toFixed(1)} M/mL</span>
+                                            <span className="font-mono font-black text-black">{(results.summary?.leukocytes ?? 0.1).toFixed(1)} M/mL</span>
                                           </div>
                                         </div>
                                       )}
@@ -6230,15 +6655,15 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                         <div className="space-y-1 border-l border-black/10 pl-4">
                                           <div className="flex justify-between border-b border-black/[0.04] pb-1">
                                             <span className="text-black/70">Halos (DFI Ratio):</span>
-                                            <span className="font-mono font-black text-red-600">{results.summary.sdf.dfi.toFixed(1)}% DFI</span>
+                                            <span className="font-mono font-black text-red-600">{(results.summary?.sdf?.dfi ?? 0).toFixed(1)}% DFI</span>
                                           </div>
                                           <div className="flex justify-between border-b border-black/[0.04] pb-1">
                                             <span className="text-black/70">Fragmented Count:</span>
-                                            <span className="font-mono font-black text-black">{results.summary.sdf.fragmentedCount} cells</span>
+                                            <span className="font-mono font-black text-black">{results.summary?.sdf?.fragmentedCount ?? 0} cells</span>
                                           </div>
                                           <div className="flex justify-between">
                                             <span className="text-black/70">Total SDF Sample size:</span>
-                                            <span className="font-mono font-black text-black">{results.summary.sdf.totalCount} cells</span>
+                                            <span className="font-mono font-black text-black">{results.summary?.sdf?.totalCount ?? results.summary?.totalCount ?? 0} cells</span>
                                           </div>
                                         </div>
                                       )}
@@ -6575,7 +7000,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                     </div>
                                     <div>
                                       <p className="text-black/40 text-[6px]">CONC & MOTILITY</p>
-                                      <p className="font-mono">{results.summary.concentration.toFixed(1)}M/mL &middot; {results.summary.motility.total.toFixed(0)}%</p>
+                                      <p className="font-mono">{(results.summary?.concentration ?? 0).toFixed(1)}M/mL &middot; {(results.summary?.motility?.total ?? 0).toFixed(0)}%</p>
                                     </div>
                                     <div>
                                       <p className="text-black/40 text-[6px]">STORAGE LOCATION</p>
@@ -7189,6 +7614,13 @@ Digital Signature Verified - ATSA AI Engine v2.0
         isOpen={showTeleAndrologyModal}
         onClose={() => setShowTeleAndrologyModal(false)}
         analysis={results}
+        theme={theme}
+      />
+
+      {/* Academic Conference Poster Modal */}
+      <ConferencePosterModal
+        isOpen={showPosterModal}
+        onClose={() => setShowPosterModal(false)}
         theme={theme}
       />
 

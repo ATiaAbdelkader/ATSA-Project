@@ -202,7 +202,8 @@ export default function App() {
       
       const dateKey = dateObj.toISOString().split('T')[0];
       if (dates[dateKey] !== undefined) {
-        dates[dateKey].sum += analysis.concentration || 0;
+        const concVal = analysis.concentration ?? analysis.summary?.concentration ?? 0;
+        dates[dateKey].sum += concVal;
         dates[dateKey].count += 1;
       }
     });
@@ -224,9 +225,9 @@ export default function App() {
 
   // Compliance calculations for the last 30 days of data against WHO 2010 ref (>= 15 M/ml)
   const complianceStats = (() => {
-    const totalWithConc = recent30DaysAnalyses.filter(a => a.concentration !== undefined);
+    const totalWithConc = recent30DaysAnalyses.filter(a => a.concentration !== undefined || a.summary?.concentration !== undefined);
     if (totalWithConc.length === 0) return { percent: 0, count: 0, total: 0 };
-    const compliant = totalWithConc.filter(a => (a.concentration || 0) >= 15);
+    const compliant = totalWithConc.filter(a => ((a.concentration ?? a.summary?.concentration) || 0) >= 15);
     return {
       percent: Math.round((compliant.length / totalWithConc.length) * 100),
       count: compliant.length,
