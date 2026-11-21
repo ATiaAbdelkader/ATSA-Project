@@ -1,0 +1,5 @@
+import type { CaptureQualityVariability as CaptureQualityVariabilityType } from "@shared/captureQualityVariability";
+
+export function CaptureQualityVariability({ evidence }: { evidence: CaptureQualityVariabilityType }) {
+  return <section className="capture-quality-variability" aria-label="Capture quality variability evidence"><div><p className="eyebrow">QUALITY VARIABILITY</p><h3>Sampled frame dispersion</h3><small>Technical sampled-frame context only. Variability evidence does not modify frames, candidates, trajectories, metrics, classifications, or biological interpretation.</small></div><div className="capture-quality-variability-grid"><span><strong>{evidence.brightnessStandardDeviation.toFixed(2)}</strong> brightness SD</span><span><strong>{evidence.contrastStandardDeviation.toFixed(2)}</strong> contrast SD</span><span><strong>{evidence.focusStandardDeviation.toFixed(2)}</strong> focus SD</span><span><strong>{evidence.sampledFrames}</strong> sampled frames</span></div><p className="capture-quality-variability-rationale">{evidence.rationale}</p></section>;
+}

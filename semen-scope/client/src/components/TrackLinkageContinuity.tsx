@@ -1,0 +1,5 @@
+import type { TrackLinkageContinuityEvidence } from "@shared/trackLinkageContinuity";
+
+export function TrackLinkageContinuity({ evidence }: { evidence: TrackLinkageContinuityEvidence }) {
+  return <section className="track-linkage-continuity" aria-label="Track linkage continuity evidence"><div><p className="eyebrow">LINKAGE CONTINUITY</p><h3>Observed point-to-point cadence</h3><small>Technical association evidence only. Observed frame gaps remain in the retained trajectory and do not change its measurements, classification, or biological interpretation.</small></div><div className="track-linkage-continuity-grid"><span><strong>{evidence.continuityPercent.toFixed(1)}%</strong> nominal cadence</span><span><strong>{evidence.gapSpanningSegments}</strong> gap-spanning links</span><span><strong>{evidence.tracksWithGaps}</strong> tracks with gaps</span><span><strong>{evidence.maxSkippedFramesInSegment}</strong> max skipped frames</span></div><p className="track-linkage-rationale">{evidence.rationale}</p></section>;
+}

@@ -1,0 +1,5 @@
+import type { TrajectoryTemporalPlacementEvidence } from "@shared/trajectoryTemporalPlacement";
+
+export function TrajectoryTemporalPlacement({ evidence }: { evidence: TrajectoryTemporalPlacementEvidence }) {
+  return <section className="trajectory-temporal-placement" aria-label="Trajectory temporal placement evidence"><div><p className="eyebrow">OBSERVATION-WINDOW PLACEMENT</p><h3>Retained track start and end positions</h3><small>Technical sampled-window provenance only. A boundary start or end does not establish a biological start or end and does not modify trajectories, measurements, or classifications.</small></div><div className="trajectory-temporal-placement-grid"><span><strong>{evidence.tracksStartingAtWindowBoundary}</strong> starts at first sample</span><span><strong>{evidence.tracksEndingAtWindowBoundary}</strong> ends at final sample</span><span><strong>{evidence.tracksSpanningEntireWindow}</strong> spans full window</span><span><strong>{evidence.windowEndFrame}</strong> final sampled frame</span></div><p className="trajectory-temporal-rationale">{evidence.rationale}</p></section>;
+}

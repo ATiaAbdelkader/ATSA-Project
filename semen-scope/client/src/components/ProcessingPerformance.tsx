@@ -1,0 +1,5 @@
+import type { ProcessingPerformanceEvidence } from "@shared/processingPerformance";
+
+export function ProcessingPerformance({ evidence }: { evidence: ProcessingPerformanceEvidence }) {
+  return <section className="processing-performance" aria-label="Browser-local processing performance evidence"><div><p className="eyebrow">PROCESSING PERFORMANCE</p><h3>Browser-local review-loop timing</h3><small>Technical execution timing context only. It does not change sampling, candidates, trajectories, metrics, classifications, or biological interpretation.</small></div><div className="processing-performance-grid"><span><strong>{evidence.elapsedMilliseconds.toFixed(0)} ms</strong> elapsed local loop</span><span><strong>{evidence.processedFrames}</strong> sampled frames</span><span><strong>{evidence.meanMillisecondsPerFrame.toFixed(1)} ms</strong> mean / sampled frame</span><span><strong>{evidence.processedFramesPerSecond.toFixed(1)}</strong> sampled frames / sec</span></div><p className="processing-performance-rationale">{evidence.rationale}</p></section>;
+}

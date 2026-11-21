@@ -1,0 +1,5 @@
+import type { DetectorConfigurationEvidence as DetectorConfigurationEvidenceType } from "@shared/detectorConfigurationEvidence";
+
+export function DetectorConfigurationEvidence({ evidence }: { evidence: DetectorConfigurationEvidenceType }) {
+  return <section className="detector-configuration-evidence" aria-label="Detector configuration evidence"><div><p className="eyebrow">DETECTOR CONFIGURATION</p><h3>Browser-local sampling provenance</h3><small>Technical configuration provenance only. It does not change detection, candidates, trajectories, metrics, classifications, or biological interpretation.</small></div><div className="detector-configuration-grid"><span><strong>{evidence.samplingStridePx} px</strong> sampling stride</span><span><strong>{evidence.darknessThreshold.toFixed(1)}</strong> darkness threshold</span><span><strong>{evidence.contrastThreshold.toFixed(1)}</strong> contrast threshold</span><span><strong>{evidence.candidateLimitPerFrame}</strong> selection cap / frame</span></div><p className="detector-configuration-rationale">{evidence.rationale}</p></section>;
+}

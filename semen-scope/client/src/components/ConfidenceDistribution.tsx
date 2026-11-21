@@ -1,0 +1,7 @@
+import type { ConfidenceDistribution as Distribution } from "@shared/confidenceDistribution";
+
+export function ConfidenceDistribution({ distribution, threshold }: { distribution: Distribution; threshold: number }) {
+  const retainedPercent = distribution.total ? (distribution.atOrAboveThreshold / distribution.total) * 100 : 0;
+  const excludedPercent = distribution.total ? (distribution.belowThreshold / distribution.total) * 100 : 0;
+  return <section className="confidence-distribution" aria-label="Association confidence distribution"><div><p className="eyebrow">TRACK ASSOCIATION EVIDENCE</p><h3>Confidence spread</h3><small>Technical linkage evidence only. This does not alter measurements, classifications, or biological interpretation.</small></div><div className="confidence-distribution-grid"><span><strong>{distribution.total}</strong> eligible tracks</span><span><strong>{distribution.atOrAboveThreshold}</strong> retained at ≥ {threshold.toFixed(2)}</span><span><strong>{distribution.belowThreshold}</strong> below active threshold</span><span><strong>{distribution.mean.toFixed(2)}</strong> mean association confidence</span></div><div className="confidence-bars" aria-label={`${retainedPercent.toFixed(0)} percent retained and ${excludedPercent.toFixed(0)} percent below threshold`}><i style={{ width: `${retainedPercent}%` }} /><b style={{ width: `${excludedPercent}%` }} /></div><div className="confidence-legend"><span><i />Retained by the active confidence threshold</span><span><b />Below threshold, excluded from summary</span></div></section>;
+}

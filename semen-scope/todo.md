@@ -1,0 +1,344 @@
+# Project TODO
+
+- [x] Establish a clinical laboratory design system with responsive dashboard navigation, accessible controls, and an explicit research-use scientific-method disclaimer.
+- [x] Create a unified analysis workspace with a sample queue and a shared intake path for uploaded microscope videos and microscope-connected camera footage.
+- [x] Support the five supplied MP4 samples and new MP4 uploads with video metadata, species/sample details, calibration, and configurable CASA thresholds.
+- [x] Implement browser-based camera selection, live preview, frame capture, short recording, and transfer of captured footage into the analysis workspace.
+- [x] Implement a server-ready CASA-style analysis contract modeled on OpenCASA concepts: preprocessing, sperm-head candidate detection, trajectory linking, and motion classification.
+- [x] Calculate and present tracked-cell count, total and progressive motility, VCL, VSL, VAP, LIN, STR, WOB, ALH, BCF, DANCE, and MAD from analysis output.
+- [x] Present annotated tracking overlays, a trajectory map, metric charts, per-track data, quality flags, and downloadable analysis summaries.
+- [x] Persist analysis records, per-sample metadata, calibration settings, thresholds, and historical comparisons in the database.
+- [x] Add automated tests for metric validation, persistence contracts, and analysis safeguards.
+- [x] Validate the desktop and mobile clinical dashboard visually with the provided videos and deliver a checkpointed project version.
+- [x] Add a persisted-history comparison view for result trends across selected completed samples.
+- [x] Add explicit automated tests for quality-flag and scientific-guardrail behavior, then complete the build validation.
+- [x] Verify first-time laboratory profiles load without a missing-settings query error.
+- [x] Fix the “Unable to decode video while waiting for loadedmetadata” failure for reference, uploaded, and camera-captured footage.
+- [x] Verify metadata loading with a browser-decodable uploaded video blob and a camera-style WebM capture blob.
+- [x] Investigate and remediate the user-reported insecure operation in the video intake and analysis workflow.
+- [x] Resolve the issue described in the newly attached diagnostic content.
+- [x] Synchronize active-video playback with live frame processing, progress, and tracking feedback while analysis runs.
+- [x] Render interim candidate and trajectory feedback on the active video while analysis is in progress.
+- [x] Validate the real on-page Run analysis interaction updates playback time and live frame status before completion.
+- [x] Allow users to select a live trajectory and view its current detailed kinematic metrics during analysis.
+- [x] Assess the Simple Sperm Analyzer repository and integrate compatible analysis, visualization, and review improvements into SemenScope.
+- [x] Assess the Computer Vision Projects repository and integrate compatible microscopy quality and analysis improvements into SemenScope.
+- [x] Add a calibration-board capture wizard that estimates, records, and applies microscope µm-per-pixel scale before analysis.
+- [x] Validate the calibration-board wizard end-to-end with a live preview, board-frame capture, two-point selection, and application of the calculated scale.
+- [ ] Validate that wizard-generated calibration evidence is persisted in saved settings and included with saved analysis output.
+- [x] Ensure a newly started microscope camera stream attaches to the rendered preview element before board capture.
+- [x] Validate board-evidence restoration after a saved settings reload through the actual settings procedure.
+- [ ] Validate a saved analysis record retains calibration evidence in its persisted metadata payload.
+- [ ] Inspect the newest real saved analysis record to verify its persisted metadata contains board calibration evidence.
+- [x] Resolve the reported browser unsupported-video codec or container error during SemenScope analysis intake.
+- [x] Validate real signed-in save/reload persistence of board calibration evidence in the workspace.
+- [ ] Validate a real saved analysis history record retains board calibration evidence in its stored metadata.
+- [x] Surface explicit board-evidence status and prevent unverified manual scale values from being mistaken for board-calibrated settings.
+- [x] Remove the disabled calibration-board capture dead end and provide an accessible board-image intake path without a live microscope preview.
+- [x] Develop the Sample History tab with persisted record browsing, comparison, and review handoff.
+- [x] Develop the Method Controls tab with saved calibration, threshold, provenance, and reproducibility controls.
+- [x] Develop the Quality Review tab with actionable analysis flags, capture-quality evidence, and review guidance.
+- [x] Validate the new dashboard tabs across desktop and mobile workflows.
+- [x] Add explicit loading and error states for persisted-record queries in Sample History and Quality Review.
+- [x] Surface every saved reproducibility parameter in the dedicated Method Controls tab.
+- [x] Complete successful interactive desktop and mobile validation of dashboard-tab navigation and tab-specific actions.
+- [x] Research leading semen-analysis applications and document their most valuable, scientifically appropriate capabilities.
+- [x] Evaluate identified application features against SemenScope’s browser-local architecture and laboratory-review safeguards.
+- [x] Integrate the highest-value compatible semen-analysis workflow improvements and validate them.
+- [x] Add structured specimen and donor traceability to the active analysis workflow and immutable record snapshot.
+- [x] Add an evidence-derived acquisition-readiness checklist to the analysis and review workflows.
+- [x] Add a clearly labeled non-inferential dose-planning worksheet based only on operator-entered concentration and target dose.
+- [x] Validate the selected feature upgrades with tests and browser workflows.
+- [x] Add a laboratory-ready structured handoff export for immutable analysis records.
+- [x] Add a reviewer-safe copyable handoff summary for recorded specimen, method, metrics, and flags.
+- [ ] Validate clinical handoff exports and interactions in tests and the browser (authenticated interaction check deferred at user request).
+- [ ] Exercise Copy handoff and Export handoff CSV against an authenticated saved analysis record in the browser session (deferred at user request).
+- [x] Continue SemenScope upgrades using browser-local and project-internal workflows only, without authenticated personal-browser access.
+- [x] Identify and implement the next highest-value compatible browser-local laboratory workflow improvement.
+- [x] Add a browser-local multi-field repeatability aggregator for user-selected field outputs.
+- [x] Add safeguards that require same-specimen confirmation and prevent bundled reference footage from being used as clinical replicates.
+- [x] Validate local multi-field aggregation metrics, safeguards, and responsive workflow without authenticated browser access.
+- [x] Research additional relevant open-source semen-analysis and microscopy repositories for a compatible browser-local upgrade.
+- [x] Document feature selection and scientific boundaries for the GitHub-informed upgrade.
+- [x] Implement and validate the selected GitHub-informed browser-local capability without authenticated personal-browser access.
+- [x] Add a browser-local trajectory-coordinate CSV export with track IDs, frame/time, pixel positions, and calibration-derived positions.
+- [x] Include immutable method context and a review-only notice in the trajectory-coordinate export without adding a new biological assay.
+- [x] Validate the trajectory-coordinate export content and browser download workflow without authenticated personal-browser access.
+- [x] Research and document a second GitHub-informed browser-local SemenScope capability.
+- [x] Implement and validate the selected second GitHub-informed capability without authenticated personal-browser access.
+- [x] Add a selectable browser-local VCL-versus-LIN kinematic landscape for current analysis tracks.
+- [x] Preserve non-predictive scientific safeguards and reuse track selection for detailed trajectory review.
+- [x] Validate kinematic-landscape rendering, selection, and responsive behavior without authenticated personal-browser access.
+- [x] Complete a dedicated mobile validation of the kinematic landscape after its introduction.
+- [x] Research and document another compatible GitHub-informed browser-local SemenScope capability.
+- [x] Implement and validate the selected additional browser-local capability without authenticated personal-browser access.
+- [x] Add a current-run technical track-review queue using transparent existing confidence, duration, and classification signals.
+- [x] Reuse the existing trajectory inspector and display a non-diagnostic technical-review disclaimer.
+- [x] Validate technical review-queue ordering, selection, and responsive behavior without authenticated personal-browser access.
+- [x] Continue autonomous browser-local, GitHub-informed SemenScope upgrades with a checkpoint after each validated capability.
+- [x] Select, implement, and validate the next safe browser-local analysis or review capability.
+- [x] Add a browser-local global field-stability monitor from reduced luminance-grid frame comparisons.
+- [x] Surface field-stability status and a non-transforming technical review flag without modifying measurement frames or trajectories.
+- [x] Validate field-stability calculations, quality flags, and responsive browser workflows without authenticated personal-browser access.
+- [x] Add browser-local trajectory point-by-point audit controls with frame/time and calibrated-position context.
+- [x] Let reviewers seek the active video to a selected trajectory point without altering any measurement data.
+- [x] Validate trajectory audit controls and responsive behavior without authenticated personal-browser access.
+- [x] Add a deterministic, human-readable browser-local fingerprint for active species, calibration, and method thresholds.
+- [x] Surface method fingerprint evidence in controls, reports, exports, and immutable saved snapshots.
+- [x] Validate method-fingerprint consistency and responsive presentation without authenticated personal-browser access.
+- [x] Add a non-diagnostic browser-local association-confidence distribution for current-run tracks.
+- [x] Surface confidence spread in technical review outputs without changing automated classifications or measurements.
+- [x] Validate confidence-distribution calculations and responsive review controls without authenticated personal-browser access.
+- [x] Add transparent temporal-sampling evidence for processed versus available frames and effective sampling interval.
+- [x] Surface temporal-sampling evidence in active review, manifests, and immutable analysis snapshots without altering measurement data.
+- [x] Validate temporal-sampling evidence and responsive presentation without authenticated personal-browser access.
+- [x] Add a transparent current-run composition summary for existing progressive, motile, and non-motile classifications.
+- [x] Surface classification composition in technical review, manifests, and immutable snapshots without inferring biological outcomes.
+- [x] Validate classification-composition evidence and responsive presentation without authenticated personal-browser access.
+- [x] Surface persisted classification-composition evidence in immutable Sample History review.
+- [x] Validate classification-composition snapshot parsing and live evidence after immutable review integration.
+- [x] Add transparent accepted-track observation-duration evidence without changing tracks or classifications.
+- [x] Surface duration evidence in technical review, manifests, and immutable snapshots without biological inference.
+- [x] Validate duration evidence and responsive presentation without authenticated personal-browser access.
+- [x] Add transparent browser-local per-track metric-range evidence for technical review without changing trajectories, classifications, or summary calculations.
+- [x] Surface metric-range evidence in current-run review, reports, method manifests, and immutable snapshots without diagnostic or biological inference.
+- [x] Validate metric-range calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add browser-local track-linkage continuity evidence for expected versus gap-spanning associations without altering trajectories or classifications.
+- [x] Surface linkage continuity in current-run review, reports, method manifests, and immutable snapshots with explicit technical-only safeguards.
+- [x] Validate linkage-continuity calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add explicit technical-only linkage-continuity safeguards to exported review text, method manifest, and immutable snapshot status.
+- [x] Add browser-local retained-trajectory spatial-coverage evidence without inferring specimen concentration, density, or biological outcomes.
+- [x] Surface spatial-coverage evidence in current-run review, reports, method manifests, and immutable snapshots with explicit technical-only safeguards.
+- [x] Validate spatial-coverage calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add browser-local retained-trajectory field-boundary contact evidence without modifying tracks, quality flags, classifications, or measurements.
+- [x] Surface boundary-contact evidence in current-run review, reports, method manifests, and immutable snapshots with explicit technical-only safeguards.
+- [x] Validate boundary-contact calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add browser-local retained-trajectory temporal-placement evidence for sampled-window starts and ends without altering tracks, classifications, or measurements.
+- [x] Surface temporal-placement evidence in current-run review, reports, method manifests, and immutable snapshots with explicit technical-only safeguards.
+- [x] Validate temporal-placement calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add browser-local retained-track directional-balance evidence without changing trajectories, classifications, or biological interpretation.
+- [x] Surface directional-balance evidence in current-run review, reports, method manifests, and immutable snapshots with explicit technical-only safeguards.
+- [x] Validate directional-balance calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Render persisted browser-local technical evidence within immutable saved snapshot review without changing historical records or requiring authenticated browser validation.
+- [x] Validate saved technical-evidence rendering and responsive layout with safe snapshot parsing and no-auth project-internal workflows.
+- [x] Refactor the saved technical-evidence archive to use valid block-level markup before browser-local layout validation.
+- [x] Add a deterministic browser-local output fingerprint for technical reproducibility review without presenting it as a signature or biological interpretation.
+- [x] Surface output-fingerprint evidence in current review, reports, method manifests, immutable snapshots, and the saved technical-evidence archive with explicit safeguards.
+- [x] Validate output-fingerprint determinism and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Include the reproducibility-only browser-local output fingerprint in trajectory-coordinate CSV audit exports without changing coordinates or classifications.
+- [x] Validate output-fingerprint coordinate-export context through unit tests and a no-auth browser-local download workflow.
+- [x] Add browser-local sampled candidate-detection load evidence without modifying candidates, tracks, classifications, or biological interpretation.
+- [x] Surface candidate-detection load evidence in current review, reports, method manifests, and immutable snapshots with explicit technical-only safeguards.
+- [x] Validate candidate-detection load calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add detector selection-cap saturation evidence to candidate-detection load review without modifying candidates, tracks, classifications, or measurements.
+- [x] Surface selection-cap saturation in reports, manifests, immutable snapshots, and technical review with explicit technical-only safeguards.
+- [x] Validate selection-cap saturation calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add browser-local candidate-score distribution evidence without changing candidate selection, tracks, classifications, or biological interpretation.
+- [x] Surface candidate-score distribution evidence in current review, reports, method manifests, and immutable snapshots with explicit technical-only safeguards.
+- [x] Validate candidate-score distribution calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add browser-local processing-performance evidence without changing sampled frames, candidates, tracks, classifications, or measurements.
+- [x] Surface processing-performance evidence in current review, reports, method manifests, and immutable snapshots with explicit technical-only safeguards.
+- [x] Validate processing-performance calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add a browser-local current-run technical-evidence navigator that improves review access without changing analyses, snapshots, or biological interpretation.
+- [x] Validate technical-evidence navigation and responsive layout without authenticated personal-browser access.
+- [x] Add browser-local analysis-scaling evidence for source and working canvas dimensions without changing video frames, candidates, tracks, or measurements.
+- [x] Surface analysis-scaling evidence in current review, reports, method manifests, and immutable snapshots with explicit technical-only safeguards.
+- [x] Validate analysis-scaling calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add browser-local detector-configuration evidence for active sampling geometry and score thresholds without changing detection, tracks, classifications, or measurements.
+- [x] Surface detector-configuration evidence in current review, reports, method manifests, and immutable snapshots with explicit technical-only safeguards.
+- [x] Validate detector-configuration calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add browser-local sampled capture-quality variability evidence without changing frames, candidates, trajectories, metrics, or classifications.
+- [x] Surface capture-quality variability evidence in current review, reports, method manifests, and immutable snapshots with explicit technical-only safeguards.
+- [x] Validate capture-quality variability calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add a browser-local sampled detector-load timeline without changing candidate selection, trajectories, metrics, classifications, or biological interpretation.
+- [x] Surface the detector-load timeline in current review, reports, method manifests, and immutable snapshots with explicit technical-only safeguards.
+- [x] Validate detector-load timeline calculations and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add browser-local microscope-intake capability evidence for camera, recording, canvas, and media support without requesting permissions or changing capture behavior.
+- [x] Validate intake capability evidence and responsive browser-local presentation without authenticated personal-browser access.
+- [x] Add an operator-controlled browser-local cancellation path for in-progress analysis without changing completed outputs or saved records.
+- [x] Validate analysis cancellation and subsequent re-run workflows across desktop and mobile without authenticated personal-browser access.
+- [x] Clear the cancellation status when operators stage replacement footage without changing completed outputs or saved records.
+- [x] Validate cancellation-status reset across desktop and mobile without authenticated personal-browser access.
+- [x] Add semantic live processing status and progress control accessibility without changing analysis output.
+- [x] Validate accessible live status and progress semantics across desktop and mobile without authenticated personal-browser access.
+- [x] Add a guarded Escape-key cancellation shortcut for active browser-local analysis without changing completed outputs or saved records.
+- [x] Validate Escape-key cancellation and rerun behavior across desktop and mobile without authenticated personal-browser access.
+- [x] Add bounded browser-local microscope clip-duration controls without changing analysis or persistence behavior.
+- [x] Validate clip-duration controls across desktop and mobile without authenticated personal-browser access.
+- [x] Add a permission-free browser-local camera device-list refresh before preview without changing capture, analysis, or persistence behavior.
+- [x] Validate camera device-list refresh across desktop and mobile without authenticated personal-browser access.
+- [x] Add a bounded browser-local microscope recording countdown without changing capture, analysis, or persistence behavior.
+- [x] Validate the recording countdown across desktop and mobile without authenticated personal-browser access.
+- [x] Add browser-local active-footage source, format, and byte-size provenance without changing analysis or persistence behavior.
+- [x] Validate active-footage provenance presentation across desktop and mobile without authenticated personal-browser access.
+- [x] Add operator-entered collection time and preparation protocol reference to browser-local specimen traceability without changing analysis calculations.
+- [x] Surface and validate the added traceability metadata across snapshot, export, desktop, and mobile no-auth workflows.
+- [x] Add operator-entered objective magnification and chamber depth to browser-local method traceability without changing calibration or analysis calculations.
+- [x] Validate optics traceability across immutable snapshot, export, desktop, and mobile no-auth workflows.
+- [x] Persist active-footage provenance as metadata and include it in laboratory audit outputs without storing video bytes or changing calculations.
+- [x] Validate persisted footage provenance across snapshot, export, desktop, and mobile no-auth workflows.
+- [x] Add a transparent browser-local method-draft save and restore workflow without authentication or changes to immutable analysis records.
+- [x] Validate local method-draft save and restore across desktop and mobile without authenticated access.
+- [x] Add explicit browser-local draft status and a clear action without affecting analysis, authenticated presets, or immutable records.
+- [x] Validate local draft status and clear workflow across desktop and mobile without authenticated access.
+- [x] Add an explicit browser-local reset for temporary operator context while preserving saved records, authenticated presets, and reference footage.
+- [x] Validate temporary-session reset across desktop and mobile without authenticated access.
+- [x] Reject incomplete or non-finite browser-local method-draft thresholds before they can restore into the active method.
+- [x] Validate malformed local-draft rejection across desktop and mobile without authenticated access.
+- [x] Add guarded browser-local method-draft export and import without authentication or changes to immutable records.
+- [x] Validate local-draft export and import across desktop and mobile without authenticated access.
+- [x] Add a concise browser-local data-handling guide that distinguishes temporary context, local drafts, and authenticated immutable records.
+- [x] Validate the browser-local data-handling guide across desktop and mobile without authenticated access.
+- [x] Add a browser-local analysis session reference to audit context without claiming uniqueness, authenticity, or biological meaning.
+- [x] Validate session-reference context across desktop and mobile without authenticated access.
+- [x] Clear stale browser-local analysis session references when replacement footage is staged without changing completed records or exports.
+- [x] Validate session-reference reset across desktop and mobile without authenticated access.
+- [x] Add selected browser camera-label provenance for local captures without changing capture, analysis, or biological interpretation.
+- [x] Validate camera-label provenance across desktop and mobile without authenticated access.
+- [x] Bind local-capture provenance to the actual active browser camera stream rather than a later selection change.
+- [x] Validate active-camera provenance across desktop and mobile without authenticated access.
+- [x] Display the actual active browser camera label during preview without changing capture, analysis, or persistence behavior.
+- [x] Validate the active-camera preview label across desktop and mobile without authenticated access.
+- [x] Warn during live preview when the selected camera differs from the actual active stream, without changing capture or analysis behavior.
+- [x] Validate selected-device mismatch guidance across desktop and mobile without authenticated access.
+- [x] Record browser-local camera capture time as read-only footage provenance without storing video bytes or changing analysis behavior.
+- [x] Surface camera capture time in local review context and immutable handoff/export metadata.
+- [x] Validate camera capture-time provenance across desktop and mobile without authenticated access.
+- [x] Validate that active camera context and selection-mismatch guidance clear when preview stops across desktop and mobile without authenticated access.
+- [x] Record the requested camera clip duration as read-only browser-local footage provenance without changing capture or analysis behavior.
+- [x] Surface requested camera clip duration in local review context and immutable handoff/export metadata.
+- [x] Validate requested camera clip-duration provenance across desktop and mobile without authenticated access.
+- [x] Add focused regression assertions that camera stream label, capture time, and requested duration appear in laboratory handoff exports.
+- [x] Add focused immutable snapshot parser coverage for camera stream label, capture time, and requested clip duration.
+- [x] Include read-only camera capture time and requested duration in the generated browser-local analysis summary without changing analysis behavior.
+- [x] Validate generated analysis-summary camera provenance context without authenticated access.
+- [x] Handle unexpected browser camera-stream termination by clearing transient preview context and guiding the operator to restart preview without changing staged footage or analysis results.
+- [x] Add an operator-controlled browser-local restart action that reopens preview with the currently selected camera after an active-stream device mismatch.
+- [x] Prevent browser-local camera device selection changes while a microscope clip is actively recording, without changing capture duration or analysis behavior.
+- [x] Record and surface the actual browser-local camera clip duration as read-only technical provenance alongside the requested duration, without changing analysis behavior.
+- [x] Record and surface a read-only browser-local camera recording-stop reason without changing capture behavior, analysis, or persistence of video bytes.
+- [x] Validate requested-duration automatic camera recording stop provenance across desktop and mobile without authenticated access.
+- [x] Validate active-stream termination during a browser-local camera recording retains technical stop provenance across desktop and mobile without authenticated access.
+- [x] Clarify in browser-local staging guidance when a camera stream ends during recording, without changing captured footage, analysis, or persistence behavior.
+- [x] Prefer browser-supported WebM recorder formats for local camera capture without changing capture duration, analysis, or video-byte persistence behavior.
+- [x] Record and surface the actual browser-local camera recorder MIME format as read-only technical provenance without changing analysis behavior.
+- [x] Explain accessibly when browser-local camera selection is locked during active recording, without changing capture or analysis behavior.
+- [x] Safely recover from browser-local camera recorder errors without replacing active footage or changing analysis behavior.
+- [x] Validate a subsequent browser-local camera capture succeeds after recorder-error recovery across desktop and mobile without authenticated access.
+- [x] Record and surface browser-local camera capture-frame dimensions as read-only technical provenance without changing analysis behavior.
+- [x] Fall back to active browser camera track settings when preview frame dimensions are not yet exposed, without changing capture or analysis behavior.
+- [x] Safely recover from browser-local camera recorder initialization failures without replacing active footage or changing analysis behavior.
+- [x] Clear stale browser-local recorder-error guidance when an operator starts a fresh camera preview, without changing active footage or analysis behavior.
+- [x] Safely recover from browser-local camera preview-access failures without replacing active footage or changing analysis behavior.
+- [x] Provide persistent browser-local guidance when required camera preview APIs are unavailable, without replacing active footage or changing analysis behavior.
+- [x] Prevent browser-local camera device inventory refresh while a local recording is active, without changing capture or analysis behavior.
+- [x] Prevent browser-local requested camera clip-duration changes while recording is active, without changing capture or analysis behavior.
+- [x] Start the laboratory navigation closed on narrow viewports while preserving the desktop sidebar and manual mobile navigation control.
+- [x] Close the laboratory navigation after an operator selects a destination on a narrow viewport while preserving desktop sidebar behavior.
+- [x] Allow Escape to dismiss the laboratory navigation on narrow viewports while preserving desktop sidebar behavior.
+- [x] Move keyboard focus into the mobile laboratory navigation on open and back to its toggle on close without affecting desktop navigation.
+- [x] Keep keyboard focus within an open mobile laboratory navigation sidebar while preserving normal desktop tab order.
+- [x] Mark the closed mobile laboratory navigation as hidden and non-interactive while exposing the toggle state without affecting desktop navigation.
+- [x] Warn before accidental page exit only while browser-local capture or analysis is active, without changing recorded footage, analysis output, or persistence behavior.
+- [x] Prevent temporary browser-local session reset while local camera recording or analysis is active, without changing footage, analysis output, or persistence behavior.
+- [x] Freeze browser-local footage and method context at analysis start so later UI changes cannot alter the active run’s technical basis or review metadata.
+- [x] Prevent replacement footage from being staged while browser-local analysis is active, without changing the active run’s output or persistence behavior.
+- [x] Clearly flag when current workspace settings differ from the frozen technical context of a completed browser-local analysis.
+- [x] Lock active sample, method, traceability, and planning inputs while browser-local analysis is active, then restore them after the run ends.
+- [x] Verify the advertised Escape-key cancellation path clears active browser-local analysis and restores locked controls at desktop and mobile sizes.
+- [x] Verify the analysis run control remains unavailable during local camera recording and restores after recording cleanup at desktop and mobile sizes.
+- [x] Verify browser-local summary export retains a completed run’s frozen sample and method context after later workspace edits at desktop and mobile sizes.
+- [x] Restore keyboard focus to Run analysis after browser-local analysis cancellation at desktop and mobile sizes.
+- [x] Capture completed browser-local run context, rather than later editable workspace values, when adding a local multi-field review entry.
+- [x] Prevent camera preview and still-capture controls from changing local acquisition state while browser-local analysis is active, then restore them afterward.
+- [x] Lock source replacement and method-context controls while local camera recording is active, then restore them after recording cleanup.
+- [x] Verify recording-time source and method locks recover after a browser-local recorder failure at desktop and mobile sizes.
+- [x] Verify recording-time source and method locks release after automatic requested-duration capture completion at desktop and mobile sizes.
+- [x] Verify local recording cleanup and partial-capture provenance when an active microscope stream ends unexpectedly at desktop and mobile sizes.
+- [x] Require explicit browser-local technical-review acknowledgement before analyzing a partial camera clip caused by unexpected stream termination.
+- [x] Preserve partial-camera-capture technical-review acknowledgement in immutable browser-local run context and audit exports.
+- [x] Show browser-local partial-camera-capture acknowledgement status to the operator before analysis begins.
+- [x] Require renewed partial-camera-capture technical review after pre-analysis method settings change.
+- [x] Disable Run analysis with clear guidance while the active footage has a browser-local decode error.
+- [x] Lock browser-local still and calibration-frame capture controls while a local camera clip is recording.
+- [x] Lock calibration-board workflow entry and frame actions while a local camera clip is recording.
+- [x] Keep the capture workspace active by blocking dashboard navigation during a local camera recording.
+- [x] Clarify and validate that privacy-stopping the camera preview safely finalizes an active local recording.
+- [x] Give the camera preview Stop action an explicit accessible name while recording and after preview teardown.
+- [x] Restore keyboard focus to Start preview after browser-local camera preview teardown.
+- [x] Complete a comparative survey of open-source semen-analysis, CASA, microscopy, tracking, and morphology projects with licensing and browser-local integration boundaries.
+- [x] Add a browser-local technical trajectory-integrity scorecard inspired by open tracking-evaluation frameworks, without changing kinematic or biological outputs.
+- [x] Preserve browser-local trajectory-integrity evidence in technical manifests and immutable saved snapshots.
+- [x] Surface browser-local trajectory-integrity evidence in an accessible current-run technical review panel.
+- [x] Add direct technical-evidence navigator access to browser-local trajectory-integrity review.
+- [x] Make every browser-local technical-evidence navigator destination consistently keyboard-focusable.
+- [x] Add a visible focus treatment after browser-local technical-evidence navigation.
+- [x] Indicate the selected browser-local technical-evidence destination in the current-run navigator.
+- [x] Include browser-local trajectory-integrity technical context in trajectory-coordinate CSV audit exports.
+- [x] Preserve per-field trajectory-integrity technical context in browser-local multi-field review without aggregating or interpreting it biologically.
+- [x] Validate browser-local multi-field trajectory-integrity review at the 375×812 mobile viewport.
+- [x] Present the per-field trajectory-integrity technical-only safeguard in browser-local multi-field review.
+- [x] Preserve browser-local trajectory-integrity attention items in trajectory-coordinate CSV audit exports.
+- [x] Include browser-local trajectory-integrity technical context in laboratory handoff export contracts.
+- [x] Present browser-local trajectory-integrity attention items in immutable saved technical-evidence review.
+- [x] Preserve and present per-field trajectory-integrity attention items in browser-local multi-field review without aggregating or interpreting them biologically.
+- [x] Reset current-run technical-evidence navigator selection when browser-local analysis output changes.
+- [x] Add a browser-local sampled-frame detector-load CSV audit export with technical-only safeguards.
+- [x] Add a browser-local candidate-score distribution CSV audit export with technical-only safeguards.
+- [x] Add direct current-run technical-evidence navigation to browser-local detector-load context.
+- [x] Add direct current-run technical-evidence navigation to browser-local candidate-score context.
+- [x] Add a browser-local multi-field technical review CSV export without pooling biological measures or storing footage.
+- [x] Add a browser-local current-frame PNG export for microscope/video technical review without storing imagery.
+- [x] Add a browser-local copy-to-clipboard action for the current-run technical summary with a review-only safeguard.
+- [x] Add a browser-local selected-trajectory CSV export for focused technical review without changing trajectory analysis.
+- [x] Add a browser-local trajectory-map PNG export for visual technical review without storing imagery or changing analysis output.
+- [x] Add browser-local previous-frame and next-frame controls for technical video review without changing analysis results.
+- [x] Add browser-local timestamped review bookmarks for technical microscope/video inspection without changing analysis output or storing footage.
+- [x] Add browser-local per-track technical review filters without changing classifications or analysis output.
+- [x] Add browser-local playback-speed controls for technical video review while preserving analysis synchronization safeguards.
+- [x] Add browser-local camera preview resolution profiles without altering calibration or analysis results.
+- [x] Add browser-local requested-versus-actual camera preview-resolution evidence without altering calibration or analysis results.
+- [x] Add browser-local active camera frame-rate evidence without automatically changing calibration or analysis results.
+- [x] Add a browser-local camera frame-rate mismatch review indicator without changing configured analysis rate or calibration.
+- [x] Add a browser-local camera acquisition-readiness card without blocking capture or changing calibration or analysis results.
+- [x] Add browser-local active camera resize-mode evidence without changing capture, calibration, or analysis results.
+- [x] Preserve browser-local camera preview technical context with staged local clips without storing video bytes or changing analysis results.
+- [x] Add a browser-local camera preview orientation preference that changes display only and does not alter captured footage, calibration, or analysis results.
+- [x] Add a browser-local technical still-frame download for microscope preview without storing imagery or changing calibration or analysis results.
+- [x] Add an optional browser-local pre-capture stabilization delay for microscope recording without changing capture pixels, calibration, or analysis results.
+- [x] Preserve selected browser-local pre-capture stabilization delay in staged camera clip technical provenance without changing analysis results.
+- [x] Cancel browser-local pre-capture stabilization safely if the camera stream ends without changing staged footage or analysis results.
+- [x] Warn before browser exit during an active local pre-capture stabilization delay without changing capture or analysis behavior.
+- [x] Add browser-local operator labels to technical review bookmarks without changing video, calibration, or analysis results.
+- [x] Add a browser-local CSV export of technical review bookmarks without changing video, calibration, or analysis results.
+- [x] Reset browser-local technical review playback speed when active footage changes to preserve transparent review context.
+- [x] Add a browser-local technical review jump-to-time control without changing video, calibration, or analysis results.
+- [x] Add a browser-local technical review window marker for local video inspection without changing video, calibration, or analysis results.
+- [x] Add a browser-local CSV export of the technical review window without changing video, calibration, or analysis results.
+- [x] Add browser-local technical review-window boundary navigation without changing video, calibration, or analysis results.
+- [x] Add an optional browser-local loop for a marked technical review window without changing video content, calibration, or analysis results.
+- [x] Improve responsive browser-local technical review controls on narrow viewports without changing video, calibration, or analysis behavior.
+- [x] Add browser-local technical reviewed-track markers without changing trajectories, calibration, or analysis results.
+- [x] Add an explicit browser-local clear action for technical reviewed-track markers without changing trajectories, calibration, or analysis results.
+- [x] Add a browser-local CSV export of operator-marked technical review tracks without changing trajectories, calibration, or analysis results.
+- [x] Add a browser-local technical review-annotations export without storing footage or changing calibration or analysis results.
+- [x] Add guarded browser-local technical review-annotations import without changing video, calibration, or analysis results.
+- [x] Validate browser-local imported technical annotations against configured frame-time alignment without changing video, calibration, or analysis results.
+- [x] Prevent browser-local technical review annotation import while analysis is active without changing analysis output.
+- [x] Require an active matching browser-local analysis output before imported technical review annotations can be applied.
+- [x] Reject browser-local imported technical annotation files with duplicate or non-chronological review bookmarks.
+- [x] Reject browser-local technical review annotation imports whose bookmark or review-window bounds exceed the active local footage duration.
+- [x] Add a single browser-local clear action for technical review bookmarks, review windows, and reviewed-track markers without changing analysis output.
+- [x] Add a compact browser-local technical annotation status summary without changing footage or analysis output.
+- [x] Enforce canonical browser-local operator-label constraints for imported technical review bookmarks.
+- [x] Limit browser-local technical review annotation imports to a safe metadata-only file size without affecting footage or analysis output.
+- [x] Warn before browser exit when unsaved browser-local technical review annotations are present without changing analysis output.
+- [x] Add accessible browser-local keyboard shortcuts for stepping technical review frames without changing analysis output.
+- [x] Reject imported technical review annotations with duplicate or non-canonical reviewed-track identifiers before local state changes.
+- [x] Make browser-local technical review keyboard shortcuts visibly discoverable without changing analysis output.
+- [x] Enforce canonical configured-frame bookmark identifiers and labels for imported browser-local technical annotations.
+- [x] Allow operators to remove a single browser-local technical review bookmark without changing video or analysis output.
+- [x] Allow operators to edit an existing browser-local technical review bookmark note without changing its configured frame reference or analysis output.
+- [x] Assess and add the next high-value browser-local dashboard tab without using deferred authenticated workflows.
+- [x] Add a browser-local Field Review tab for the existing multi-field repeatability workspace without pooling biological measures or using authenticated saved records.
+- [x] Add a browser-local Technical Audit tab that centralizes existing technical evidence and local review safeguards without using deferred authenticated workflows.

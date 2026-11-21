@@ -1,0 +1,5 @@
+import type { CandidateScoreDistributionEvidence } from "@shared/candidateScoreDistribution";
+
+export function CandidateScoreDistribution({ evidence }: { evidence: CandidateScoreDistributionEvidence }) {
+  return <section className="candidate-score-distribution" aria-label="Candidate score distribution evidence"><div><p className="eyebrow">CANDIDATE-SCORE DISTRIBUTION</p><h3>Selected detector contrast-score context</h3><small>Technical detector-score context only. Scores do not add, remove, re-rank, or alter candidates, trajectories, classifications, or biological interpretation.</small></div><div className="candidate-score-grid"><span><strong>{evidence.candidateCount}</strong> scored candidates</span><span><strong>{evidence.meanScore.toFixed(1)}</strong> mean score</span><span><strong>{evidence.medianScore.toFixed(1)}</strong> median score</span><span><strong>{evidence.minimumScore.toFixed(1)}–{evidence.maximumScore.toFixed(1)}</strong> score range</span></div><p className="candidate-score-rationale">{evidence.rationale}</p></section>;
+}

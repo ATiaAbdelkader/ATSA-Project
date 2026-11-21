@@ -1,0 +1,5 @@
+import type { FieldBoundaryContactEvidence } from "@shared/fieldBoundaryContact";
+
+export function FieldBoundaryContact({ evidence }: { evidence: FieldBoundaryContactEvidence }) {
+  return <section className="field-boundary-contact" aria-label="Field boundary contact evidence"><div><p className="eyebrow">FIELD-BOUNDARY CONTACT</p><h3>Retained trajectory edge proximity</h3><small>Technical image-boundary context only. Boundary contact does not reject trajectories, alter quality flags, change measurements or classifications, or infer biological outcomes.</small></div><div className="field-boundary-contact-grid"><span><strong>{evidence.boundaryPointPercent.toFixed(1)}%</strong> points in outer {evidence.boundaryZonePercent}%</span><span><strong>{evidence.tracksWithBoundaryPoints}</strong> tracks touching boundary</span><span><strong>{evidence.tracksStartingInBoundary}</strong> boundary starts</span><span><strong>{evidence.tracksEndingInBoundary}</strong> boundary ends</span></div><p className="field-boundary-rationale">{evidence.rationale}</p></section>;
+}

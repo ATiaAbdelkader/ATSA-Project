@@ -1,0 +1,5 @@
+import type { TrajectoryIntegrityEvidence } from "@shared/trajectoryIntegrity";
+
+export function TrajectoryIntegrity({ evidence }: { evidence: TrajectoryIntegrityEvidence }) {
+  return <section className="trajectory-integrity" aria-label="Trajectory integrity technical evidence"><div><p className="eyebrow">TRAJECTORY INTEGRITY</p><h3>Retained-track technical scorecard</h3><small>{evidence.safeguard}</small></div><div className="track-linkage-continuity-grid"><span><strong>{evidence.continuityPercent.toFixed(1)}%</strong> nominal links</span><span><strong>{evidence.tracksWithoutGaps}/{evidence.acceptedTracks}</strong> without observed gaps</span><span><strong>{evidence.windowSpanningPercent.toFixed(1)}%</strong> span sample window</span><span><strong>{evidence.boundaryPointPercent.toFixed(1)}%</strong> outer-zone points</span></div><p className="track-linkage-rationale">{evidence.attentionItems.length ? `Technical attention: ${evidence.attentionItems.join(" · ")}.` : "No technical attention items were recorded from the retained-track evidence."}</p></section>;
+}

@@ -1,0 +1,5 @@
+import type { CandidateDetectionLoadEvidence } from "@shared/candidateDetectionLoad";
+
+export function CandidateDetectionLoad({ evidence }: { evidence: CandidateDetectionLoadEvidence }) {
+  return <section className="candidate-detection-load" aria-label="Candidate detection load evidence"><div><p className="eyebrow">CANDIDATE-DETECTION LOAD</p><h3>Sampled detector output context</h3><small>Technical detector-load context only. These counts do not represent concentration or cell count and do not alter candidates, trajectories, classifications, or biological interpretation.</small></div><div className="candidate-load-grid"><span><strong>{evidence.totalCandidates}</strong> sampled candidates</span><span><strong>{evidence.meanCandidatesPerFrame.toFixed(1)}</strong> mean / sampled frame</span><span><strong>{evidence.peakCandidatesInFrame} / {evidence.candidateLimitPerFrame}</strong> peak / selection cap</span><span><strong>{evidence.framesAtCandidateLimit}</strong> cap-bound sampled frames</span></div><p className="candidate-load-rationale">{evidence.rationale}</p></section>;
+}

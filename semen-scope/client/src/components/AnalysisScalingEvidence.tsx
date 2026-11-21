@@ -1,0 +1,5 @@
+import type { AnalysisScalingEvidence as AnalysisScalingEvidenceType } from "@shared/analysisScalingEvidence";
+
+export function AnalysisScalingEvidence({ evidence }: { evidence: AnalysisScalingEvidenceType }) {
+  return <section className="analysis-scaling-evidence" aria-label="Analysis scaling evidence"><div><p className="eyebrow">ANALYSIS SCALING</p><h3>Browser-local canvas provenance</h3><small>Technical execution provenance only. Canvas context does not modify source frames, candidates, trajectories, metrics, classifications, or biological interpretation.</small></div><div className="analysis-scaling-grid"><span><strong>{evidence.sourceWidth}×{evidence.sourceHeight}</strong> source pixels</span><span><strong>{evidence.workingCanvasWidth}×{evidence.workingCanvasHeight}</strong> working canvas</span><span><strong>{evidence.sourcePixelsPerWorkingPixelX.toFixed(3)}×</strong> horizontal scaling</span><span><strong>{evidence.wasDownscaled ? "Downscaled" : "Native"}</strong> canvas status</span></div><p className="analysis-scaling-rationale">{evidence.rationale}</p></section>;
+}

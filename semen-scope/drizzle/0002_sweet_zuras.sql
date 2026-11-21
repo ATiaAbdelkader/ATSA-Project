@@ -1,0 +1,1 @@
+ALTER TABLE `analysis_records` MODIFY COLUMN `tracksJson` mediumtext NOT NULL;
