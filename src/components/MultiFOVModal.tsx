@@ -68,22 +68,28 @@ export const MultiFOVModal: React.FC<MultiFOVModalProps> = ({
     onClose();
   };
 
-  const handleSampleNextField = () => {
-    const nextIdx = fields.length + 1;
-    const baseConc = fields.length > 0 ? fields[0].concentration : 120.0;
-    const varianceFactor = 1 + (Math.random() - 0.5) * 0.12; // Realistic ~6% variance
-    const nextConc = Math.max(10, Math.round(baseConc * varianceFactor * 10) / 10);
-    const nextProg = Math.min(95, Math.max(20, Math.round((64 + (Math.random() - 0.5) * 8) * 10) / 10));
+  const numberFrom = (value: string) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+  };
 
+  const updateField = (index: number, patch: Partial<FieldOfViewData>) => {
+    onFieldsChange(fields.map((field, idx) => (idx === index ? { ...field, ...patch } : field)));
+  };
+
+  // Adds an empty field for the operator to fill with values measured in that
+  // field of view. No metric is pre-filled: every number in the composite must
+  // come from the user's measurement.
+  const handleSampleNextField = () => {
     const newField: FieldOfViewData = {
-      fieldIndex: nextIdx,
+      fieldIndex: fields.length + 1,
       timestamp: new Date().toISOString(),
-      spermCount: Math.round(nextConc * 2.2),
-      concentration: nextConc,
-      totalMotility: Math.min(100, nextProg + 18),
-      progressiveMotility: nextProg,
-      normalMorphology: 5.6,
-      avgVcl: Math.round((82 + (Math.random() - 0.5) * 10) * 10) / 10
+      spermCount: 0,
+      concentration: 0,
+      totalMotility: 0,
+      progressiveMotility: 0,
+      normalMorphology: 0,
+      avgVcl: 0
     };
 
     onFieldsChange([...fields, newField]);
@@ -291,9 +297,9 @@ export const MultiFOVModal: React.FC<MultiFOVModalProps> = ({
               {/* Right: Automated Sequence Actions */}
               <div className="md:col-span-5 p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between space-y-4">
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-white">Automated Step-and-Repeat</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-white">Manual Field Entry</h4>
                   <p className="text-[10px] text-white/50 mt-1 leading-relaxed">
-                    Capture each quadrant in sequence to satisfy WHO 2010/2021 multi-field homogeneity protocols and eliminate meniscus bias.
+                    Measure each field on the microscope, then add a field and enter its values. Nothing is pre-filled or simulated, so the homogeneity statistics only reflect values you recorded.
                   </p>
                 </div>
 
@@ -317,7 +323,7 @@ export const MultiFOVModal: React.FC<MultiFOVModalProps> = ({
                     className="w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Capture Next Field Position (#{fields.length + 1})</span>
+                    <span>Add Measured Field (#{fields.length + 1})</span>
                   </button>
 
                   <button
@@ -357,7 +363,7 @@ export const MultiFOVModal: React.FC<MultiFOVModalProps> = ({
                 )}>
                   <Microscope className="w-8 h-8 opacity-20 text-emerald-500" />
                   <p className={cn("text-xs font-medium", isDark ? "text-white/40" : "text-slate-500")}>
-                    No optical fields captured yet. Click "Capture Next Field Position" to aggregate fields.
+                    No measured fields yet. Add a field and enter the values you measured on the microscope.
                   </p>
                 </div>
               ) : (
@@ -382,24 +388,68 @@ export const MultiFOVModal: React.FC<MultiFOVModalProps> = ({
                             </span>
                           </div>
                           <p className={cn("text-[10px]", isDark ? "text-white/50" : "text-slate-500")}>
-                            {f.spermCount} spermatozoa tracked &bull; VCL: {f.avgVcl.toFixed(1)} µm/s
+                            Enter the measured values for this field of view.
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-6 self-end sm:self-center">
-                        <div className="text-right">
+                      <div className="flex flex-wrap items-end gap-3 self-end sm:self-center">
+                        <label className="text-right">
                           <span className={cn("text-[8px] uppercase font-bold block", isDark ? "text-white/30" : "text-slate-400")}>Concentration</span>
-                          <span className="text-sm font-mono font-bold">{f.concentration.toFixed(1)} <span className="text-[9px] opacity-60">M/ml</span></span>
-                        </div>
-                        <div className="text-right">
+                          <span className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.1}
+                              value={f.concentration}
+                              onChange={(e) => updateField(idx, { concentration: numberFrom(e.target.value) })}
+                              className={cn(
+                                "w-16 px-1 py-0.5 rounded border text-right text-sm font-mono font-bold focus:outline-none",
+                                isDark ? "bg-black/40 border-white/10 text-white focus:border-emerald-500" : "bg-white border-slate-200 text-slate-900 focus:border-emerald-500"
+                              )}
+                              aria-label={`Field ${f.fieldIndex} concentration in million per millilitre`}
+                            />
+                            <span className="text-[9px] opacity-60">M/ml</span>
+                          </span>
+                        </label>
+                        <label className="text-right">
                           <span className={cn("text-[8px] uppercase font-bold block", isDark ? "text-white/30" : "text-slate-400")}>Progressive</span>
-                          <span className="text-sm font-mono font-bold text-emerald-400">{f.progressiveMotility.toFixed(1)}%</span>
-                        </div>
-                        <div className="text-right">
+                          <span className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.1}
+                              value={f.progressiveMotility}
+                              onChange={(e) => updateField(idx, { progressiveMotility: numberFrom(e.target.value) })}
+                              className={cn(
+                                "w-16 px-1 py-0.5 rounded border text-right text-sm font-mono font-bold text-emerald-400 focus:outline-none",
+                                isDark ? "bg-black/40 border-white/10 focus:border-emerald-500" : "bg-white border-slate-200 focus:border-emerald-500"
+                              )}
+                              aria-label={`Field ${f.fieldIndex} progressive motility percent`}
+                            />
+                            <span className="text-[9px] opacity-60">%</span>
+                          </span>
+                        </label>
+                        <label className="text-right">
                           <span className={cn("text-[8px] uppercase font-bold block", isDark ? "text-white/30" : "text-slate-400")}>Total Motility</span>
-                          <span className="text-sm font-mono font-bold text-blue-400">{f.totalMotility.toFixed(1)}%</span>
-                        </div>
+                          <span className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.1}
+                              value={f.totalMotility}
+                              onChange={(e) => updateField(idx, { totalMotility: numberFrom(e.target.value) })}
+                              className={cn(
+                                "w-16 px-1 py-0.5 rounded border text-right text-sm font-mono font-bold text-blue-400 focus:outline-none",
+                                isDark ? "bg-black/40 border-white/10 focus:border-emerald-500" : "bg-white border-slate-200 focus:border-emerald-500"
+                              )}
+                              aria-label={`Field ${f.fieldIndex} total motility percent`}
+                            />
+                            <span className="text-[9px] opacity-60">%</span>
+                          </span>
+                        </label>
 
                         <button
                           type="button"

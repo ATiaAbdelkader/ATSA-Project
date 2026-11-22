@@ -114,7 +114,7 @@ export const AuditTrailLog: React.FC<AuditTrailLogProps> = ({
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(events, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `ATSA-ISO15189-Audit-Trail-${Date.now()}.json`);
+    downloadAnchor.setAttribute("download", `ATSA-sample-audit-log-${Date.now()}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -130,13 +130,13 @@ export const AuditTrailLog: React.FC<AuditTrailLogProps> = ({
           </div>
           <div>
             <h3 className="text-lg font-black tracking-tight flex items-center gap-2">
-              GLP / 21 CFR Part 11 Tamper-Evident Audit Trail & Timeline
-              <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-teal-500/20 text-teal-400 rounded-full border border-teal-500/30">
-                TOX IVOS II Style
+              Audit Trail Preview (Sample Data)
+              <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 rounded-full border border-amber-500/30">
+                Demonstration only
               </span>
             </h3>
             <p className={cn("text-xs mt-0.5", isDark ? "text-white/40" : "text-slate-500")}>
-              Immutable chronological activity stream with SHA-256 cryptographic verification for clinical accreditation
+              Seeded example events that illustrate an audit layout. This application does not create, store, or certify a 21 CFR Part 11 audit record.
             </p>
           </div>
         </div>
@@ -150,9 +150,17 @@ export const AuditTrailLog: React.FC<AuditTrailLogProps> = ({
             )}
           >
             <Download className="w-4 h-4 text-teal-400" />
-            Export Audit Certificate (JSON)
+            Export Sample Log (JSON)
           </button>
         </div>
+      </div>
+
+      <div className={cn(
+        "p-3 rounded-xl border text-[11px] leading-relaxed",
+        isDark ? "bg-amber-500/10 border-amber-500/25 text-amber-200/90" : "bg-amber-50 border-amber-200 text-amber-950/80"
+      )}>
+        <strong className="font-black uppercase tracking-wider">Not a regulatory record.</strong>{' '}
+        The entries below are bundled examples with invented timestamps, operators, and hashes. They are not evidence of any real calibration, QC run, or analysis.
       </div>
 
       {/* Search & Category Filter Bar */}

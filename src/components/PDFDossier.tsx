@@ -25,7 +25,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils';
-import type { AnalysisResult } from '../types';
+import type { AnalysisResult, DomainAssessment } from '../types';
+import { domainBasis, getProvenance, hasDomainValues } from '../services/resultProvenance';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -81,6 +82,10 @@ export const PDFDossier: React.FC<PDFDossierProps> = ({
 
   const whoEdition = results.whoEdition || '6th';
   const isHuman = results.species.toLowerCase() === 'human';
+  const provenance = getProvenance(results);
+  const isMeasuredResult = provenance.source === 'measured';
+  const reportValue = (domain: keyof DomainAssessment, text: string) =>
+    hasDomainValues(domainBasis(results, domain)) ? text : 'Not assessed';
 
   // WHO 6th vs 5th standard comparisons (lower reference limits)
   const who5th = {
@@ -159,10 +164,10 @@ export const PDFDossier: React.FC<PDFDossierProps> = ({
         heightLeft -= pdfHeight;
       }
 
-      const fileName = `ATSA-Certified-Dossier-${results.patientId}-${template}-${new Date().toISOString().split('T')[0]}.pdf`;
+      const fileName = `ATSA-Report-Dossier-${results.patientId}-${template}-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(fileName);
       setDossierToast({
-        message: `Certified Clinical Dossier (PDF) for sample ${results.patientId} downloaded successfully.`,
+        message: `Report dossier (PDF) for sample ${results.patientId} downloaded successfully.`,
         type: 'success'
       });
     } catch (err) {
@@ -203,7 +208,7 @@ export const PDFDossier: React.FC<PDFDossierProps> = ({
     printWindow.document.write(`
       <html>
         <head>
-          <title>ATSA Certified Clinical Dossier - ${results.patientId}</title>
+          <title>ATSA Report Dossier - ${results.patientId}</title>
           ${stylesheets}
           <style>
             body { background: #fff !important; color: #000 !important; padding: 0 !important; margin: 0 !important; font-family: sans-serif; }
@@ -237,9 +242,11 @@ export const PDFDossier: React.FC<PDFDossierProps> = ({
 
   const copyEMRFormat = () => {
     const text = `=====================================================
-ATSA CASA CERTIFIED ANDROLOGY DOSSIER
+ATSA CASA ANDROLOGY DOSSIER
 =====================================================
 Template: ${template.toUpperCase()}
+Result type: ${provenance.label}
+Provenance: ${provenance.detail}
 Patient ID: ${results.patientId}
 Species / Demographics: ${results.species}
 Timestamp: ${new Date(results.timestamp).toLocaleString()}
@@ -253,13 +260,13 @@ MACROSCOPIC EVALUATION:
 - Collection Method: ${collectionMethod}
 -----------------------------------------------------
 MICROSCOPIC PARAMETERS:
-- Concentration: ${results.summary.concentration.toFixed(1)} M/mL
-- Total Motility (PR+NP): ${results.summary.motility.total.toFixed(1)}%
-- Progressive Motility (PR): ${results.summary.motility.progressive.toFixed(1)}%
-- Normal Morphology (Kruger): ${results.summary.morphology.normal.toFixed(1)}%
-- Vitality (Live %): ${results.summary.vitality.live.toFixed(1)}%
-- Leukocytes: ${results.summary.leukocytes.toFixed(1)} M/mL
-- DNA Fragmentation (DFI): ${results.summary.sdf.dfi.toFixed(1)}%
+- Concentration: ${reportValue('concentration', `${results.summary.concentration.toFixed(1)} M/mL`)}
+- Total Motility (PR+NP): ${reportValue('kinematics', `${results.summary.motility.total.toFixed(1)}%`)}
+- Progressive Motility (PR): ${reportValue('kinematics', `${results.summary.motility.progressive.toFixed(1)}%`)}
+- Normal Morphology (Kruger): ${reportValue('morphology', `${results.summary.morphology.normal.toFixed(1)}%`)}
+- Vitality (Live %): ${reportValue('vitality', `${results.summary.vitality.live.toFixed(1)}%`)}
+- Leukocytes: ${reportValue('leukocytes', `${results.summary.leukocytes.toFixed(1)} M/mL`)}
+- DNA Fragmentation (DFI): ${reportValue('sdf', `${results.summary.sdf.dfi.toFixed(1)}%`)}
 -----------------------------------------------------
 OPENCASA 8-PARAMETER KINEMATICS:
 - VCL: ${results.summary.kinematics.avgVcl.toFixed(1)} µm/s
@@ -273,16 +280,17 @@ OPENCASA 8-PARAMETER KINEMATICS:
 - Hyperactivation (HA%): ${results.summary.kinematics.hyperactivation.percentage.toFixed(1)}%
 -----------------------------------------------------
 CLINICAL IMPRESSION:
-${customRemarks || results.summary.interpretation?.comments.join('. ') || 'Normozoospermic parameters within clinical reference standards.'}
+${customRemarks || results.summary.interpretation?.comments.join('. ') || 'No clinician impression recorded.'}
 -----------------------------------------------------
-DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUpperCase()} (ISO 15189 Verified)
+Run ID: ${new Date(results.timestamp).getTime().toString(16).toUpperCase()}
+${isMeasuredResult ? 'Research use only. Not a validated diagnostic device.' : 'DEMONSTRATION OUTPUT - NOT A MEASUREMENT.'}
 =====================================================`;
 
     navigator.clipboard.writeText(text);
     setCopiedEMR(true);
     setTimeout(() => setCopiedEMR(false), 2500);
     setDossierToast({
-      message: `Certified EMR summary for sample ${results.patientId} copied to clipboard.`,
+      message: `EMR summary for sample ${results.patientId} copied to clipboard.`,
       type: 'success'
     });
   };
@@ -297,26 +305,31 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
         volumeMl: parseFloat(sampleVolume),
         ph: parseFloat(samplePh),
         appearance: sampleAppearance
-      },
-      laboratory: {
+      },      laboratory: {
         facility: facilityName,
-        authorizedSpecialist: clinicianName,
-        accreditation: 'ISO 15189 / WHO 6th Edition'
+        authorizedSpecialist: clinicianName
+      },
+      provenance: {
+        source: provenance.source,
+        label: provenance.label,
+        detail: provenance.detail,
+        recordEligible: provenance.recordEligible,
+        domains: provenance.domains
       },
       measurements: {
-        concentration_M_ml: results.summary.concentration,
-        totalMotility_percent: results.summary.motility.total,
-        progressiveMotility_percent: results.summary.motility.progressive,
-        normalMorphology_percent: results.summary.morphology.normal,
-        vitality_percent: results.summary.vitality.live,
-        leukocytes_M_ml: results.summary.leukocytes,
-        sdf_dfi_percent: results.summary.sdf.dfi
+        concentration_M_ml: hasDomainValues(domainBasis(results, 'concentration')) ? results.summary.concentration : null,
+        totalMotility_percent: hasDomainValues(domainBasis(results, 'kinematics')) ? results.summary.motility.total : null,
+        progressiveMotility_percent: hasDomainValues(domainBasis(results, 'kinematics')) ? results.summary.motility.progressive : null,
+        normalMorphology_percent: hasDomainValues(domainBasis(results, 'morphology')) ? results.summary.morphology.normal : null,
+        vitality_percent: hasDomainValues(domainBasis(results, 'vitality')) ? results.summary.vitality.live : null,
+        leukocytes_M_ml: hasDomainValues(domainBasis(results, 'leukocytes')) ? results.summary.leukocytes : null,
+        sdf_dfi_percent: hasDomainValues(domainBasis(results, 'sdf')) ? results.summary.sdf.dfi : null
       },
-      kinematics: results.summary.kinematics,
-      morphologyDefects: results.summary.morphology,
+      kinematics: hasDomainValues(domainBasis(results, 'kinematics')) ? results.summary.kinematics : null,
+      morphologyDefects: hasDomainValues(domainBasis(results, 'morphology')) ? results.summary.morphology : null,
       multiFov: results.multiFov || null,
-      clinicalConclusion: customRemarks || results.summary.interpretation?.comments.join('. '),
-      digitalSignature: `SHA256-${new Date(results.timestamp).getTime().toString(16).toUpperCase()}`
+      clinicalConclusion: customRemarks || results.summary.interpretation?.comments.join('.') || null,
+      runId: new Date(results.timestamp).getTime().toString(16).toUpperCase()
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -353,13 +366,18 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-black tracking-tight uppercase">Certified Clinical Report Dossier</h3>
-                <span className="px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  ISO 15189 & WHO 6th
+                <h3 className="text-sm font-black tracking-tight uppercase">{isMeasuredResult ? 'Clinical Report Dossier' : 'Demonstration Report Dossier'}</h3>
+                <span className={cn(
+                  "px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider border",
+                  isMeasuredResult
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                    : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                )}>
+                  {provenance.label}
                 </span>
               </div>
               <p className={cn("text-xs mt-0.5", isDark ? "text-white/40" : "text-slate-500")}>
-                Full-spectrum validated andrology report with regulatory reference compliance
+                Research-use andrology report with reference-limit comparison
               </p>
             </div>
           </div>
@@ -430,7 +448,7 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
               className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Download className="w-4 h-4" />
-              {isGenerating ? "Rendering 300 DPI PDF..." : "Export Certified PDF"}
+              {isGenerating ? "Rendering 300 DPI PDF..." : "Export PDF"}
             </button>
 
             <button
@@ -535,13 +553,13 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
               </div>
             </div>
 
-            {/* Accreditation Badges */}
+            {/* Provenance & report-format notice */}
             <div className="p-3 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 space-y-1.5 text-[9px]">
               <div className="flex items-center gap-1.5 text-emerald-400 font-bold uppercase tracking-wider text-[10px]">
-                <ShieldCheck className="w-3.5 h-3.5" /> Certified Compliance
+                <ShieldCheck className="w-3.5 h-3.5" /> {isMeasuredResult ? 'Measured result' : 'Demonstration output'}
               </div>
               <p className="text-slate-400 leading-relaxed">
-                Report generated adhering to <strong>ISO 15189:2022</strong> medical laboratory standards and <strong>WHO 6th Edition (2021)</strong> laboratory manual.
+                {provenance.label}. The dossier follows the layout of the <strong>WHO 6th Edition (2021)</strong> laboratory manual. This application is not an accredited ISO 15189 medical device and the dossier is not a clinical certificate.
               </p>
             </div>
           </div>
@@ -565,25 +583,44 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
                         ATSA ANDROLOGY & THERIOGENOLOGY DIAGNOSTICS
                       </h1>
                       <p className="text-[9px] font-bold text-slate-500 tracking-widest uppercase mt-1">
-                        Automated Computer-Assisted Semen Analysis (CASA) Certified Clinical Dossier
+                        Automated Computer-Assisted Semen Analysis (CASA) {isMeasuredResult ? 'Report Dossier' : 'Demonstration Dossier — Not a Clinical Measurement'}
                       </p>
                     </div>
                   </div>
                   <div className="mt-2 text-[9px] text-slate-600 space-y-0.5 font-mono">
-                    <div>Facility: <strong className="text-slate-900">{facilityName || 'ATSA Certified Andrology Laboratory'}</strong></div>
+                    <div>Facility: <strong className="text-slate-900">{facilityName || 'Andrology Laboratory'}</strong></div>
                     <div>Authorizing Specialist: <strong className="text-slate-900">{clinicianName || 'Dr. Abdelkader Atia, DVM / Lead Andrologist'}</strong></div>
                   </div>
                 </div>
 
                 <div className="text-right font-mono text-[9px] text-slate-500 space-y-1">
-                  <div className="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 rounded uppercase">
-                    {template === 'who6th' ? 'WHO 6th Edition (2021) Certified' :
-                     template === 'iso15189' ? 'ISO 15189 Medical Lab Accredited' :
-                     template === 'veterinary_sft' ? 'SFT Theriogenology Standard' : 'Extended Kinematics Profile'}
+                  <div className={cn(
+                    "inline-block px-2.5 py-1 font-bold border rounded uppercase",
+                    isMeasuredResult ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-50 text-amber-900 border-amber-300"
+                  )}>
+                    {!isMeasuredResult
+                      ? 'Demonstration — Not Certified'
+                      : template === 'who6th' ? 'WHO 6th Edition (2021) Format' :
+                        template === 'iso15189' ? 'ISO 15189 Report Format' :
+                        template === 'veterinary_sft' ? 'SFT Theriogenology Format' : 'Extended Kinematics Profile'}
                   </div>
                   <div>DOSSIER NO: <strong className="text-slate-900">ATSA-CR-{results.patientId.toUpperCase()}</strong></div>
                   <div>ANALYSIS DATE: <strong>{new Date(results.timestamp).toLocaleDateString()}</strong></div>
                   <div>TIME: <strong>{new Date(results.timestamp).toLocaleTimeString()}</strong></div>
+                </div>
+              </div>
+
+              {/* Provenance notice: always printed in the dossier */}
+              <div className={cn(
+                "p-3 rounded-lg border text-[9px] leading-relaxed space-y-1",
+                isMeasuredResult ? "bg-emerald-50 border-emerald-200 text-emerald-900" : "bg-amber-50 border-amber-300 text-amber-950"
+              )}>
+                <div className="font-black uppercase tracking-wider text-[9.5px]">
+                  Result type: {provenance.label}{isMeasuredResult ? '' : ' — not a measurement'}
+                </div>
+                <div>{provenance.detail}</div>
+                <div className="opacity-75">
+                  Research and educational use only. Not a validated diagnostic device and not for clinical decision-making.
                 </div>
               </div>
 
@@ -685,85 +722,109 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
                   <tbody className="divide-y divide-slate-100">
                     <tr>
                       <td className="p-2 font-bold text-slate-800">Sperm Concentration</td>
-                      <td className="p-2 font-mono font-black text-slate-900 text-[10px]">{results.summary.concentration.toFixed(1)} M/mL</td>
+                      <td className="p-2 font-mono font-black text-slate-900 text-[10px]">{reportValue('concentration', `${results.summary.concentration.toFixed(1)} M/mL`)}</td>
                       <td className="p-2 font-mono text-slate-600">≥ 16.0 M/mL</td>
                       <td className="p-2 font-mono text-slate-600">≥ 15.0 M/mL</td>
                       <td className="p-2 text-right">
                         <span className={cn(
                           "px-1.5 py-0.5 rounded font-black text-[8px] uppercase",
-                          results.summary.concentration >= currentRef.concentration ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+                          !hasDomainValues(domainBasis(results, 'concentration'))
+                            ? "bg-slate-100 text-slate-500"
+                            : results.summary.concentration >= currentRef.concentration ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
                         )}>
-                          {results.summary.concentration >= currentRef.concentration ? "Normozoospermia" : "Oligozoospermia"}
+                          {!hasDomainValues(domainBasis(results, 'concentration'))
+                            ? "Not assessed"
+                            : results.summary.concentration >= currentRef.concentration ? "Normozoospermia" : "Oligozoospermia"}
                         </span>
                       </td>
                     </tr>
                     <tr>
                       <td className="p-2 font-bold text-slate-800">Total Motility (PR + NP)</td>
-                      <td className="p-2 font-mono font-black text-slate-900 text-[10px]">{results.summary.motility.total.toFixed(1)}%</td>
+                      <td className="p-2 font-mono font-black text-slate-900 text-[10px]">{reportValue('kinematics', `${results.summary.motility.total.toFixed(1)}%`)}</td>
                       <td className="p-2 font-mono text-slate-600">≥ 42%</td>
                       <td className="p-2 font-mono text-slate-600">≥ 40%</td>
                       <td className="p-2 text-right">
                         <span className={cn(
                           "px-1.5 py-0.5 rounded font-black text-[8px] uppercase",
-                          results.summary.motility.total >= currentRef.totalMotility ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                          !hasDomainValues(domainBasis(results, 'kinematics'))
+                            ? "bg-slate-100 text-slate-500"
+                            : results.summary.motility.total >= currentRef.totalMotility ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
                         )}>
-                          {results.summary.motility.total >= currentRef.totalMotility ? "Normal Motility" : "Asthenozoospermia"}
+                          {!hasDomainValues(domainBasis(results, 'kinematics'))
+                            ? "Not assessed"
+                            : results.summary.motility.total >= currentRef.totalMotility ? "Normal Motility" : "Asthenozoospermia"}
                         </span>
                       </td>
                     </tr>
                     <tr>
                       <td className="p-2 font-bold text-slate-800">Progressive Motility (PR)</td>
-                      <td className="p-2 font-mono font-black text-emerald-700 text-[10px]">{results.summary.motility.progressive.toFixed(1)}%</td>
+                      <td className="p-2 font-mono font-black text-emerald-700 text-[10px]">{reportValue('kinematics', `${results.summary.motility.progressive.toFixed(1)}%`)}</td>
                       <td className="p-2 font-mono text-slate-600">≥ 30%</td>
                       <td className="p-2 font-mono text-slate-600">≥ 32%</td>
                       <td className="p-2 text-right">
                         <span className={cn(
                           "px-1.5 py-0.5 rounded font-black text-[8px] uppercase",
-                          results.summary.motility.progressive >= currentRef.progressiveMotility ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+                          !hasDomainValues(domainBasis(results, 'kinematics'))
+                            ? "bg-slate-100 text-slate-500"
+                            : results.summary.motility.progressive >= currentRef.progressiveMotility ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
                         )}>
-                          {results.summary.motility.progressive >= currentRef.progressiveMotility ? "Progressive" : "Sub-Optimal"}
+                          {!hasDomainValues(domainBasis(results, 'kinematics'))
+                            ? "Not assessed"
+                            : results.summary.motility.progressive >= currentRef.progressiveMotility ? "Progressive" : "Sub-Optimal"}
                         </span>
                       </td>
                     </tr>
                     <tr>
                       <td className="p-2 font-bold text-slate-800">Normal Morphology (Strict Kruger)</td>
-                      <td className="p-2 font-mono font-black text-slate-900 text-[10px]">{results.summary.morphology.normal.toFixed(1)}%</td>
+                      <td className="p-2 font-mono font-black text-slate-900 text-[10px]">{reportValue('morphology', `${results.summary.morphology.normal.toFixed(1)}%`)}</td>
                       <td className="p-2 font-mono text-slate-600">≥ 4.0%</td>
                       <td className="p-2 font-mono text-slate-600">≥ 4.0%</td>
                       <td className="p-2 text-right">
                         <span className={cn(
                           "px-1.5 py-0.5 rounded font-black text-[8px] uppercase",
-                          results.summary.morphology.normal >= currentRef.normalMorphology ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+                          !hasDomainValues(domainBasis(results, 'morphology'))
+                            ? "bg-slate-100 text-slate-500"
+                            : results.summary.morphology.normal >= currentRef.normalMorphology ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
                         )}>
-                          {results.summary.morphology.normal >= currentRef.normalMorphology ? "Normomorphic" : "Teratozoospermia"}
+                          {!hasDomainValues(domainBasis(results, 'morphology'))
+                            ? "Not assessed"
+                            : results.summary.morphology.normal >= currentRef.normalMorphology ? "Normomorphic" : "Teratozoospermia"}
                         </span>
                       </td>
                     </tr>
                     <tr>
                       <td className="p-2 font-bold text-slate-800">Vitality (Eosin-Nigrosin Live %)</td>
-                      <td className="p-2 font-mono font-black text-slate-900 text-[10px]">{results.summary.vitality.live.toFixed(1)}%</td>
+                      <td className="p-2 font-mono font-black text-slate-900 text-[10px]">{reportValue('vitality', `${results.summary.vitality.live.toFixed(1)}%`)}</td>
                       <td className="p-2 font-mono text-slate-600">≥ 54%</td>
                       <td className="p-2 font-mono text-slate-600">≥ 58%</td>
                       <td className="p-2 text-right">
                         <span className={cn(
                           "px-1.5 py-0.5 rounded font-black text-[8px] uppercase",
-                          results.summary.vitality.live >= currentRef.vitality ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+                          !hasDomainValues(domainBasis(results, 'vitality'))
+                            ? "bg-slate-100 text-slate-500"
+                            : results.summary.vitality.live >= currentRef.vitality ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
                         )}>
-                          {results.summary.vitality.live >= currentRef.vitality ? "High Viability" : "Necrozoospermia"}
+                          {!hasDomainValues(domainBasis(results, 'vitality'))
+                            ? "Not assessed"
+                            : results.summary.vitality.live >= currentRef.vitality ? "High Viability" : "Necrozoospermia"}
                         </span>
                       </td>
                     </tr>
                     <tr>
                       <td className="p-2 font-bold text-slate-800">Peroxidase Leukocytes</td>
-                      <td className="p-2 font-mono font-black text-slate-900 text-[10px]">{results.summary.leukocytes.toFixed(1)} M/mL</td>
+                      <td className="p-2 font-mono font-black text-slate-900 text-[10px]">{reportValue('leukocytes', `${results.summary.leukocytes.toFixed(1)} M/mL`)}</td>
                       <td className="p-2 font-mono text-slate-600">&lt; 1.0 M/mL</td>
                       <td className="p-2 font-mono text-slate-600">&lt; 1.0 M/mL</td>
                       <td className="p-2 text-right">
                         <span className={cn(
                           "px-1.5 py-0.5 rounded font-black text-[8px] uppercase",
-                          results.summary.leukocytes <= 1.0 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                          !hasDomainValues(domainBasis(results, 'leukocytes'))
+                            ? "bg-slate-100 text-slate-500"
+                            : results.summary.leukocytes <= 1.0 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
                         )}>
-                          {results.summary.leukocytes <= 1.0 ? "Normal" : "Leukocytospermia"}
+                          {!hasDomainValues(domainBasis(results, 'leukocytes'))
+                            ? "Not assessed"
+                            : results.summary.leukocytes <= 1.0 ? "Normal" : "Leukocytospermia"}
                         </span>
                       </td>
                     </tr>
@@ -819,9 +880,16 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
                   <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                     <Dna className="w-3.5 h-3.5 text-purple-600" /> III. Morphometry & Multiple Deformity Indices (Strict Kruger)
                   </h3>
-                  <span className="text-[8px] font-mono text-slate-400">Strict Kruger Criteria</span>
+                  <span className="text-[8px] font-mono text-slate-400">Basis: {domainBasis(results, 'morphology')}</span>
                 </div>
 
+                {!hasDomainValues(domainBasis(results, 'morphology')) && (
+                  <div className="p-3 bg-amber-50 rounded border border-amber-300 text-[9px] font-bold text-amber-900">
+                    Not assessed. Morphometry and deformity indices require a dedicated stained-image assessment that this run did not perform.
+                  </div>
+                )}
+
+                {hasDomainValues(domainBasis(results, 'morphology')) && (
                 <div className="grid grid-cols-3 gap-3">
                   {/* Deformity Indices */}
                   <div className="p-2.5 bg-slate-50 rounded border border-slate-200 space-y-1">
@@ -836,7 +904,7 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
                     </div>
                     <div className="flex justify-between text-[9px]">
                       <span>SDI (Sperm Deformity):</span>
-                      <strong className="font-mono">{results.summary.morphology.sdi?.toFixed(2) || '1.18'}</strong>
+                      <strong className="font-mono">{reportValue('morphology', (results.summary.morphology.sdi ?? 0).toFixed(2))}</strong>
                     </div>
                     <span className="text-[7px] text-slate-400 block pt-0.5">Normal cutoff: TZI &lt; 1.6, MAI &lt; 1.5</span>
                   </div>
@@ -869,11 +937,12 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
                     </div>
                     <div className="flex justify-between text-[9px]">
                       <span>DNA Frag Index (SDF):</span>
-                      <strong className="font-mono text-red-600">{results.summary.sdf.dfi.toFixed(1)}% DFI</strong>
+                      <strong className="font-mono text-red-600">{reportValue('sdf', `${results.summary.sdf.dfi.toFixed(1)}% DFI`)}</strong>
                     </div>
                     <span className="text-[7px] text-slate-400 block pt-0.5">DFI Cutoff: &lt;15% Excellent, &gt;25% Poor</span>
                   </div>
                 </div>
+                )}
               </div>
 
               {/* 6. Multi-FOV Homogeneity Section (if multi-field data exists) */}
@@ -912,10 +981,9 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
                     Clinician Diagnostic Impression & Therapeutic Recommendations
                   </h4>
                   <div className="p-3 bg-slate-50 rounded border border-slate-200 text-[9px] leading-relaxed text-slate-800 font-serif italic">
-                    {customRemarks || (
-                      results.summary.interpretation?.comments.join('. ') || 
-                      "Specimen exhibits normozoospermic parameters adhering to reference limits of the WHO standard. Kinematic velocity distributions demonstrate vigorous progressive motility."
-                    )}
+                    {customRemarks ||
+                      results.summary.interpretation?.comments.join('. ') ||
+                      'No clinician impression recorded.'}
                   </div>
                 </div>
 
@@ -926,7 +994,7 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
                     <div className="text-lg font-serif italic font-semibold text-emerald-800 border-b border-slate-300 pb-1 pr-12">
                       {clinicianName || 'Dr. Abdelkader Atia'}
                     </div>
-                    <div className="text-[8px] text-slate-500 font-mono">License / Cert: ATSA-CASA-DVM-2026 &middot; CAP / CLIA Certified</div>
+                    <div className="text-[8px] text-slate-500 font-mono">Research-use software &middot; not an accredited clinical laboratory report</div>
                   </div>
 
                   {includeCryptoStamp && (
@@ -934,9 +1002,19 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
                       {/* Digital seal badge */}
                       <div className="w-16 h-16 rounded-full border-2 border-emerald-600/40 border-dashed flex items-center justify-center p-1 text-center select-none bg-emerald-50/30">
                         <span className="text-[6.5px] font-black uppercase tracking-tighter text-emerald-700 leading-none">
-                          ATSA CASA<br />
-                          CERTIFIED<br />
-                          ISO 15189
+                          {isMeasuredResult ? (
+                            <>
+                              ATSA CASA<br />
+                              REPORT<br />
+                              FORMAT
+                            </>
+                          ) : (
+                            <>
+                              DEMO<br />
+                              NOT<br />
+                              CERTIFIED
+                            </>
+                          )}
                         </span>
                       </div>
 
@@ -944,7 +1022,7 @@ DIGITAL SEAL: SHA256-${new Date(results.timestamp).getTime().toString(16).toUppe
                         <div>DIGITAL CRYPTO SEAL</div>
                         <div className="font-bold text-slate-700">SHA256-{new Date(results.timestamp).getTime().toString(16).toUpperCase()}</div>
                         <div className="text-emerald-600 flex items-center justify-end gap-1 font-sans font-bold">
-                          <ShieldCheck className="w-3 h-3 inline" /> Verified & Tamper-Proof
+                          <ShieldCheck className="w-3 h-3 inline" /> {isMeasuredResult ? 'Measured run' : 'Demonstration output'}
                         </div>
                       </div>
                     </div>

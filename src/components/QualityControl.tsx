@@ -81,14 +81,16 @@ export const QualityControl: React.FC<QualityControlProps> = ({ onBack, currentA
   const [selectedLevel, setSelectedLevel] = useState<'level_1_low' | 'level_2_normal' | 'level_3_high'>('level_2_normal');
   const [selectedParam, setSelectedParam] = useState<'concentration' | 'motility' | 'progressive'>('concentration');
   const [qcHistory, setQcHistory] = useState<QCDataPoint[]>([]);
+  const [isExampleHistory, setIsExampleHistory] = useState(false);
   const [isAddingRun, setIsAddingRun] = useState(false);
   const [activeTab, setActiveTab] = useState<'chart' | 'logs' | 'westgard'>('chart');
 
   // New QC Run Form state
-  const [inputConc, setInputConc] = useState<string>('51.2');
-  const [inputMotility, setInputMotility] = useState<string>('56.0');
-  const [inputProg, setInputProg] = useState<string>('44.0');
-  const [inputMorph, setInputMorph] = useState<string>('5.2');
+  const [inputConc, setInputConc] = useState<string>('');
+  const [inputMotility, setInputMotility] = useState<string>('');
+  const [inputProg, setInputProg] = useState<string>('');
+  const [inputMorph, setInputMorph] = useState<string>('');
+  const [formError, setFormError] = useState<string>('');
   const [operatorName, setOperatorName] = useState<string>('Dr. Atia / Lab Specialist');
   const [notes, setNotes] = useState<string>('');
 
@@ -118,6 +120,7 @@ export const QualityControl: React.FC<QualityControlProps> = ({ onBack, currentA
         { id: '8', timestamp: new Date(Date.now() - 1 * 86400000).toISOString(), runDate: 'Yesterday', lotNumber: selectedLot, level: selectedLevel, operator: 'Dr. Atia', instrumentId: 'ATSA-CASA-01', concentration: 50.8, motility: 55.1, progressive: 43.9, morphology: 5.1, status: 'in_control', westgardViolations: [] }
       ];
       setQcHistory(seedHistory);
+      setIsExampleHistory(true);
       return;
     }
 
@@ -142,12 +145,14 @@ export const QualityControl: React.FC<QualityControlProps> = ({ onBack, currentA
           { id: '6', timestamp: new Date(Date.now() - 1 * 86400000).toISOString(), runDate: 'Day -1', lotNumber: selectedLot, level: selectedLevel, operator: 'Dr. Atia', instrumentId: 'ATSA-CASA-01', concentration: 51.5, motility: 56.4, progressive: 44.6, morphology: 5.3, status: 'in_control', westgardViolations: [] }
         ];
         setQcHistory(seedHistory);
+        setIsExampleHistory(true);
       } else {
         const records = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as QCDataPoint[];
         setQcHistory(records);
+        setIsExampleHistory(false);
       }
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'qc_runs');
@@ -158,10 +163,17 @@ export const QualityControl: React.FC<QualityControlProps> = ({ onBack, currentA
 
   const handleSaveQCRun = async (e: React.FormEvent) => {
     e.preventDefault();
-    const conc = parseFloat(inputConc) || targetMean;
-    const mot = parseFloat(inputMotility) || 50;
-    const prog = parseFloat(inputProg) || 40;
-    const morph = parseFloat(inputMorph) || 5;
+    // Every value must be entered by the operator. Falling back to a target or
+    // default would write an invented measurement into the QC record.
+    const conc = parseFloat(inputConc);
+    const mot = parseFloat(inputMotility);
+    const prog = parseFloat(inputProg);
+    const morph = parseFloat(inputMorph);
+    if (![conc, mot, prog, morph].every((value) => Number.isFinite(value))) {
+      setFormError('Enter the measured concentration, motility, progressive motility, and morphology before committing the run.');
+      return;
+    }
+    setFormError('');
 
     // Evaluate Westgard Rules against prior runs
     const pastValues = qcHistory.map(h => (selectedParam === 'concentration' ? h.concentration : h.motility));
@@ -331,6 +343,16 @@ export const QualityControl: React.FC<QualityControlProps> = ({ onBack, currentA
           );
         })}
       </div>
+
+      {isExampleHistory && qcSection === 'levey_jennings' && (
+        <div className={cn(
+          "p-3.5 rounded-2xl border text-[11px] leading-relaxed",
+          isDark ? "bg-amber-500/10 border-amber-500/25 text-amber-200/90" : "bg-amber-50 border-amber-200 text-amber-950/80"
+        )}>
+          <strong className="font-black uppercase tracking-wider">Example control history.</strong>{' '}
+          No QC runs are stored for this account yet, so the chart shows bundled example points, not measurements from your instrument. Record a calibration run to start your own history.
+        </div>
+      )}
 
       {qcSection === 'debris' && (
         <DebrisFilterInspector spermatozoa={currentAnalysis?.spermatozoa || []} theme={theme} />
@@ -688,6 +710,12 @@ export const QualityControl: React.FC<QualityControlProps> = ({ onBack, currentA
                     className={cn("w-full px-3.5 py-2.5 rounded-xl text-xs border focus:ring-2 focus:ring-emerald-500/50 outline-none", isDark ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200")}
                   />
                 </div>
+
+                {formError && (
+                  <p className="p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-[11px] font-semibold text-red-500">
+                    {formError}
+                  </p>
+                )}
 
                 <div className="flex items-center gap-3 pt-4 border-t border-white/10 dark:border-white/10 border-slate-200">
                   <button

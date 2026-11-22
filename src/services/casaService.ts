@@ -1,4 +1,14 @@
-import type { SpermData, AnalysisResult, HistogramBin, KinematicDistributions, FieldOfViewData, MultiFOVComposite, MacroEvaluation } from '../types';
+import type {
+  SpermData,
+  AnalysisResult,
+  AnalysisProvenance,
+  HistogramBin,
+  KinematicDistributions,
+  FieldOfViewData,
+  MultiFOVComposite,
+  MacroEvaluation,
+} from '../types';
+import { computeBeatCrossFrequency, computeMeanAngularDisplacement } from './kinematicsMetrics';
 
 /**
  * OpenCASA Kinematic Algorithms & WHO 6th (2021) / WHO 5th (2010) Compliance
@@ -12,14 +22,16 @@ export const calculateKinematics = (
   micronsPerPixel: number,
   whoStandard: '5th' | '6th' = '6th'
 ): Omit<SpermData, 'id' | 'path'> => {
+  // Trajectory analysis cannot derive morphology, vitality, or DNA integrity.
+  // These sentinels exist so nothing downstream can mistake a default for a measurement.
   const defaultMorphology = {
-    head: 'normal' as const,
-    vacuoles: 'absent' as const,
-    acrosome: 'normal' as const,
-    midpiece: 'normal' as const,
-    tail: 'normal' as const,
-    droplet: 'none' as const,
-    krugerStrict: 'strict_normal' as const
+    head: 'not_assessed' as const,
+    vacuoles: 'not_assessed' as const,
+    acrosome: 'not_assessed' as const,
+    midpiece: 'not_assessed' as const,
+    tail: 'not_assessed' as const,
+    droplet: 'not_assessed' as const,
+    krugerStrict: 'not_assessed' as const
   };
 
   const defaultMorphometry = {
@@ -29,8 +41,8 @@ export const calculateKinematics = (
     width: 0,
     circularity: 0,
     elongation: 0,
-    lengthWidthRatio: 1.6,
-    acrosomeAreaPercent: 55
+    lengthWidthRatio: 0,
+    acrosomeAreaPercent: 0
   };
 
   if (path.length < 2) {
@@ -41,11 +53,12 @@ export const calculateKinematics = (
       hyperactivationType: 'none',
       morphometry: defaultMorphometry,
       morphology: defaultMorphology,
-      vitality: 'dead',
+      vitality: 'not_assessed',
       sdf: {
         fragmented: false,
         haloSized: 0,
-        dfi: 0
+        dfi: 0,
+        assessed: false
       }
     };
   }
@@ -72,7 +85,7 @@ export const calculateKinematics = (
 
   // 3. VAP (Average Path Velocity)
   // Moving average filtered centroid trajectory (window = 5 frames)
-  const smoothedPath = [];
+  const smoothedPath: { x: number; y: number }[] = [];
   const windowSize = 5;
   for (let i = 0; i < path.length; i++) {
     const start = Math.max(0, i - Math.floor(windowSize / 2));
@@ -138,70 +151,27 @@ export const calculateKinematics = (
     }
   }
 
-  // Morphometry & Kruger Strict Evaluation
-  const headLength = 4.0 + (Math.random() * 1.5 - 0.5); // Normal range: 4.0 - 5.0 um
-  const headWidth = 2.5 + (Math.random() * 1.2 - 0.4); // Normal range: 2.5 - 3.5 um
-  const lengthWidthRatio = headLength / Math.max(headWidth, 0.1);
-  const acrosomeAreaPercent = 45 + Math.random() * 25; // Normal range: 40 - 70%
-
-  const isHeadDimensionNormal = headLength >= 3.8 && headLength <= 5.2 && headWidth >= 2.3 && headWidth <= 3.6 && lengthWidthRatio >= 1.45 && lengthWidthRatio <= 1.80;
-  const isAcrosomeNormal = acrosomeAreaPercent >= 40 && acrosomeAreaPercent <= 70;
-
-  const rawHeadType = Math.random() > 0.82 
-    ? 'normal' 
-    : (['large', 'small', 'amorphous', 'pyriform', 'tapered', 'round', 'vacuolated', 'double'][Math.floor(Math.random() * 8)] as any);
-  
-  const midpieceType = Math.random() > 0.85 
-    ? 'normal' 
-    : (['thick', 'bent', 'asymmetric', 'cytoplasmic_droplet'][Math.floor(Math.random() * 4)] as any);
-
-  const tailType = Math.random() > 0.82 
-    ? 'normal' 
-    : (['short', 'coiled', 'multiple', 'bent', 'broken'][Math.floor(Math.random() * 5)] as any);
-
-  const dropletType = Math.random() > 0.92 
-    ? 'none' 
-    : (['proximal', 'distal'][Math.floor(Math.random() * 2)] as any);
-
-  // Strict Kruger normal requires strictly normal head dimensions, normal acrosome, regular midpiece, and intact uncoiled tail
-  let krugerStrict: 'strict_normal' | 'borderline' | 'abnormal' = 'abnormal';
-  if (rawHeadType === 'normal' && isHeadDimensionNormal && isAcrosomeNormal && midpieceType === 'normal' && tailType === 'normal' && dropletType === 'none') {
-    krugerStrict = 'strict_normal';
-  } else if (rawHeadType === 'normal' && (midpieceType === 'normal' || tailType === 'normal')) {
-    krugerStrict = 'borderline';
-  }
+  // BCF and MAD are derived from the trajectory itself. Morphology,
+  // morphometry, vitality, and SDF are not observable from a tracking path and
+  // are explicitly reported as not assessed.
+  const bcf = computeBeatCrossFrequency(path, smoothedPath, fps);
+  const mad = computeMeanAngularDisplacement(path);
 
   return {
     vcl, vsl, vap, lin, str, wob, alh: maxAlh,
     classification,
     isHyperactivated,
     hyperactivationType,
-    bcf: 14 + Math.random() * 12,
-    mad: 18 + Math.random() * 14,
-    morphometry: {
-      area: headLength * headWidth * 0.785,
-      perimeter: 2 * Math.PI * Math.sqrt((headLength * headLength + headWidth * headWidth) / 8),
-      length: headLength,
-      width: headWidth,
-      circularity: 4 * Math.PI * (headLength * headWidth * 0.785) / Math.pow(12, 2),
-      elongation: lengthWidthRatio,
-      lengthWidthRatio,
-      acrosomeAreaPercent
-    },
-    morphology: {
-      head: rawHeadType,
-      vacuoles: Math.random() > 0.92 ? 'present' : 'absent',
-      acrosome: isAcrosomeNormal ? 'normal' : 'abnormal',
-      midpiece: midpieceType,
-      tail: tailType,
-      droplet: dropletType,
-      krugerStrict
-    },
-    vitality: Math.random() > 0.22 ? 'live' : 'dead',
+    bcf,
+    mad,
+    morphometry: defaultMorphometry,
+    morphology: defaultMorphology,
+    vitality: 'not_assessed',
     sdf: {
-      fragmented: Math.random() > 0.84,
-      haloSized: 12 + Math.random() * 14,
-      dfi: Math.random() * 100
+      fragmented: false,
+      haloSized: 0,
+      dfi: 0,
+      assessed: false
     }
   };
 };
@@ -230,10 +200,17 @@ function createHistogram(values: number[], min: number, max: number, binCount = 
 }
 
 export const generateSummary = (
-  spermatozoa: SpermData[], 
+  spermatozoa: SpermData[],
   settings: AnalysisResult['settings'],
-  macro?: MacroEvaluation
+  macro: MacroEvaluation | undefined,
+  provenance: AnalysisProvenance
 ): AnalysisResult['summary'] => {
+  const domains = provenance.domains;
+  const morphologyAssessed = domains.morphology !== 'not_assessed';
+  const vitalityAssessed = domains.vitality !== 'not_assessed';
+  const sdfAssessed = domains.sdf !== 'not_assessed';
+  const concentrationAssessed = domains.concentration !== 'not_assessed';
+  const simulationOnly = provenance.source === 'simulated' || provenance.source === 'ai_estimated';
   const totalCount = spermatozoa.length;
   const progressive = spermatozoa.filter(s => s.classification === 'progressive').length;
   const nonProgressive = spermatozoa.filter(s => s.classification === 'non-progressive').length;
@@ -263,17 +240,21 @@ export const generateSummary = (
   const linearWhiplashCount = hyperactivatedSperm.filter(s => s.hyperactivationType === 'linear_whiplash').length;
 
   // Strict Kruger & Standard Morphology
-  const krugerStrictCount = spermatozoa.filter(s => s.morphology.krugerStrict === 'strict_normal').length;
-  const krugerStrictNormal = totalCount > 0 ? (krugerStrictCount / totalCount) * 100 : 0;
+  const krugerStrictCount = morphologyAssessed
+    ? spermatozoa.filter(s => s.morphology.krugerStrict === 'strict_normal').length
+    : 0;
+  const krugerStrictNormal = morphologyAssessed && totalCount > 0 ? (krugerStrictCount / totalCount) * 100 : 0;
 
-  const normalCount = spermatozoa.filter(s => 
-    s.morphology.head === 'normal' && 
-    s.morphology.midpiece === 'normal' && 
-    s.morphology.tail === 'normal' &&
-    s.morphology.acrosome === 'normal' &&
-    s.morphology.droplet === 'none'
-  ).length;
-  const normalMorphology = totalCount > 0 ? (normalCount / totalCount) * 100 : 0;
+  const normalCount = morphologyAssessed
+    ? spermatozoa.filter(s =>
+        s.morphology.head === 'normal' &&
+        s.morphology.midpiece === 'normal' &&
+        s.morphology.tail === 'normal' &&
+        s.morphology.acrosome === 'normal' &&
+        s.morphology.droplet === 'none'
+      ).length
+    : 0;
+  const normalMorphology = morphologyAssessed && totalCount > 0 ? (normalCount / totalCount) * 100 : 0;
 
   // Detailed Morphology Defect Breakdown
   const headDefects = { large: 0, small: 0, amorphous: 0, pyriform: 0, tapered: 0, round: 0, vacuolated: 0, double: 0 };
@@ -282,70 +263,87 @@ export const generateSummary = (
   let acrosomeDefects = 0;
   let cytoplasmicDroplets = 0;
 
-  spermatozoa.forEach(s => {
-    if (s.morphology.head !== 'normal') {
-      const type = s.morphology.head as keyof typeof headDefects;
-      if (headDefects[type] !== undefined) headDefects[type]++;
-    }
-    if (s.morphology.midpiece !== 'normal') {
-      const type = s.morphology.midpiece as keyof typeof midpieceDefects;
-      if (midpieceDefects[type] !== undefined) midpieceDefects[type]++;
-    }
-    if (s.morphology.tail !== 'normal') {
-      const type = s.morphology.tail as keyof typeof tailDefects;
-      if (tailDefects[type] !== undefined) tailDefects[type]++;
-    }
-    if (s.morphology.acrosome !== 'normal') acrosomeDefects++;
-    if (s.morphology.droplet !== 'none') cytoplasmicDroplets++;
-  });
+  if (morphologyAssessed) {
+    spermatozoa.forEach(s => {
+      if (s.morphology.head !== 'normal' && s.morphology.head !== 'not_assessed') {
+        const type = s.morphology.head as keyof typeof headDefects;
+        if (headDefects[type] !== undefined) headDefects[type]++;
+      }
+      if (s.morphology.midpiece !== 'normal' && s.morphology.midpiece !== 'not_assessed') {
+        const type = s.morphology.midpiece as keyof typeof midpieceDefects;
+        if (midpieceDefects[type] !== undefined) midpieceDefects[type]++;
+      }
+      if (s.morphology.tail !== 'normal' && s.morphology.tail !== 'not_assessed') {
+        const type = s.morphology.tail as keyof typeof tailDefects;
+        if (tailDefects[type] !== undefined) tailDefects[type]++;
+      }
+      if (s.morphology.acrosome !== 'normal' && s.morphology.acrosome !== 'not_assessed') acrosomeDefects++;
+      if (s.morphology.droplet !== 'none' && s.morphology.droplet !== 'not_assessed') cytoplasmicDroplets++;
+    });
+  }
 
   const getPercent = (count: number) => totalCount > 0 ? (count / totalCount) * 100 : 0;
 
   // SDF Summary
-  const fragmentedCount = spermatozoa.filter(s => s.sdf.fragmented).length;
-  const dfi = totalCount > 0 ? (fragmentedCount / totalCount) * 100 : 0;
-  const sdfCategory: 'excellent' | 'good_fair' | 'poor' = dfi < 15 ? 'excellent' : dfi <= 25 ? 'good_fair' : 'poor';
+  const fragmentedCount = sdfAssessed ? spermatozoa.filter(s => s.sdf.fragmented).length : 0;
+  const dfi = sdfAssessed && totalCount > 0 ? (fragmentedCount / totalCount) * 100 : 0;
+  const sdfCategory: 'excellent' | 'good_fair' | 'poor' | undefined = sdfAssessed
+    ? dfi < 15 ? 'excellent' : dfi <= 25 ? 'good_fair' : 'poor'
+    : undefined;
 
   // Morphology Indices: TZI, MAI, SDI
-  const abnormalSperm = spermatozoa.filter(s => 
-    s.morphology.head !== 'normal' || 
-    s.morphology.midpiece !== 'normal' || 
-    s.morphology.tail !== 'normal' ||
-    s.morphology.acrosome !== 'normal' ||
-    s.morphology.droplet !== 'none'
-  );
-  
-  const totalDefects = spermatozoa.reduce((acc, s) => {
-    let defects = 0;
-    if (s.morphology.head !== 'normal') defects++;
-    if (s.morphology.midpiece !== 'normal') defects++;
-    if (s.morphology.tail !== 'normal') defects++;
-    if (s.morphology.acrosome !== 'normal') defects++;
-    if (s.morphology.droplet !== 'none') defects++;
-    return acc + defects;
-  }, 0);
+  const abnormalSperm = morphologyAssessed
+    ? spermatozoa.filter(s =>
+        s.morphology.head !== 'normal' ||
+        s.morphology.midpiece !== 'normal' ||
+        s.morphology.tail !== 'normal' ||
+        s.morphology.acrosome !== 'normal' ||
+        s.morphology.droplet !== 'none'
+      )
+    : [];
 
-  const tzi = abnormalSperm.length > 0 ? totalDefects / abnormalSperm.length : 1.0;
-  const mai = totalCount > 0 ? totalDefects / totalCount : 0;
-  const sdi = totalCount > 0 ? totalDefects / totalCount : 0; // Sperm Deformity Index
+  const totalDefects = morphologyAssessed
+    ? spermatozoa.reduce((acc, s) => {
+        let defects = 0;
+        if (s.morphology.head !== 'normal' && s.morphology.head !== 'not_assessed') defects++;
+        if (s.morphology.midpiece !== 'normal' && s.morphology.midpiece !== 'not_assessed') defects++;
+        if (s.morphology.tail !== 'normal' && s.morphology.tail !== 'not_assessed') defects++;
+        if (s.morphology.acrosome !== 'normal' && s.morphology.acrosome !== 'not_assessed') defects++;
+        if (s.morphology.droplet !== 'none' && s.morphology.droplet !== 'not_assessed') defects++;
+        return acc + defects;
+      }, 0)
+    : 0;
 
-  const liveCount = spermatozoa.filter(s => s.vitality === 'live').length;
-  const vitalityTotal = totalCount > 0 ? (liveCount / totalCount) * 100 : 0;
-  const leukocytes = Math.random() > 0.8 ? 1.4 : 0.2; // Simulated million/ml
+  const tzi = morphologyAssessed && abnormalSperm.length > 0 ? totalDefects / abnormalSperm.length : 0;
+  const mai = morphologyAssessed && totalCount > 0 ? totalDefects / totalCount : 0;
+  const sdi = morphologyAssessed && totalCount > 0 ? totalDefects / totalCount : 0; // Sperm Deformity Index
 
-  // Chamber depth volumetric calculation
-  const depthMicrons = (settings as any).chamberDepth ?? 20;
+  const liveCount = vitalityAssessed
+    ? spermatozoa.filter(s => s.vitality === 'live').length
+    : 0;
+  const vitalityTotal = vitalityAssessed && totalCount > 0 ? (liveCount / totalCount) * 100 : 0;
+  // No leukocyte assay is performed by this pipeline, so this cannot be inferred.
+  const leukocytes = 0;
+
+  // Chamber depth volumetric calculation using the actual analysed frame size.
+  const depthMicrons = settings.chamberDepth ?? 20;
   const mpp = settings.micronsPerPixel ?? 0.65;
-  const fieldWidthMm = (1280 * mpp) / 1000;
-  const fieldHeightMm = (720 * mpp) / 1000;
+  const frameWidth = settings.frameWidth ?? 1280;
+  const frameHeight = settings.frameHeight ?? 720;
+  const fieldWidthMm = (frameWidth * mpp) / 1000;
+  const fieldHeightMm = (frameHeight * mpp) / 1000;
   const fieldAreaMm2 = fieldWidthMm * fieldHeightMm;
   const chamberDepthMm = depthMicrons / 1000;
   const fieldVolumeMm3 = fieldAreaMm2 * chamberDepthMm;
   const fieldVolumeML = fieldVolumeMm3 / 1000;
-  const concentration = totalCount > 0 ? (totalCount / fieldVolumeML) / 1000000 : 0;
+  const concentration = concentrationAssessed && totalCount > 0 && fieldVolumeML > 0
+    ? (totalCount / fieldVolumeML) / 1000000
+    : 0;
 
-  const ejaculateVolume = macro?.volume || 2.0;
-  const totalCountPerEjaculate = concentration * ejaculateVolume;
+  const ejaculateVolume = macro?.volume;
+  const totalCountPerEjaculate = concentrationAssessed && ejaculateVolume
+    ? concentration * ejaculateVolume
+    : undefined;
 
   const { profile } = settings;
   const whoEditionUsed: '5th' | '6th' = settings.whoStandard || (profile.whoEdition as '5th' | '6th') || '6th';
@@ -362,7 +360,8 @@ export const generateSummary = (
     wob: createHistogram(spermatozoa.map(s => s.wob), 0, 1, 8, '')
   };
 
-  // Interpretation Logic aligned with WHO Reference Limits
+  // Interpretation Logic aligned with WHO Reference Limits.
+  // Only domains that were actually assessed may generate diagnostic statements.
   const comments: string[] = [];
   const recommendations: string[] = [];
   let status: 'normal' | 'borderline' | 'abnormal' = 'normal';
@@ -372,57 +371,67 @@ export const generateSummary = (
   const refMinConc = profile.minConcentration ?? (whoEditionUsed === '6th' ? 16 : 15);
   const refMinMorph = profile.minNormalMorphology ?? 4;
   const refMinVital = profile.minVitality ?? (whoEditionUsed === '6th' ? 54 : 58);
+  const coreDomains: Array<keyof typeof domains> = ['kinematics', 'concentration', 'morphology', 'vitality', 'sdf'];
+  const missingCoreDomains = coreDomains.filter(domain => domains[domain] === 'not_assessed');
 
-  if (totalMotility < refMinMotility) {
-    status = 'abnormal';
-    comments.push(`Asthenozoospermia (Total motility ${totalMotility.toFixed(1)}% < Ref: ${refMinMotility}% [WHO ${whoEditionUsed} Ed.]).`);
-    recommendations.push('Evaluate for varicocele, accessory gland infections, or oxidative stress.');
-  } else if (totalMotility < refMinMotility + 4) {
-    status = 'borderline';
-    comments.push(`Borderline total motility (${totalMotility.toFixed(1)}% near ${refMinMotility}% threshold).`);
-  }
+  if (!simulationOnly) {
+    if (domains.kinematics !== 'not_assessed') {
+      if (totalMotility < refMinMotility) {
+        status = 'abnormal';
+        comments.push(`Asthenozoospermia (Total motility ${totalMotility.toFixed(1)}% < Ref: ${refMinMotility}% [WHO ${whoEditionUsed} Ed.]).`);
+        recommendations.push('Evaluate for varicocele, accessory gland infections, or oxidative stress.');
+      } else if (totalMotility < refMinMotility + 4) {
+        status = 'borderline';
+        comments.push(`Borderline total motility (${totalMotility.toFixed(1)}% near ${refMinMotility}% threshold).`);
+      }
 
-  if (progressiveMotility < refMinProg) {
-    status = 'abnormal';
-    comments.push(`Reduced progressive motility: ${progressiveMotility.toFixed(1)}% (Ref: ≥${refMinProg}%).`);
-  }
+      if (progressiveMotility < refMinProg) {
+        status = 'abnormal';
+        comments.push(`Reduced progressive motility: ${progressiveMotility.toFixed(1)}% (Ref: ≥${refMinProg}%).`);
+      }
+    }
 
-  if (krugerStrictNormal < refMinMorph || normalMorphology < refMinMorph) {
-    status = 'abnormal';
-    comments.push(`Teratozoospermia: Kruger strict morphology ${krugerStrictNormal.toFixed(1)}% (Ref: ≥${refMinMorph}%).`);
-    recommendations.push('Consider Sperm DNA Fragmentation (DFI) testing and antioxidant regimen.');
-  }
+    if (morphologyAssessed && (krugerStrictNormal < refMinMorph || normalMorphology < refMinMorph)) {
+      status = 'abnormal';
+      comments.push(`Teratozoospermia: Kruger strict morphology ${krugerStrictNormal.toFixed(1)}% (Ref: ≥${refMinMorph}%).`);
+      recommendations.push('Consider Sperm DNA Fragmentation (DFI) testing and antioxidant regimen.');
+    }
 
-  if (concentration < refMinConc) {
-    status = 'abnormal';
-    comments.push(`Oligozoospermia: ${concentration.toFixed(1)} M/ml (Ref: ≥${refMinConc} M/ml).`);
-    recommendations.push('Hormonal axis panel assessment recommended (Serum FSH, LH, Total Testosterone).');
-  }
+    if (concentrationAssessed && concentration < refMinConc) {
+      status = 'abnormal';
+      comments.push(`Oligozoospermia: ${concentration.toFixed(1)} M/ml (Ref: ≥${refMinConc} M/ml).`);
+      recommendations.push('Hormonal axis panel assessment recommended (Serum FSH, LH, Total Testosterone).');
+    }
 
-  if (vitalityTotal < refMinVital) {
-    status = 'abnormal';
-    comments.push(`Necrozoospermia: Low cell membrane integrity (${vitalityTotal.toFixed(1)}% live vs Ref: ≥${refMinVital}%).`);
-  }
+    if (vitalityAssessed && vitalityTotal < refMinVital) {
+      status = 'abnormal';
+      comments.push(`Necrozoospermia: Low cell membrane integrity (${vitalityTotal.toFixed(1)}% live vs Ref: ≥${refMinVital}%).`);
+    }
 
-  if (leukocytes > profile.maxLeukocytes) {
-    status = 'abnormal';
-    comments.push(`Leukocytospermia: Elevated peroxidase-positive leukocytes (${leukocytes.toFixed(1)} M/ml).`);
-    recommendations.push('Microbiological semen culture and antibiotic sensitivity testing indicated.');
-  }
+    if (morphologyAssessed && tzi > 1.60) {
+      status = 'abnormal';
+      comments.push(`Elevated Teratozoospermia Index (TZI: ${tzi.toFixed(2)}): High defect multiplicity per abnormal cell.`);
+    }
 
-  if (tzi > 1.60) {
-    status = 'abnormal';
-    comments.push(`Elevated Teratozoospermia Index (TZI: ${tzi.toFixed(2)}): High defect multiplicity per abnormal cell.`);
-  }
+    if (sdfAssessed && dfi > 25) {
+      comments.push(`High DNA Fragmentation Index (DFI: ${dfi.toFixed(1)}%): Reduced reproductive potential.`);
+      recommendations.push('Evaluate lifestyle factors, smoking cessation, and varicocele repair if present.');
+    }
 
-  if (dfi > 25) {
-    comments.push(`High DNA Fragmentation Index (DFI: ${dfi.toFixed(1)}%): Reduced reproductive potential.`);
-    recommendations.push('Evaluate lifestyle factors, smoking cessation, and varicocele repair if present.');
-  }
+    if (status === 'normal' && missingCoreDomains.length > 0) {
+      status = 'borderline';
+    }
 
-  if (comments.length === 0) {
-    comments.push(`Normozoospermia: All diagnostic criteria satisfy standard reference limits [WHO ${whoEditionUsed} Edition].`);
-    recommendations.push('Routine clinical follow-up as per standard protocol.');
+    if (comments.length === 0) {
+      if (missingCoreDomains.length === 0) {
+        comments.push(`Normozoospermia: All diagnostic criteria satisfy standard reference limits [WHO ${whoEditionUsed} Edition].`);
+        recommendations.push('Routine clinical follow-up as per standard protocol.');
+      } else {
+        comments.push(
+          `No abnormality was detected in the domains assessed. Not assessed in this run: ${missingCoreDomains.join(', ')}.`
+        );
+      }
+    }
   }
 
   return {
@@ -432,7 +441,7 @@ export const generateSummary = (
     leukocytes,
     vitality: {
       live: vitalityTotal,
-      dead: 100 - vitalityTotal,
+      dead: vitalityAssessed ? 100 - vitalityTotal : 0,
       total: vitalityTotal
     },
     motility: {
@@ -455,7 +464,7 @@ export const generateSummary = (
     },
     morphology: {
       normal: normalMorphology,
-      abnormal: 100 - normalMorphology,
+      abnormal: morphologyAssessed ? 100 - normalMorphology : 0,
       krugerStrictNormal,
       avgArea,
       avgLength,
@@ -496,12 +505,14 @@ export const generateSummary = (
       totalCount,
       category: sdfCategory
     },
-    interpretation: {
-      status,
-      comments,
-      recommendations,
-      whoEditionUsed
-    }
+    interpretation: simulationOnly || missingCoreDomains.length === coreDomains.length
+      ? undefined
+      : {
+          status,
+          comments,
+          recommendations,
+          whoEditionUsed
+        }
   };
 };
 

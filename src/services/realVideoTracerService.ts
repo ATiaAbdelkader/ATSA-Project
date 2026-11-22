@@ -1,9 +1,15 @@
 import type { SpermData, AnalysisResult } from '../types';
+import {
+  computeBeatCrossFrequency,
+  computeMeanAngularDisplacement,
+  movingAveragePath,
+} from './kinematicsMetrics';
 
 export interface VideoTracingOptions {
   fps?: number;
   maxFrames?: number;
   micronsPerPixel?: number;
+  chamberDepthMicrons?: number;
   onProgress?: (progress: number, status: string) => void;
 }
 
@@ -29,6 +35,7 @@ export async function analyzeVideoElement(
   const fps = options.fps || 25;
   const maxFrames = options.maxFrames || 25;
   const micronsPerPixel = options.micronsPerPixel || 0.81;
+  const chamberDepthMicrons = options.chamberDepthMicrons || 20;
   const onProgress = options.onProgress || (() => {});
 
   const width = video.videoWidth || 780;
@@ -267,8 +274,8 @@ export async function analyzeVideoElement(
     const pts = [];
     for (let f = 0; f < totalFrames; f++) {
       pts.push({
-        x: c.x + (Math.random() - 0.5) * 0.4,
-        y: c.y + (Math.random() - 0.5) * 0.4,
+        x: c.x,
+        y: c.y,
         frame: f,
         t: f / fps
       });
@@ -318,10 +325,9 @@ export async function analyzeVideoElement(
       const dy = vapPoints[i].y - vapPoints[i - 1].y;
       avgPathDist += Math.sqrt(dx * dx + dy * dy);
     }
-    const vap =
-      Number(
-        ((avgPathDist * micronsPerPixel) / Math.max(0.04, trackDuration * (vapPoints.length / pts.length))).toFixed(1)
-      ) || Number((vsl * 1.15).toFixed(1));
+    const vap = Number(
+      ((avgPathDist * micronsPerPixel) / Math.max(0.04, trackDuration * (vapPoints.length / pts.length))).toFixed(1)
+    );
 
     const lin = vcl > 0 ? Number(Math.min(1.0, vsl / vcl).toFixed(2)) : 0;
     const str = vap > 0 ? Number(Math.min(1.0, vsl / vap).toFixed(2)) : 0;
@@ -338,7 +344,9 @@ export async function analyzeVideoElement(
       }
     }
     const alh = Number((maxDev * 2).toFixed(1));
-    const bcf = Number((8 + Math.random() * 12).toFixed(1));
+    const bcfSmoothed = movingAveragePath(pts, 2);
+    const bcf = Number(computeBeatCrossFrequency(pts, bcfSmoothed, fps, trackDuration).toFixed(1));
+    const mad = Number(computeMeanAngularDisplacement(pts).toFixed(1));
 
     let classification: 'progressive' | 'non-progressive' | 'immotile' = 'immotile';
     if (vcl >= 25 && lin >= 0.35) {
@@ -347,17 +355,6 @@ export async function analyzeVideoElement(
       classification = 'non-progressive';
     }
 
-    const headLen = Number((8.5 + (Math.random() - 0.5) * 1.2).toFixed(2));
-    const headWid = Number((4.5 + (Math.random() - 0.5) * 0.8).toFixed(2));
-    const area = Number((Math.PI * (headLen / 2) * (headWid / 2)).toFixed(1));
-    const perimeter = Number(
-      (
-        Math.PI *
-        ((3 * (headLen + headWid)) / 2 - Math.sqrt((3 * headLen + headWid) * (headLen + 3 * headWid)) / 2)
-      ).toFixed(1)
-    );
-    const ellipticity = Number((headLen / headWid).toFixed(2));
-    const elongation = Number(((headLen - headWid) / (headLen + headWid)).toFixed(2));
     const isHyper = vcl > 70 && lin < 0.45 && alh > 5;
 
     return {
@@ -371,34 +368,37 @@ export async function analyzeVideoElement(
       wob,
       alh,
       bcf,
-      mad: Math.round(15 + Math.random() * 25),
+      mad,
+      // A tracking pipeline cannot measure morphology. Keep neutral values so
+      // nothing downstream can mistake a default for a classification.
       morphometry: {
-        area,
-        perimeter,
-        length: headLen,
-        width: headWid,
-        circularity: Math.round(((4 * Math.PI * area) / (perimeter * perimeter)) * 100) / 100,
-        elongation,
-        lengthWidthRatio: ellipticity,
-        acrosomeAreaPercent: 52
+        area: 0,
+        perimeter: 0,
+        length: 0,
+        width: 0,
+        circularity: 0,
+        elongation: 0,
+        lengthWidthRatio: 0,
+        acrosomeAreaPercent: 0
       },
       morphology: {
-        head: Math.random() > 0.88 ? 'pyriform' : 'normal',
-        vacuoles: Math.random() > 0.85 ? 'present' : 'absent',
-        acrosome: Math.random() > 0.12 ? 'normal' : 'abnormal',
-        midpiece: Math.random() > 0.92 ? 'bent' : 'normal',
-        tail: Math.random() > 0.9 ? 'coiled' : 'normal',
-        droplet: 'none',
-        krugerStrict: Math.random() > 0.88 ? 'abnormal' : 'strict_normal'
+        head: 'not_assessed',
+        vacuoles: 'not_assessed',
+        acrosome: 'not_assessed',
+        midpiece: 'not_assessed',
+        tail: 'not_assessed',
+        droplet: 'not_assessed',
+        krugerStrict: 'not_assessed'
       },
-      vitality: classification === 'immotile' && Math.random() > 0.4 ? 'dead' : 'live',
+      vitality: 'not_assessed',
       classification,
       isHyperactivated: isHyper,
       hyperactivationType: isHyper ? 'linear_whiplash' : 'none',
       sdf: {
-        fragmented: Math.random() < 0.08,
-        haloSized: 18.5,
-        dfi: Math.round(6 + Math.random() * 5)
+        fragmented: false,
+        haloSized: 0,
+        dfi: 0,
+        assessed: false
       }
     };
   });
@@ -408,27 +408,28 @@ export async function analyzeVideoElement(
   const imm = spermatozoa.filter((s) => s.classification === 'immotile').length;
   const total = Math.max(1, spermatozoa.length);
 
-  const normalMorph = Number(
-    (
-      (spermatozoa.filter(
-        (s) =>
-          s.morphology.head === 'normal' &&
-          s.morphology.midpiece === 'normal' &&
-          s.morphology.tail === 'normal'
-      ).length /
-        total) *
-      100
-    ).toFixed(1)
+  // Concentration is estimated from the median number of detected objects in a
+  // single field, using the actual frame geometry and configured chamber depth.
+  // It is not a validated volumetric count.
+  const cellsPerFrame = frameDetections.map(
+    (detections) => detections.length + immotileCentroids.length
   );
-  const headDefPct = Number(((spermatozoa.filter((s) => s.morphology.head !== 'normal').length / total) * 100).toFixed(1));
-  const midDefPct = Number(((spermatozoa.filter((s) => s.morphology.midpiece !== 'normal').length / total) * 100).toFixed(1));
-  const tailDefPct = Number(((spermatozoa.filter((s) => s.morphology.tail !== 'normal').length / total) * 100).toFixed(1));
-  const dfiVal = Number((8 + Math.random() * 5).toFixed(1));
+  const sortedCellsPerFrame = [...cellsPerFrame].sort((a, b) => a - b);
+  const medianCellsPerFrame = sortedCellsPerFrame.length > 0
+    ? sortedCellsPerFrame[Math.floor(sortedCellsPerFrame.length / 2)]
+    : 0;
+  const fieldWidthMm = (width * micronsPerPixel) / 1000;
+  const fieldHeightMm = (height * micronsPerPixel) / 1000;
+  const fieldAreaMm2 = fieldWidthMm * fieldHeightMm;
+  const fieldVolumeMl = (fieldAreaMm2 * (chamberDepthMicrons / 1000)) / 1000;
+  const concentrationEstimate = fieldVolumeMl > 0
+    ? medianCellsPerFrame / fieldVolumeMl / 1_000_000
+    : 0;
 
   const summary = {
     totalCount: total,
-    concentration: Number((total * 1.85).toFixed(1)),
-    leukocytes: 0.1,
+    concentration: Number(concentrationEstimate.toFixed(1)),
+    leukocytes: 0,
     motility: {
       total: Number((((prog + nonProg) / total) * 100).toFixed(1)),
       progressive: Number(((prog / total) * 100).toFixed(1)),
@@ -451,53 +452,52 @@ export async function analyzeVideoElement(
         )
       }
     },
+    // No morphology, vitality, or DNA-fragmentation assay is performed by this
+    // tracking pipeline. Report neutral values; provenance marks them unassessed.
     morphology: {
-      normal: normalMorph,
-      abnormal: Number((100 - normalMorph).toFixed(1)),
-      krugerStrictNormal: normalMorph,
-      avgArea: 32.8,
-      tzi: 1.15,
-      mai: 1.12,
-      sdi: 1.10,
+      normal: 0,
+      abnormal: 0,
+      krugerStrictNormal: 0,
+      avgArea: 0,
+      tzi: 0,
+      mai: 0,
+      sdi: 0,
       headDefects: {
-        large: Number((headDefPct * 0.15).toFixed(1)),
-        small: Number((headDefPct * 0.10).toFixed(1)),
-        amorphous: Number((headDefPct * 0.28).toFixed(1)),
-        pyriform: Number((headDefPct * 0.22).toFixed(1)),
-        tapered: Number((headDefPct * 0.14).toFixed(1)),
-        round: Number((headDefPct * 0.06).toFixed(1)),
-        vacuolated: Number((headDefPct * 0.04).toFixed(1)),
-        double: 0.1
+        large: 0,
+        small: 0,
+        amorphous: 0,
+        pyriform: 0,
+        tapered: 0,
+        round: 0,
+        vacuolated: 0,
+        double: 0
       },
       midpieceDefects: {
-        thick: Number((midDefPct * 0.30).toFixed(1)),
-        bent: Number((midDefPct * 0.40).toFixed(1)),
-        asymmetric: Number((midDefPct * 0.18).toFixed(1)),
-        droplet: Number((midDefPct * 0.12).toFixed(1))
+        thick: 0,
+        bent: 0,
+        asymmetric: 0,
+        droplet: 0
       },
       tailDefects: {
-        short: Number((tailDefPct * 0.15).toFixed(1)),
-        coiled: Number((tailDefPct * 0.35).toFixed(1)),
-        multiple: 0.3,
-        bent: Number((tailDefPct * 0.35).toFixed(1)),
-        broken: Number((tailDefPct * 0.10).toFixed(1))
+        short: 0,
+        coiled: 0,
+        multiple: 0,
+        bent: 0,
+        broken: 0
       },
-      acrosomeDefects: 2.1,
-      cytoplasmicDroplets: 1.3
+      acrosomeDefects: 0,
+      cytoplasmicDroplets: 0
     },
     vitality: {
-      live: Number((((prog + nonProg + imm * 0.4) / total) * 100).toFixed(1)),
-      dead: Number((((imm * 0.6) / total) * 100).toFixed(1)),
-      total: 100,
-      membraneIntact: Number((((prog + nonProg + imm * 0.45) / total) * 100).toFixed(1)),
-      hosPositive: Number((((prog + nonProg + imm * 0.5) / total) * 100).toFixed(1))
+      live: 0,
+      dead: 0,
+      total: 0
     },
     sdf: {
-      dfi: dfiVal,
-      fragmentedCount: Math.round(total * (dfiVal / 100)),
-      totalCount: total,
-      hds: Number((4 + Math.random() * 3).toFixed(1)),
-      category: 'excellent'
+      dfi: 0,
+      fragmentedCount: 0,
+      totalCount: 0,
+      category: undefined
     }
   };
 

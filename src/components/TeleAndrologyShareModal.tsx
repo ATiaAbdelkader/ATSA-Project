@@ -19,6 +19,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils';
 import type { AnalysisResult } from '../types';
+import { domainBasis, getProvenance, hasDomainValues } from '../services/resultProvenance';
 
 interface TeleAndrologyShareModalProps {
   isOpen: boolean;
@@ -105,11 +106,22 @@ export const TeleAndrologyShareModal: React.FC<TeleAndrologyShareModalProps> = (
               </div>
               <div>
                 <span className="text-xs font-bold text-white font-mono">{patientId}</span>
-                <span className="text-[10px] text-white/50 block">{species} &bull; Motility: {analysis?.summary.motility.progressive || 62.4}% &bull; Conc: {analysis?.summary.concentration || 580.0} M/mL</span>
+                <span className="text-[10px] text-white/50 block">
+                  {species} &bull; Motility:{' '}
+                  {analysis && hasDomainValues(domainBasis(analysis, 'kinematics'))
+                    ? `${analysis.summary.motility.progressive.toFixed(1)}%`
+                    : 'Not assessed'}{' '}
+                  &bull; Conc:{' '}
+                  {analysis && hasDomainValues(domainBasis(analysis, 'concentration'))
+                    ? `${analysis.summary.concentration.toFixed(1)} M/mL`
+                    : 'Not assessed'}
+                </span>
               </div>
             </div>
             <div className="text-right">
-              <span className="text-[9px] uppercase tracking-wider font-bold text-emerald-400 block">SFT Certified</span>
+              <span className="text-[9px] uppercase tracking-wider font-bold text-emerald-400 block">
+                {analysis ? getProvenance(analysis).label : 'No result loaded'}
+              </span>
               <span className="text-[9px] text-white/40 font-mono">{new Date().toLocaleDateString()}</span>
             </div>
           </div>
@@ -122,7 +134,7 @@ export const TeleAndrologyShareModal: React.FC<TeleAndrologyShareModalProps> = (
               <div className="space-y-1.5">
                 {[
                   { id: 'interactive', label: 'Interactive Player & Waves', desc: 'Allows scrubbing video, kinematics & kymograph' },
-                  { id: 'dossier', label: 'Clinical Dossier Only', desc: 'Read-only verified PDF evaluation summary' },
+                  { id: 'dossier', label: 'Report Dossier Only', desc: 'Read-only PDF evaluation summary with its provenance label' },
                   { id: 'full_audit', label: 'Full Audit Trail & Raw CSV', desc: 'Includes raw cell coordinates & QA stamps' }
                 ].map(opt => (
                   <button

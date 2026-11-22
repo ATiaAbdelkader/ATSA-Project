@@ -160,16 +160,16 @@ export const VisemBenchmarkValidator: React.FC<VisemBenchmarkValidatorProps> = (
                 <Database className="w-5 h-5 animate-pulse" />
               </span>
               <div>
-                <span className="text-[10px] font-mono font-bold tracking-widest text-blue-400 uppercase">
-                  Gold-Standard Validation • Simula VISEM
+                <span className="text-[10px] font-mono font-bold tracking-widest text-amber-400 uppercase">
+                  Demonstration view • Not benchmarked
                 </span>
                 <h2 className={cn("text-xl font-black tracking-tight", theme === 'dark' ? "text-white" : "text-slate-900")}>
-                  VISEM-Tracking Benchmark & AI Model Calibration
+                  Tracking Benchmark Interface (Illustrative)
                 </h2>
               </div>
             </div>
             <p className={cn("text-xs max-w-2xl leading-relaxed", theme === 'dark' ? "text-white/60" : "text-slate-500")}>
-              Validates AI CASA multi-object tracking accuracy (MOTA), precision, and trajectory continuity against 29,196 manually annotated ground-truth spermatozoa tracks from the open-source VISEM benchmark repository.
+              This screen illustrates how tracking metrics would be presented. The curves below are generated from a simple threshold formula and the confusion matrix is example data. The application has not been benchmarked against VISEM or any annotated ground-truth dataset, and these values are not measurements of model accuracy.
             </p>
           </div>
 
@@ -256,7 +256,7 @@ export const VisemBenchmarkValidator: React.FC<VisemBenchmarkValidatorProps> = (
             <span className={cn("text-2xl font-black font-mono", theme === 'dark' ? "text-white" : "text-slate-900")}>
               {currentMetrics.mota}%
             </span>
-            <span className="text-[10px] font-mono text-emerald-400 font-bold">Grade A</span>
+            <span className="text-[10px] font-mono text-amber-400 font-bold">Illustrative</span>
           </div>
           <p className="text-[10px] text-muted-foreground mt-2">
             Multi-Object Tracking Accuracy incorporating misses, false positives, and ID switches.
@@ -397,7 +397,7 @@ export const VisemBenchmarkValidator: React.FC<VisemBenchmarkValidatorProps> = (
                   Ground-Truth Cross Validation
                 </span>
                 <h3 className={cn("text-base font-black", theme === 'dark' ? "text-white" : "text-slate-900")}>
-                  Andrologist Confusion Matrix
+                  Example Confusion Matrix (Not Measured)
                 </h3>
               </div>
               <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">
@@ -458,8 +458,8 @@ export const VisemBenchmarkValidator: React.FC<VisemBenchmarkValidatorProps> = (
           </div>
 
           <div className="pt-3 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
-            <span>Overall Cohen's Kappa: κ = 0.912</span>
-            <span className="text-emerald-400 font-bold">Almost Perfect Agreement</span>
+            <span>Overall Cohen's Kappa: not computed</span>
+            <span className="text-amber-400 font-bold">Example values only</span>
           </div>
         </div>
       </div>

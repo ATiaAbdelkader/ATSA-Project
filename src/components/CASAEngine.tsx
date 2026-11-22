@@ -54,7 +54,9 @@ import {
   StepBack,
   Share2,
   Package,
-  MoreHorizontal
+  MoreHorizontal,
+  AlertTriangle,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -74,8 +76,27 @@ import {
 } from 'recharts';
 import { cn, SPECIES_PROFILES } from '../utils';
 import { useLanguage } from '../context/LanguageContext';
-import type { SpermData, AnalysisResult, SpeciesProfile, FieldOfViewData, MultiFOVComposite } from '../types';
+import type {
+  SpermData,
+  AnalysisResult,
+  SpeciesProfile,
+  FieldOfViewData,
+  MultiFOVComposite,
+  DomainAssessment,
+} from '../types';
 import { calculateKinematics, generateSummary } from '../services/casaService';
+import {
+  AI_ESTIMATE_PROVENANCE,
+  MEASURED_VIDEO_PROVENANCE,
+  REFERENCE_DATASET_PROVENANCE,
+  SIMULATED_ANIMAL_PROVENANCE,
+  SIMULATED_CAMERA_PROVENANCE,
+  canSaveToPatientRecord,
+  describeMissingDomains,
+  domainBasis,
+  getProvenance,
+  hasDomainValues,
+} from '../services/resultProvenance';
 import { HelpCenter } from './HelpCenter';
 import { QualityControl } from './QualityControl';
 import { MultiFOVModal } from './MultiFOVModal';
@@ -112,6 +133,93 @@ import { onAuthStateChanged, User, signInWithPopup } from 'firebase/auth';
 import { queueOfflineAnalysis } from '../services/offlineSyncService';
 import { OfflineFieldIndicator } from './OfflineFieldIndicator';
 import { PWAInstallButton } from './PWAInstallButton';
+
+const UnassessedPanel: React.FC<{
+  domain: string;
+  reason: string;
+  theme: 'light' | 'dark';
+}> = ({ domain, reason, theme }) => (
+  <div
+    role="status"
+    className={cn(
+      'p-6 rounded-2xl border space-y-3',
+      theme === 'dark'
+        ? 'bg-amber-500/[0.06] border-amber-500/20 text-amber-100/80'
+        : 'bg-amber-50 border-amber-200 text-amber-950/80'
+    )}
+  >
+    <div className="flex items-center gap-2">
+      <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+      <h3 className="text-xs font-black uppercase tracking-widest text-amber-500">
+        {domain} not assessed in this run
+      </h3>
+    </div>
+    <p className="text-[11px] leading-relaxed">{reason}</p>
+    <p className="text-[10px] leading-relaxed opacity-70">
+      No value is shown because this pipeline did not measure it. A blank result is safer than an invented one.
+    </p>
+  </div>
+);
+
+const ResultProvenanceBanner: React.FC<{
+  result: AnalysisResult;
+  theme: 'light' | 'dark';
+}> = ({ result, theme }) => {
+  const provenance = getProvenance(result);
+  const missing = describeMissingDomains(result, [
+    'concentration',
+    'morphometry',
+    'morphology',
+    'vitality',
+    'sdf',
+    'leukocytes',
+  ]);
+  const isMeasured = provenance.source === 'measured';
+  const isSimulated = provenance.source === 'simulated' || provenance.source === 'ai_estimated';
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn(
+        'px-4 py-2.5 border-b flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] leading-relaxed',
+        isMeasured
+          ? theme === 'dark'
+            ? 'bg-emerald-500/[0.06] border-emerald-500/20 text-emerald-100/80'
+            : 'bg-emerald-50 border-emerald-200 text-emerald-950/80'
+          : isSimulated
+            ? theme === 'dark'
+              ? 'bg-amber-500/[0.08] border-amber-500/25 text-amber-100/85'
+              : 'bg-amber-50 border-amber-200 text-amber-950/85'
+            : theme === 'dark'
+              ? 'bg-sky-500/[0.06] border-sky-500/20 text-sky-100/80'
+              : 'bg-sky-50 border-sky-200 text-sky-950/80'
+      )}
+    >
+      <span
+        className={cn(
+          'px-2 py-0.5 rounded-full font-black uppercase tracking-widest text-[8px] border shrink-0',
+          isMeasured
+            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-500'
+            : isSimulated
+              ? 'bg-amber-500/15 border-amber-500/30 text-amber-500'
+              : 'bg-sky-500/15 border-sky-500/30 text-sky-500'
+        )}
+      >
+        {provenance.label}
+      </span>
+      <span className="min-w-0">{provenance.detail}</span>
+      {!provenance.recordEligible && (
+        <span className="font-bold text-amber-500">
+          Not eligible for patient history.
+        </span>
+      )}
+      {missing.length > 0 && (
+        <span className="opacity-75">Not assessed: {missing.join(', ')}.</span>
+      )}
+    </div>
+  );
+};
 
 const SpermZoom: React.FC<{ sperm: SpermData; isAnalyzing: boolean; highContrast?: boolean; theme?: 'light' | 'dark' }> = ({ sperm, isAnalyzing, highContrast, theme = 'dark' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -263,38 +371,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<any>(null);
-  const [multiFOVFields, setMultiFOVFields] = useState<FieldOfViewData[]>([
-    {
-      fieldIndex: 1,
-      timestamp: new Date().toISOString(),
-      spermCount: 142,
-      concentration: 68.4,
-      totalMotility: 83.1,
-      progressiveMotility: 64.8,
-      normalMorphology: 5.8,
-      avgVcl: 84.5
-    },
-    {
-      fieldIndex: 2,
-      timestamp: new Date().toISOString(),
-      spermCount: 138,
-      concentration: 65.2,
-      totalMotility: 81.2,
-      progressiveMotility: 63.8,
-      normalMorphology: 5.4,
-      avgVcl: 82.1
-    },
-    {
-      fieldIndex: 3,
-      timestamp: new Date().toISOString(),
-      spermCount: 146,
-      concentration: 71.0,
-      totalMotility: 83.6,
-      progressiveMotility: 65.1,
-      normalMorphology: 5.9,
-      avgVcl: 86.2
-    }
-  ]);
+  const [multiFOVFields, setMultiFOVFields] = useState<FieldOfViewData[]>([]);
   const [designerInfo, setDesignerInfo] = useState(() => {
     const saved = localStorage.getItem('atsa_designer_info');
     return saved ? JSON.parse(saved) : {
@@ -354,9 +431,9 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   const [extenderType, setExtenderType] = useState<'commercial' | 'egg_yolk' | 'milk_glycerol'>('commercial');
   const [strawSize, setStrawSize] = useState<0.25 | 0.5>(0.5);
   const [qcFields, setQcFields] = useState([
-    { id: 1, active: true, name: 'Field A (Front Left)', concentration: 120, progressive: 55 },
-    { id: 2, active: true, name: 'Field B (Front Right)', concentration: 115, progressive: 52 },
-    { id: 3, active: true, name: 'Field C (Deep Centric)', concentration: 122, progressive: 58 }
+    { id: 1, active: true, name: 'Field A (enter measured value)', concentration: 0, progressive: 0 },
+    { id: 2, active: false, name: 'Field B (enter measured value)', concentration: 0, progressive: 0 },
+    { id: 3, active: false, name: 'Field C (enter measured value)', concentration: 0, progressive: 0 }
   ]);
   const [reportSections, setReportSections] = useState({
     kinematics: true,
@@ -400,6 +477,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const autoSavedRunRef = useRef<string | null>(null);
   const [results, setResults] = useState<AnalysisResult | null>(null);
 
   // Real Microscope Optical Tracing State (Bovine 25 FPS Datasets)
@@ -425,11 +503,14 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       timestamp: new Date().toISOString(),
       patientId: rec.bullId,
       species: rec.species,
+      provenance: REFERENCE_DATASET_PROVENANCE,
       settings: {
         ...settings,
         profile: settings.profile || SPECIES_PROFILES[rec.species] || SPECIES_PROFILES['Bovine'],
         fps: rec.fps,
-        micronsPerPixel: rec.micronsPerPixel
+        micronsPerPixel: rec.micronsPerPixel,
+        frameWidth: rec.width,
+        frameHeight: rec.height
       },
       summary: rec.summary,
       spermatozoa: rec.spermatozoa
@@ -489,7 +570,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
 
     const animal: VirtualAnimalRecord = VIRTUAL_ANIMALS[animalKey] || VIRTUAL_ANIMALS.bovine;
 
-    setResults(animal.results);
+    setResults({ ...animal.results, provenance: SIMULATED_ANIMAL_PROVENANCE });
     setClinicianName('Dr. Sarah Jenkins, DVM - Theriogenology Specialist');
     setFacilityName(animal.ownerFacility || 'Central Semen Pathology & Cryopreservation Center');
     setCollectionMethod(animal.macroscopic.collectionMethod as any);
@@ -523,16 +604,6 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     }
   }, []);
 
-  // Sync QC fields with loaded specimen results for visual continuity
-  useEffect(() => {
-    if (results) {
-      setQcFields([
-        { id: 1, active: true, name: 'Field A (Front Left)', concentration: Math.round(results.summary.concentration * 10) / 10, progressive: Math.round(results.summary.motility.progressive * 10) / 10 },
-        { id: 2, active: true, name: 'Field B (Front Right)', concentration: Math.max(1, Math.round(results.summary.concentration * 0.94 * 10) / 10), progressive: Math.max(0, Math.round(results.summary.motility.progressive * 0.91 * 10) / 10) },
-        { id: 3, active: true, name: 'Field C (Deep Centric)', concentration: Math.round(results.summary.concentration * 1.05 * 10) / 10, progressive: Math.min(100, Math.round(results.summary.motility.progressive * 1.03 * 10) / 10) }
-      ]);
-    }
-  }, [results]);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -819,50 +890,73 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
   };
 
   const toggleAnalysis = async () => {
-    if (!stream && !isAnalyzing) {
-      // Try to start camera automatically if not started
-      await startCamera();
-      // If still no stream, then we show error
-      if (!navigator.mediaDevices?.getUserMedia) {
-         setCameraError("Camera access is required for analysis. Please connect a microscope camera.");
-         return;
-      }
-    }
-
     if (!isAnalyzing) {
+      if (!stream) {
+        // Try to start camera automatically if not started
+        await startCamera();
+        // If still no stream, then we show error
+        if (!navigator.mediaDevices?.getUserMedia) {
+          setCameraError("Camera access is required for analysis. Please connect a microscope camera.");
+          return;
+        }
+      }
+
       setIsAnalyzing(true);
       setResults(null);
+      setSelectedSperm(null);
       // Reset paths for new analysis to avoid re-using frozen arrays from previous results
       particles.current.forEach(p => {
         p.path = [];
       });
-    } else {
-      setIsAnalyzing(false);
-      // Process all paths with OpenCASA algorithms
-      const spermatozoa: SpermData[] = particles.current.map(p => {
-        // Clone the path array to prevent React state freezing from affecting our mutable ref
-        const pathClone = [...p.path];
-        const kinematics = calculateKinematics(pathClone, settings.fps, settings.micronsPerPixel);
-        return {
-          id: p.id,
-          path: pathClone,
-          ...kinematics,
-        } as SpermData;
+      setEngineToast({
+        message: 'Live-camera tracking is a simulation. It will be labelled as simulated and cannot be saved to patient history.',
+        type: 'info'
       });
-
-      const summary = generateSummary(spermatozoa, settings);
-      
-      setResults({
-        timestamp: new Date().toISOString(),
-        patientId: patientData.id,
-        species: patientData.species,
-        settings,
-        summary,
-        spermatozoa
-      });
-      
-      if (spermatozoa.length > 0) setSelectedSperm(spermatozoa[0]);
+      return;
     }
+
+    // Stopping a run that already produced a measured/reference result must
+    // never rebuild or overwrite that result with synthetic trajectories.
+    if (results) {
+      setIsAnalyzing(false);
+      return;
+    }
+
+    setIsAnalyzing(false);
+    // Camera mode only: derive kinematics from the simulated particle paths.
+    const spermatozoa: SpermData[] = particles.current.map(p => {
+      const pathClone = [...p.path];
+      const kinematics = calculateKinematics(pathClone, settings.fps, settings.micronsPerPixel);
+      return {
+        id: p.id,
+        path: pathClone,
+        ...kinematics,
+      } as SpermData;
+    });
+
+    const simulationSettings = {
+      ...settings,
+      frameWidth: videoDimensions.width,
+      frameHeight: videoDimensions.height,
+    };
+    const summary = generateSummary(
+      spermatozoa,
+      simulationSettings,
+      undefined,
+      SIMULATED_CAMERA_PROVENANCE
+    );
+
+    setResults({
+      timestamp: new Date().toISOString(),
+      patientId: patientData.id,
+      species: patientData.species,
+      provenance: SIMULATED_CAMERA_PROVENANCE,
+      settings: simulationSettings,
+      summary,
+      spermatozoa
+    });
+
+    if (spermatozoa.length > 0) setSelectedSperm(spermatozoa[0]);
   };
 
   const processFile = async (file: File) => {
@@ -990,6 +1084,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
           const tracingRes = await analyzeVideoElement(tempVideo, {
             fps: 25,
             micronsPerPixel: settings.micronsPerPixel,
+            chamberDepthMicrons: settings.chamberDepth,
             onProgress: (pct, msg) => {
               setUploadProgress(pct);
               setRealTracingProgress({ percent: pct, status: msg });
@@ -998,13 +1093,16 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
 
           const resultData: AnalysisResult = {
             timestamp: new Date().toISOString(),
-            patientId: `OPT-${Date.now().toString().slice(-4)}`,
+            patientId: patientData.id,
             species: patientData.species || 'Bovine',
+            provenance: MEASURED_VIDEO_PROVENANCE,
             settings: {
               ...settings,
               profile: settings.profile || SPECIES_PROFILES[patientData.species] || SPECIES_PROFILES['Bovine'],
               fps: tracingRes.fps,
-              micronsPerPixel: tracingRes.micronsPerPixel
+              micronsPerPixel: tracingRes.micronsPerPixel,
+              frameWidth: tracingRes.width,
+              frameHeight: tracingRes.height
             },
             summary: tracingRes.summary,
             spermatozoa: tracingRes.spermatozoa
@@ -1026,7 +1124,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
           setIsAnalyzing(true);
           setActiveRealSampleKey(null);
           setEngineToast({
-            message: `Optical Tracing Complete: ${tracingRes.spermatozoa.length} moving sperm tracked across ${tracingRes.totalFrames} frames!`,
+            message: `Optical tracing complete: ${tracingRes.spermatozoa.length} tracks measured across ${tracingRes.totalFrames} frames. Morphology, vitality, and SDF were not assessed.`,
             type: 'success'
           });
           return;
@@ -1219,68 +1317,53 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
 
       particles.current = generatedParticles;
 
-      // Map generated particles to complete SpermData diagnostics list
+      // Map generated particles to SpermData. The trajectories are synthetic;
+      // no per-cell morphology is invented from model prose.
       const spermatozoa = generatedParticles.map(p => {
         const pathClone = [...p.path];
         const kinematics = calculateKinematics(pathClone, settings.fps, settings.micronsPerPixel);
-        
-        let headDefect = 'normal';
-        let tailDefect = 'normal';
-        let midpieceDefect = 'normal';
-        
-        if (Math.random() * 100 > normMorph) {
-          if (aiResult.morphology?.defects?.head?.length > 0 && Math.random() > 0.4) {
-            headDefect = aiResult.morphology.defects.head[Math.floor(Math.random() * aiResult.morphology.defects.head.length)];
-          } else {
-            headDefect = ['amorphous', 'pyriform', 'tapered', 'round'][Math.floor(Math.random() * 4)];
-          }
-          if (aiResult.morphology?.defects?.midpiece?.length > 0 && Math.random() > 0.5) {
-            midpieceDefect = aiResult.morphology.defects.midpiece[Math.floor(Math.random() * aiResult.morphology.defects.midpiece.length)];
-          } else {
-            midpieceDefect = ['thick', 'bent', 'asymmetric'][Math.floor(Math.random() * 3)];
-          }
-          if (aiResult.morphology?.defects?.tail?.length > 0 && Math.random() > 0.5) {
-            tailDefect = aiResult.morphology.defects.tail[Math.floor(Math.random() * aiResult.morphology.defects.tail.length)];
-          } else {
-            tailDefect = ['coiled', 'bent', 'short'][Math.floor(Math.random() * 3)];
-          }
-        }
-
         return {
           id: p.id,
           path: pathClone,
           ...kinematics,
           classification: p.type,
-          morphology: {
-            ...kinematics.morphology,
-            head: headDefect,
-            midpiece: midpieceDefect,
-            tail: tailDefect
-          }
         } as SpermData;
       });
 
-      const summary = generateSummary(spermatozoa, settings);
+      const aiSettings = {
+        ...settings,
+        frameWidth: 1280,
+        frameHeight: 720,
+      };
+      const summary = generateSummary(
+        spermatozoa,
+        aiSettings,
+        undefined,
+        AI_ESTIMATE_PROVENANCE
+      );
+      // The model's concentration is an estimate, not a volumetric count.
+      summary.concentration = conc;
 
       setResults({
         timestamp: new Date().toISOString(),
         patientId: patientData.id,
         species: patientData.species,
-        settings,
+        provenance: AI_ESTIMATE_PROVENANCE,
+        settings: aiSettings,
         summary: {
           ...summary,
-          visionInsights: aiResult,
-          interpretation: {
-            status: aiResult.observations?.toLowerCase().includes('abnormal') ? 'abnormal' : 'normal',
-            comments: [aiResult.observations],
-            recommendations: ["Follow-up with manual verification if necessary."]
-          }
+          visionInsights: aiResult
         },
         spermatozoa
       });
 
       if (spermatozoa.length > 0) setSelectedSperm(spermatozoa[0]);
-      
+
+      setEngineToast({
+        message: 'AI estimate only: on-screen tracks are synthetic. The model morphology narrative is in the AI tab and was not written to morphology results.',
+        type: 'info'
+      });
+
       // Auto-switch to live screen and trigger animation tracks immediately
       setActiveTab('live');
       setIsAnalyzing(true);
@@ -1301,6 +1384,15 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
 
   const generateAIInterpretation = async () => {
     if (!results) return;
+    const provenance = getProvenance(results);
+    if (provenance.source !== 'measured') {
+      setEngineToast({
+        message: 'AI interpretation is available only for measured runs. Simulated and reference data are not sent for clinical interpretation.',
+        type: 'error'
+      });
+      return;
+    }
+
     setIsGeneratingInterpretation(true);
     try {
       const apiKey = process.env.GEMINI_API_KEY;
@@ -1309,18 +1401,45 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
       }
       const ai = new GoogleGenAI({ apiKey });
       const profile = SPECIES_PROFILES[results.species] || SPECIES_PROFILES['Bovine'];
-      
+      const canUse = (domain: keyof DomainAssessment) => hasDomainValues(provenance.domains[domain]);
+      const notAssessed = 'not assessed in this run';
+      const concentrationLine = canUse('concentration')
+        ? `${results.summary.concentration.toFixed(1)} M/ml (Threshold: ${profile.minConcentration} M/ml)`
+        : notAssessed;
+      const motilityLine = canUse('kinematics')
+        ? `${results.summary.motility.total.toFixed(1)}% (Threshold: ${profile.minTotalMotility}%)`
+        : notAssessed;
+      const progressiveLine = canUse('kinematics')
+        ? `${results.summary.motility.progressive.toFixed(1)}% (Threshold: ${profile.minProgressiveMotility}%)`
+        : notAssessed;
+      const morphologyLine = canUse('morphology')
+        ? `${results.summary.morphology.normal.toFixed(1)}% (Threshold: ${profile.minNormalMorphology}%)`
+        : notAssessed;
+      const dfiLine = canUse('sdf') ? `${results.summary.sdf.dfi.toFixed(1)}%` : notAssessed;
+      const hyperactivationLine = canUse('kinematics')
+        ? `${results.summary.kinematics.hyperactivation.percentage.toFixed(1)}%`
+        : notAssessed;
+      const vapLine = canUse('kinematics')
+        ? `${results.summary.kinematics.avgVap.toFixed(1)} µm/s`
+        : notAssessed;
+      const linLine = canUse('kinematics')
+        ? results.summary.kinematics.avgLin.toFixed(2)
+        : notAssessed;
+
       const prompt = `As a senior veterinary/human embryologist specializing in CASA (Computer-Aided Sperm Analysis), interpret the following results for a ${results.species} sample.
+
+      IMPORTANT: Values marked "${notAssessed}" were not measured. Do not infer, estimate, or comment on them.
       
       Current Results:
-      - Concentration: ${results.summary.concentration.toFixed(1)} M/ml (Threshold: ${profile.minConcentration} M/ml)
-      - Total Motility: ${results.summary.motility.total.toFixed(1)}% (Threshold: ${profile.minTotalMotility}%)
-      - Progressive Motility: ${results.summary.motility.progressive.toFixed(1)}% (Threshold: ${profile.minProgressiveMotility}%)
-      - Normal Morphology: ${(results.summary?.morphology?.normal ?? 0).toFixed(1)}% (Threshold: ${profile.minNormalMorphology}%)
-      - DFI (DNA Fragmentation): ${(results.summary?.sdf?.dfi ?? 0).toFixed(1)}%
-      - Hyperactivation: ${results.summary.kinematics.hyperactivation.percentage.toFixed(1)}%
-      - VAP (Avg Path Velocity): ${(results.summary?.kinematics?.avgVap ?? 0).toFixed(1)} µm/s
-      - LIN (Linearity): ${results.summary.kinematics.avgLin.toFixed(2)}
+      - Concentration: ${concentrationLine}
+      - Total Motility: ${motilityLine}
+      - Progressive Motility: ${progressiveLine}
+      - Normal Morphology: ${morphologyLine}
+      - DFI (DNA Fragmentation): ${dfiLine}
+      - Hyperactivation: ${hyperactivationLine}
+      - VAP (Avg Path Velocity): ${vapLine}
+      - LIN (Linearity): ${linLine}
+      - Provenance: ${provenance.label}. ${provenance.detail}
       
       Species Context:
       ${results.species === 'Human' ? '- Follow WHO 2010 5th Edition standards. Consider lifestyle factors (heat, smoking), age, and DFI impact on IUI/IVF success. Look for leukocytospermia.' : ''}
@@ -1411,51 +1530,87 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     }
   };
 
-  // Auto-save effect
+  // Auto-save only measured runs, and only once per run. Simulated and
+  // reference results are never written to a patient record.
   useEffect(() => {
-    if (settings.autoSave && results && !isSaving) {
-      saveToHistory();
-      playNotification();
-    }
+    if (!settings.autoSave || !results || isSaving) return;
+    if (!canSaveToPatientRecord(results)) return;
+    if (autoSavedRunRef.current === results.timestamp) return;
+    autoSavedRunRef.current = results.timestamp;
+    saveToHistory({ navigate: false, silent: true });
+    playNotification();
   }, [results, settings.autoSave]);
 
-  const saveToHistory = async () => {
+  const saveToHistory = async (options?: { navigate?: boolean; silent?: boolean }) => {
     if (!results || !user) return;
+    if (!canSaveToPatientRecord(results)) {
+      if (!options?.silent) {
+        setEngineToast({
+          message: 'Only measured runs can be saved to patient history. Simulated, reference, and AI-estimated results are excluded.',
+          type: 'error'
+        });
+      }
+      return;
+    }
+
     setIsSaving(true);
+    const provenance = getProvenance(results);
+    const domains = provenance.domains;
+    const valueFor = <T,>(domain: keyof DomainAssessment, value: T): T | null =>
+      hasDomainValues(domains[domain]) ? value : null;
+
     const analysisPayload = {
       patientId: patientData.id,
       species: patientData.species,
-      timestamp: new Date().toISOString(),
-      concentration: results.summary.concentration,
+      timestamp: results.timestamp,
+      concentration: valueFor('concentration', results.summary.concentration),
       motility: {
-        total: results.summary.motility.total,
-        progressive: results.summary.motility.progressive
+        total: valueFor('kinematics', results.summary.motility.total),
+        progressive: valueFor('kinematics', results.summary.motility.progressive)
       },
       morphology: {
-        normal: results.summary.morphology.normal
+        normal: valueFor('morphology', results.summary.morphology.normal)
       },
       vitality: {
-        live: results.summary.vitality.live
+        live: valueFor('vitality', results.summary.vitality.live)
       },
       sdf: {
-        dfi: results.summary.sdf.dfi
+        dfi: valueFor('sdf', results.summary.sdf.dfi)
       },
-      interpretation: results.summary.interpretation || (aiAnalysis ? {
-        status: aiAnalysis.toLowerCase().includes('normal') ? 'normal' : 'abnormal',
-        comments: [aiAnalysis]
-      } : null),
+      interpretation: results.summary.interpretation ?? null,
+      provenance: {
+        source: provenance.source,
+        label: provenance.label,
+        detail: provenance.detail,
+        recordEligible: provenance.recordEligible,
+        domains,
+      },
+      settings: {
+        fps: results.settings.fps,
+        micronsPerPixel: results.settings.micronsPerPixel,
+        chamberDepth: results.settings.chamberDepth ?? null,
+        chamberPreset: results.settings.chamberPreset ?? null,
+        whoStandard: results.settings.whoStandard ?? null,
+        frameWidth: results.settings.frameWidth ?? null,
+        frameHeight: results.settings.frameHeight ?? null,
+      },
+      totalCount: results.summary.totalCount,
       uid: user.uid
+    };
+
+    const notify = (message: string, type: 'success' | 'info' | 'error') => {
+      if (!options?.silent) setEngineToast({ message, type });
+    };
+    const navigate = () => {
+      if (options?.navigate !== false) setActiveTab('history');
     };
 
     // If offline, queue in IndexedDB immediately
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       try {
         await queueOfflineAnalysis(analysisPayload);
-        setEngineToast({
-          message: `Field Mode (Offline): Analysis for ${patientData.id} queued in IndexedDB. Will auto-sync when online.`,
-          type: 'info'
-        });
-        setActiveTab('history');
+        notify(`Field mode (offline): measured analysis for ${patientData.id} queued in IndexedDB.`, 'info');
+        navigate();
         setIsSaving(false);
         return;
       } catch (err) {
@@ -1467,36 +1622,29 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
     try {
       await addDoc(collection(db, path), analysisPayload);
 
-      // Trigger notification for abnormal results
-      const status = results.summary.interpretation?.status || (aiAnalysis?.toLowerCase().includes('normal') ? 'normal' : 'abnormal');
-      if (status === 'abnormal') {
+      // Trigger notification only when an interpretation actually reports an abnormality.
+      if (results.summary.interpretation?.status === 'abnormal') {
         await createNotification(
           "Abnormal Result Detected",
-          `Analysis for ${patientData.id} (${patientData.species}) shows abnormal parameters. Please review the report.`,
+          `Measured analysis for ${patientData.id} (${patientData.species}) reports abnormal parameters. Please review the report.`,
           "warning"
         );
       } else {
         await createNotification(
           "Analysis Completed",
-          `New analysis saved for ${patientData.id}. Parameters are within normal range.`,
+          `Measured analysis saved for ${patientData.id}. Domains that were not assessed are recorded as not assessed.`,
           "success"
         );
       }
 
-      setEngineToast({
-        message: `Analysis for ${patientData.id} saved to Cloud Workstation.`,
-        type: 'success'
-      });
-      setActiveTab('history');
+      notify(`Measured analysis for ${patientData.id} saved to Cloud Workstation.`, 'success');
+      navigate();
     } catch (err) {
       // If Firestore failed due to offline / connectivity drop, queue in IndexedDB
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         await queueOfflineAnalysis(analysisPayload);
-        setEngineToast({
-          message: `Network offline: Analysis saved to local Field Queue. Will sync on reconnection.`,
-          type: 'info'
-        });
-        setActiveTab('history');
+        notify('Network offline: measured analysis saved to the local field queue.', 'info');
+        navigate();
       } else {
         handleFirestoreError(err, OperationType.WRITE, path);
       }
@@ -1554,12 +1702,15 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
 
   const copyReportToClipboard = () => {
     if (!results) return;
-    
+    const provenance = getProvenance(results);
+    const show = (domain: keyof DomainAssessment) => hasDomainValues(domainBasis(results, domain));
+    const metric = (domain: keyof DomainAssessment, text: string) => show(domain) ? text : 'Not assessed';
+
     const interpretationText = results.summary.interpretation
       ? `\nSTATUS: ${results.summary.interpretation.status.toUpperCase()}\n` +
         `Comments:\n${results.summary.interpretation.comments.map(c => `- ${c}`).join('\n')}\n` +
         `Recommendations:\n${results.summary.interpretation.recommendations.map(r => `- ${r}`).join('\n')}`
-      : aiAnalysis ? `\nAI Analysis:\n${aiAnalysis}` : '';
+      : '';
 
     const text = `==================================================
 ATSA COMPUTER-ASSISTED SEMEN ANALYSIS (CASA) REPORT
@@ -1567,6 +1718,8 @@ ATSA COMPUTER-ASSISTED SEMEN ANALYSIS (CASA) REPORT
 Report Date: ${new Date(results.timestamp).toLocaleString()}
 Facility:    ${facilityName}
 Operator:    ${clinicianName}
+Result type: ${provenance.label}
+Provenance:  ${provenance.detail}
 
 PATIENT INFORMATION
 --------------------------------------------------
@@ -1581,13 +1734,13 @@ Appearance:  ${sampleAppearance}
 
 KEY PERFORMANCE INDICATORS
 --------------------------------------------------
-Concentration:  ${results.summary.concentration.toFixed(1)} M/mL
-Total Motility: ${results.summary.motility.total.toFixed(1)}%
-Progressive:    ${results.summary.motility.progressive.toFixed(1)}%
-Vitality (Live):${(results.summary?.vitality?.live ?? 0).toFixed(1)}%
-DFI (SDF):      ${results.summary.sdf.dfi.toFixed(1)}%
-TZI Index:      ${(results.summary?.morphology?.tzi ?? 1.15).toFixed(2)}
-MAI Index:      ${(results.summary?.morphology?.mai ?? 1.12).toFixed(2)}
+Concentration:  ${metric('concentration', `${results.summary.concentration.toFixed(1)} M/mL`)}
+Total Motility: ${metric('kinematics', `${results.summary.motility.total.toFixed(1)}%`)}
+Progressive:    ${metric('kinematics', `${results.summary.motility.progressive.toFixed(1)}%`)}
+Vitality (Live):${metric('vitality', `${results.summary.vitality.live.toFixed(1)}%`)}
+DFI (SDF):      ${metric('sdf', `${results.summary.sdf.dfi.toFixed(1)}%`)}
+TZI Index:      ${metric('morphology', results.summary.morphology.tzi.toFixed(2))}
+MAI Index:      ${metric('morphology', results.summary.morphology.mai.toFixed(2))}
 
 CLINICIAN REMARKS
 --------------------------------------------------
@@ -1595,7 +1748,7 @@ ${clinicianRemarks ? clinicianRemarks : 'No custom remarks recorded.'}
 
 ${interpretationText}
 ==================================================
-Digital Signature Verified - ATSA AI Engine v2.0
+Research use only. Not a validated diagnostic device.
 ==================================================`;
 
     navigator.clipboard.writeText(text);
@@ -1609,65 +1762,73 @@ Digital Signature Verified - ATSA AI Engine v2.0
 
   const exportToCSV = () => {
     if (!results) return;
-    
+    const provenance = getProvenance(results);
+    const show = (domain: keyof DomainAssessment) => hasDomainValues(domainBasis(results, domain));
+    const value = (domain: keyof DomainAssessment, text: string) => show(domain) ? text : 'Not assessed';
+    const clean = (text: string) => text.replace(/[\r\n,]+/g, ' ');
+
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Parameter,Value,Reference Range,Units\r\n";
+    csvContent += "Parameter,Value,Reference Range,Units,Measurement Basis\r\n";
     
     // Add General
-    csvContent += `Patient ID,${results.patientId},-,-\r\n`;
-    csvContent += `Species,${results.species},-,-\r\n`;
-    csvContent += `Report Date,${new Date(results.timestamp).toLocaleDateString()},-,-\r\n`;
-    csvContent += `Operator,${clinicianName.replace(/,/g, '')},-,-\r\n`;
-    csvContent += `Facility,${facilityName.replace(/,/g, '')},-,-\r\n`;
-    csvContent += `Collection Method,${collectionMethod},-,-\r\n`;
-    csvContent += `Sample Volume,${sampleVolume},-,mL\r\n`;
-    csvContent += `Sample pH,${samplePh},-,pH\r\n`;
-    csvContent += `Sample Appearance,${sampleAppearance.replace(/,/g, '')},-,-\r\n`;
-    csvContent += `Clinician Remarks,${(clinicianRemarks || "None").replace(/[\r\n,]+/g, ' ')},-,-\r\n`;
+    csvContent += `Patient ID,${results.patientId},-,-,-\r\n`;
+    csvContent += `Species,${results.species},-,-,-\r\n`;
+    csvContent += `Report Date,${new Date(results.timestamp).toLocaleDateString()},-,-,-\r\n`;
+    csvContent += `Operator,${clinicianName.replace(/,/g, '')},-,-,-\r\n`;
+    csvContent += `Facility,${facilityName.replace(/,/g, '')},-,-,-\r\n`;
+    csvContent += `Collection Method,${collectionMethod},-,-,-\r\n`;
+    csvContent += `Sample Volume,${sampleVolume},-,mL,-\r\n`;
+    csvContent += `Sample pH,${samplePh},-,pH,-\r\n`;
+    csvContent += `Sample Appearance,${sampleAppearance.replace(/,/g, '')},-,-,-\r\n`;
+    csvContent += `Clinician Remarks,${(clinicianRemarks || "None").replace(/[\r\n,]+/g, ' ')},-,-,-\r\n`;
+    csvContent += `Result Source,${provenance.source},-,-,-\r\n`;
+    csvContent += `Provenance,${clean(provenance.label)},-,-,-\r\n`;
+    csvContent += `Provenance Detail,${clean(provenance.detail)},-,-,-\r\n`;
 
     // Add Kinematics
     const prof = results.settings?.profile || SPECIES_PROFILES[results.species] || SPECIES_PROFILES['Bovine'];
-    csvContent += `Concentration,${(results.summary?.concentration ?? 0).toFixed(2)},> ${prof?.minConcentration ?? 20},M/mL\r\n`;
-    csvContent += `Total Motility,${(results.summary?.motility?.total ?? 0).toFixed(2)},> ${prof?.minTotalMotility ?? 60},%\r\n`;
-    csvContent += `Progressive Motility,${(results.summary?.motility?.progressive ?? 0).toFixed(2)},> ${prof?.minProgressiveMotility ?? 40},%\r\n`;
-    csvContent += `Non-Progressive Motility,${(results.summary?.motility?.nonProgressive ?? 0).toFixed(2)},-,%\r\n`;
-    csvContent += `Immotile Sperm,${(results.summary?.motility?.immotile ?? 0).toFixed(2)},-,%\r\n`;
-    csvContent += `Average VCL,${(results.summary?.kinematics?.avgVcl ?? 0).toFixed(2)},-,um/s\r\n`;
-    csvContent += `Average VSL,${(results.summary?.kinematics?.avgVsl ?? 0).toFixed(2)},-,um/s\r\n`;
-    csvContent += `Average VAP,${(results.summary?.kinematics?.avgVap ?? 0).toFixed(2)},-,um/s\r\n`;
-    csvContent += `Average LIN,${((results.summary?.kinematics?.avgLin ?? 0) * 100).toFixed(2)},-,%\r\n`;
-    csvContent += `Average STR,${((results.summary?.kinematics?.avgStr ?? 0) * 100).toFixed(2)},-,%\r\n`;
-    csvContent += `Average ALH,${(results.summary?.kinematics?.avgAlh ?? 0).toFixed(2)},-,um\r\n`;
-    csvContent += `Average BCF,${(results.summary?.kinematics?.avgBcf ?? 0).toFixed(2)},-,Hz\r\n`;
+    csvContent += `Concentration,${value('concentration', results.summary.concentration.toFixed(2))},> ${prof?.minConcentration ?? 20},M/mL,${provenance.domains.concentration}\r\n`;
+    csvContent += `Total Motility,${value('kinematics', results.summary.motility.total.toFixed(2))},> ${prof?.minTotalMotility ?? 60},%,${provenance.domains.kinematics}\r\n`;
+    csvContent += `Progressive Motility,${value('kinematics', results.summary.motility.progressive.toFixed(2))},> ${prof?.minProgressiveMotility ?? 40},%,${provenance.domains.kinematics}\r\n`;
+    csvContent += `Non-Progressive Motility,${value('kinematics', results.summary.motility.nonProgressive.toFixed(2))},-,%,${provenance.domains.kinematics}\r\n`;
+    csvContent += `Immotile Sperm,${value('kinematics', results.summary.motility.immotile.toFixed(2))},-,%,${provenance.domains.kinematics}\r\n`;
+    csvContent += `Average VCL,${value('kinematics', results.summary.kinematics.avgVcl.toFixed(2))},-,um/s,${provenance.domains.kinematics}\r\n`;
+    csvContent += `Average VSL,${value('kinematics', results.summary.kinematics.avgVsl.toFixed(2))},-,um/s,${provenance.domains.kinematics}\r\n`;
+    csvContent += `Average VAP,${value('kinematics', results.summary.kinematics.avgVap.toFixed(2))},-,um/s,${provenance.domains.kinematics}\r\n`;
+    csvContent += `Average LIN,${value('kinematics', (results.summary.kinematics.avgLin * 100).toFixed(2))},-,%,${provenance.domains.kinematics}\r\n`;
+    csvContent += `Average STR,${value('kinematics', (results.summary.kinematics.avgStr * 100).toFixed(2))},-,%,${provenance.domains.kinematics}\r\n`;
+    csvContent += `Average ALH,${value('kinematics', results.summary.kinematics.avgAlh.toFixed(2))},-,um,${provenance.domains.kinematics}\r\n`;
+    csvContent += `Average BCF,${value('kinematics', results.summary.kinematics.avgBcf.toFixed(2))},-,Hz,${provenance.domains.kinematics}\r\n`;
 
     // Add Morphology
-    csvContent += `Normal Morphology,${(results.summary?.morphology?.normal ?? 0).toFixed(2)},> ${prof?.minNormalMorphology ?? 70},%\r\n`;
-    csvContent += `TZI Index,${(results.summary?.morphology?.tzi ?? 1.15).toFixed(2)},< 1.6,-\r\n`;
-    csvContent += `MAI Index,${(results.summary?.morphology?.mai ?? 1.12).toFixed(2)},< 1.5,-\r\n`;
-    csvContent += `Acrosome Defects,${(results.summary?.morphology?.acrosomeDefects ?? 0).toFixed(2)},-,%\r\n`;
-    csvContent += `Cytoplasmic Droplets,${(results.summary?.morphology?.cytoplasmicDroplets ?? 0).toFixed(2)},-,%\r\n`;
+    csvContent += `Normal Morphology,${value('morphology', results.summary.morphology.normal.toFixed(2))},> ${prof?.minNormalMorphology ?? 70},%,${provenance.domains.morphology}\r\n`;
+    csvContent += `TZI Index,${value('morphology', results.summary.morphology.tzi.toFixed(2))},< 1.6,-,${provenance.domains.morphology}\r\n`;
+    csvContent += `MAI Index,${value('morphology', results.summary.morphology.mai.toFixed(2))},< 1.5,-,${provenance.domains.morphology}\r\n`;
+    csvContent += `Acrosome Defects,${value('morphology', results.summary.morphology.acrosomeDefects.toFixed(2))},-,%,${provenance.domains.morphology}\r\n`;
+    csvContent += `Cytoplasmic Droplets,${value('morphology', results.summary.morphology.cytoplasmicDroplets.toFixed(2))},-,%,${provenance.domains.morphology}\r\n`;
 
-    // Defects details
-    if (typeof results.summary?.morphology?.headDefects === 'object' && results.summary?.morphology?.headDefects !== null) {
+    // Defects details only when morphology was actually assessed.
+    if (show('morphology') && typeof results.summary?.morphology?.headDefects === 'object' && results.summary?.morphology?.headDefects !== null) {
       Object.entries(results.summary.morphology.headDefects).forEach(([k, v]) => {
-        csvContent += `Head defect: ${k},${(Number(v) || 0).toFixed(2)},-,%\r\n`;
+        csvContent += `Head defect: ${k},${(Number(v) || 0).toFixed(2)},-,%,${provenance.domains.morphology}\r\n`;
       });
     }
-    if (typeof results.summary?.morphology?.midpieceDefects === 'object' && results.summary?.morphology?.midpieceDefects !== null) {
+    if (show('morphology') && typeof results.summary?.morphology?.midpieceDefects === 'object' && results.summary?.morphology?.midpieceDefects !== null) {
       Object.entries(results.summary.morphology.midpieceDefects).forEach(([k, v]) => {
-        csvContent += `Midpiece defect: ${k},${(Number(v) || 0).toFixed(2)},-,%\r\n`;
+        csvContent += `Midpiece defect: ${k},${(Number(v) || 0).toFixed(2)},-,%,${provenance.domains.morphology}\r\n`;
       });
     }
-    if (typeof results.summary?.morphology?.tailDefects === 'object' && results.summary?.morphology?.tailDefects !== null) {
+    if (show('morphology') && typeof results.summary?.morphology?.tailDefects === 'object' && results.summary?.morphology?.tailDefects !== null) {
       Object.entries(results.summary.morphology.tailDefects).forEach(([k, v]) => {
-        csvContent += `Tail defect: ${k},${(Number(v) || 0).toFixed(2)},-,%\r\n`;
+        csvContent += `Tail defect: ${k},${(Number(v) || 0).toFixed(2)},-,%,${provenance.domains.morphology}\r\n`;
       });
     }
 
     // DNA / SDF & Vitality
-    csvContent += `DNA Fragmentation Index (SDF),${(results.summary?.sdf?.dfi ?? 0).toFixed(2)},< 30,%\r\n`;
-    csvContent += `Vitality Live,${(results.summary?.vitality?.live ?? 0).toFixed(2)},> ${prof?.minVitality ?? 70},%\r\n`;
-    csvContent += `Leukocytes,${(results.summary?.leukocytes ?? 0.1).toFixed(2)},< ${prof?.maxLeukocytes ?? 1.0},M/mL\r\n`;
+    csvContent += `DNA Fragmentation Index (SDF),${value('sdf', results.summary.sdf.dfi.toFixed(2))},< 30,%,${provenance.domains.sdf}\r\n`;
+    csvContent += `Vitality Live,${value('vitality', results.summary.vitality.live.toFixed(2))},> ${prof?.minVitality ?? 70},%,${provenance.domains.vitality}\r\n`;
+    csvContent += `Leukocytes,${value('leukocytes', results.summary.leukocytes.toFixed(2))},< ${prof?.maxLeukocytes ?? 1.0},M/mL,${provenance.domains.leukocytes}\r\n`;
+    csvContent += `Research Use Only,Yes,-,-,-\r\n`;
 
     const csvDataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent.replace("data:text/csv;charset=utf-8,", ""));
     const link = document.createElement("a");
@@ -2448,11 +2609,11 @@ Digital Signature Verified - ATSA AI Engine v2.0
         } else {
           updatedSpermatozoa = updatedSpermatozoa.map(s => {
             if (s.id === spermId) {
+              // Reclassification is an operator decision; measured velocities
+              // are left untouched rather than replaced with invented values.
               return {
                 ...s,
                 classification: nextClass,
-                vcl: nextClass === 'immotile' ? 0.5 : (nextClass === 'non-progressive' ? 15 : 65),
-                vsl: nextClass === 'immotile' ? 0.0 : (nextClass === 'non-progressive' ? 5 : 45),
               };
             }
             return s;
@@ -2460,47 +2621,29 @@ Digital Signature Verified - ATSA AI Engine v2.0
           createNotification("Manual Annotation Override", `Sperm ${spermId} changed to ${nextClass.toUpperCase()}`, "success");
         }
 
-        const updatedSummary = generateSummary(updatedSpermatozoa, settings);
+        const updatedSummary = generateSummary(
+          updatedSpermatozoa,
+          settings,
+          undefined,
+          getProvenance(results)
+        );
         setResults({
           ...results,
           spermatozoa: updatedSpermatozoa,
           summary: updatedSummary
         });
       } else {
-        const newId = `M-${Date.now().toString().slice(-4)}`;
-        const path = Array.from({ length: 15 }, (_, idx) => ({
-          x: x + (Math.random() - 0.5) * 8,
-          y: y + (Math.random() - 0.5) * 8,
-          t: idx / settings.fps
-        }));
-        const kinematics = calculateKinematics(path, settings.fps, settings.micronsPerPixel);
-        const newSperm: SpermData = {
-          id: newId,
-          path,
-          ...kinematics,
-          classification: 'progressive',
-          morphology: {
-            head: 'normal',
-            vacuoles: 'absent',
-            acrosome: 'normal',
-            midpiece: 'normal',
-            tail: 'normal',
-            droplet: 'none',
-            krugerStrict: 'strict_normal'
-          },
-          morphometry: { area: 18, perimeter: 15, length: 6, width: 3.2, circularity: 0.85, elongation: 0.45, lengthWidthRatio: 1.875, acrosomeAreaPercent: 55.0 },
-          vitality: 'live',
-          sdf: { fragmented: false, haloSized: 18, dfi: 10 }
-        };
-
-        const updatedSpermatozoa = [...results.spermatozoa, newSperm];
-        const updatedSummary = generateSummary(updatedSpermatozoa, settings);
-        setResults({
-          ...results,
-          spermatozoa: updatedSpermatozoa,
-          summary: updatedSummary
+        // Seeding a new track from a click would fabricate trajectories and
+        // kinematics that were never measured. Direct the operator to a real capture.
+        createNotification(
+          "Manual Track Seeding Disabled",
+          `No measured track was found near (${x.toFixed(0)}, ${y.toFixed(0)}). Capture or upload footage to create measured tracks.`,
+          "warning"
+        );
+        setEngineToast({
+          message: 'Manual track seeding is disabled because it would invent a trajectory. Reclassify an existing measured track instead.',
+          type: 'info'
         });
-        createNotification("Manual Point Added", `Manually annotated cell ${newId} at screen coordinates (${x.toFixed(0)}, ${y.toFixed(0)})`, "success");
       }
       return;
     }
@@ -2955,6 +3098,23 @@ Digital Signature Verified - ATSA AI Engine v2.0
           })}
         </div>
       </div>
+
+      {results && <ResultProvenanceBanner result={results} theme={theme} />}
+
+      {isAnalyzing && !results && (
+        <div
+          role="status"
+          className={cn(
+            'px-4 py-2 border-b flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider',
+            theme === 'dark'
+              ? 'bg-amber-500/[0.08] border-amber-500/25 text-amber-300'
+              : 'bg-amber-50 border-amber-200 text-amber-800'
+          )}
+        >
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          Simulation in progress — tracks are synthetic and will be labelled simulated. This run cannot be saved to patient history.
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Main Workspace */}
@@ -4317,7 +4477,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                           <div className="bg-black/40 p-4 rounded-2xl border border-white/5 h-48">
                             <p className="text-[8px] font-bold text-white/20 uppercase mb-4">Concentration Trend (M/ml)</p>
                             <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={[...history].reverse()}>
+                              <LineChart data={[...history].reverse().filter((entry) => typeof entry.concentration === 'number')}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                                 <XAxis 
                                   dataKey="timestamp" 
@@ -4352,10 +4512,16 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                 <div>
                                   <p className="text-[10px] font-bold text-white/80">{new Date(item.timestamp).toLocaleDateString()}</p>
                                   <p className="text-[8px] text-white/30 uppercase tracking-widest">{new Date(item.timestamp).toLocaleTimeString()}</p>
+                                  <p className="text-[8px] text-white/25">{item.provenance ? getProvenance(item).label : 'Legacy record — unverified'}</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="text-xs font-mono text-emerald-400">{item.concentration.toFixed(1)} <span className="text-[8px] text-white/20">M/ml</span></p>
-                                  <p className="text-[8px] text-white/40">{item.motility.progressive.toFixed(1)}% Prog.</p>
+                                  <p className="text-xs font-mono text-emerald-400">
+                                    {typeof item.concentration === 'number' ? item.concentration.toFixed(1) : '—'}
+                                    <span className="text-[8px] text-white/20"> M/ml</span>
+                                  </p>
+                                  <p className="text-[8px] text-white/40">
+                                    {typeof item.motility?.progressive === 'number' ? `${item.motility.progressive.toFixed(1)}% Prog.` : 'Progressive not assessed'}
+                                  </p>
                                 </div>
                               </div>
                             ))}
@@ -4815,7 +4981,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                   {/* Clinical advice box */}
                                   <div className="text-[9px] text-white/45 leading-relaxed pt-1">
                                     {maxCV <= 10 && (
-                                      <span>✅ <strong>Excellent Homogeneity</strong>: Microscope fields correspond with negligible coefficient drift. Certified with WHO guidelines section 2.4. Specimen is ready for automated clinical profiling.</span>
+                                      <span>✅ <strong>Low Inter-Field Variance</strong>: The entered fields agree closely. This is a homogeneity check on your own measurements, not a certification of the specimen.</span>
                                     )}
                                     {maxCV > 10 && maxCV <= 15 && (
                                       <span>⚠️ <strong>Acceptable Multi-Field Variance</strong>: Low level drift identified. Valid for baseline work, but suggest checking that coverslips are balanced and free of shear forces.</span>
@@ -4846,16 +5012,32 @@ Digital Signature Verified - ATSA AI Engine v2.0
                           <div className="grid grid-cols-2 gap-3">
                             <div className="bg-black/40 p-3 rounded-xl border border-white/5">
                               <p className="text-[10px] text-white/40 uppercase font-bold mb-1">Concentration</p>
-                              <p className="text-xl font-mono text-white">{results.summary.concentration.toFixed(1)} <span className="text-[10px] text-white/20">M/ml</span></p>
+                              {hasDomainValues(domainBasis(results, 'concentration')) ? (
+                                <>
+                                  <p className="text-xl font-mono text-white">{results.summary.concentration.toFixed(1)} <span className="text-[10px] text-white/20">M/ml</span></p>
+                                  <p className="text-[8px] uppercase tracking-wider text-white/30 mt-0.5">
+                                    {domainBasis(results, 'concentration') === 'estimated' ? 'Estimated from field detections' : domainBasis(results, 'concentration')}
+                                  </p>
+                                </>
+                              ) : (
+                                <p className="text-sm font-mono text-white/35">Not assessed</p>
+                              )}
                             </div>
                             <div className="bg-black/40 p-3 rounded-xl border border-white/5">
                               <p className="text-[10px] text-white/40 uppercase font-bold mb-1">Leukocytes</p>
-                              <p className={cn(
-                                "text-xl font-mono",
-                                results.summary.leukocytes > results.settings.profile.maxLeukocytes ? "text-red-400" : "text-emerald-400"
-                              )}>
-                                {results.summary.leukocytes.toFixed(1)} <span className="text-[10px] opacity-40">M/ml</span>
-                              </p>
+                              {hasDomainValues(domainBasis(results, 'leukocytes')) ? (
+                                <p className={cn(
+                                  "text-xl font-mono",
+                                  results.summary.leukocytes > results.settings.profile.maxLeukocytes ? "text-red-400" : "text-emerald-400"
+                                )}>
+                                  {results.summary.leukocytes.toFixed(1)} <span className="text-[10px] opacity-40">M/ml</span>
+                                </p>
+                              ) : (
+                                <>
+                                  <p className="text-sm font-mono text-white/35">Not assessed</p>
+                                  <p className="text-[8px] uppercase tracking-wider text-white/30 mt-0.5">No leukocyte assay in this pipeline</p>
+                                </>
+                              )}
                             </div>
                           </div>
                         </section>
@@ -5012,6 +5194,18 @@ Digital Signature Verified - ATSA AI Engine v2.0
 
                     {activeTab === 'kinematics' && selectedSperm && (
                       <div className="space-y-4">
+                        {!hasDomainValues(domainBasis(results, 'kinematics')) && (
+                          <UnassessedPanel
+                            domain="Trajectory kinematics"
+                            reason="No trajectory was tracked for this run, so velocity and trajectory values are not reported."
+                            theme={theme}
+                          />
+                        )}
+                        {domainBasis(results, 'kinematics') === 'simulated' && (
+                          <div className="p-3 rounded-xl border border-amber-500/25 bg-amber-500/10 text-[10px] font-bold text-amber-300">
+                            Simulated trajectory. These velocities come from a generated path, not from tracking the specimen.
+                          </div>
+                        )}
                         <div className="flex gap-2 mb-4">
                           <button 
                             onClick={() => setKinematicsView('2d')}
@@ -5065,7 +5259,15 @@ Digital Signature Verified - ATSA AI Engine v2.0
                       </div>
                     )}
 
-                    {activeTab === 'morphology' && selectedSperm && (
+                    {activeTab === 'morphology' && selectedSperm && !hasDomainValues(domainBasis(results, 'morphology')) && (
+                      <UnassessedPanel
+                        domain="Morphology"
+                        reason="Morphology and morphometry require a dedicated stained-image or vision assessment. The tracking pipeline used for this run only measured trajectory kinematics, so no morphology values are reported."
+                        theme={theme}
+                      />
+                    )}
+
+                    {activeTab === 'morphology' && selectedSperm && hasDomainValues(domainBasis(results, 'morphology')) && (
                       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl">
                           <div className="flex items-center gap-3 mb-2">
@@ -5074,17 +5276,12 @@ Digital Signature Verified - ATSA AI Engine v2.0
                             </div>
                             <div>
                               <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Morphology Status</p>
-                              <p className="text-xs text-white/80">Automated Head Classification</p>
+                              <p className="text-xs text-white/80">Morphology basis: {domainBasis(results, 'morphology')}</p>
                             </div>
                           </div>
-                          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                            <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: '94%' }}
-                              className="h-full bg-emerald-500"
-                            />
-                          </div>
-                          <p className="text-[8px] text-white/40 mt-2 italic">Confidence Score: 94.2% (WHO 2010 Standards)</p>
+                          <p className="text-[8px] text-white/40 mt-2 italic">
+                            Values below come from the {domainBasis(results, 'morphology')} source shown in the provenance banner. No confidence score is inferred when none was measured.
+                          </p>
                         </div>
 
                         {/* Head Analysis */}
@@ -5184,39 +5381,6 @@ Digital Signature Verified - ATSA AI Engine v2.0
                             </div>
                           </div>
                         </section>
-
-                        {/* Morphology Distribution */}
-                        <div className={cn(
-                          "p-4 rounded-2xl border",
-                          theme === 'dark' ? "bg-white/5 border-white/10" : "bg-black/5 border-black/10"
-                        )}>
-                          <h4 className={cn(
-                            "text-[9px] font-bold uppercase mb-3",
-                            theme === 'dark' ? "text-white/40" : "text-black/40"
-                          )}>Sample Morphology Distribution</h4>
-                          <div className="space-y-3">
-                            {[
-                              { label: 'Normal Head', value: 85, color: 'bg-emerald-500' },
-                              { label: 'Large Head', value: 8, color: 'bg-amber-500' },
-                              { label: 'Small Head', value: 4, color: 'bg-red-500' },
-                              { label: 'Amorphous', value: 3, color: 'bg-purple-500' },
-                              { label: 'Pyriform/Tapered', value: 2, color: 'bg-blue-500' },
-                            ].map(item => (
-                              <div key={item.label}>
-                                <div className="flex justify-between text-[9px] mb-1">
-                                  <span className={theme === 'dark' ? "text-white/60" : "text-black/60"}>{item.label}</span>
-                                  <span className={theme === 'dark' ? "text-white/40" : "text-black/40"}>{item.value}%</span>
-                                </div>
-                                <div className={cn(
-                                  "h-1 w-full rounded-full overflow-hidden",
-                                  theme === 'dark' ? "bg-white/5" : "bg-black/5"
-                                )}>
-                                  <div className={cn("h-full rounded-full", item.color)} style={{ width: `${item.value}%` }} />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
 
                         {/* Indices Section */}
                         {results && (
@@ -5390,7 +5554,15 @@ Digital Signature Verified - ATSA AI Engine v2.0
                       </div>
                     )}
 
-                    {activeTab === 'vitality' && results && (
+                    {activeTab === 'vitality' && results && !hasDomainValues(domainBasis(results, 'vitality')) && (
+                      <UnassessedPanel
+                        domain="Vitality"
+                        reason="Vitality requires a dye-exclusion or membrane-integrity assay. No such assay was performed for this run, so live/dead percentages are not reported."
+                        theme={theme}
+                      />
+                    )}
+
+                    {activeTab === 'vitality' && results && hasDomainValues(domainBasis(results, 'vitality')) && (
                       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-[32px]">
                           <div className="flex items-center gap-4 mb-6">
@@ -5478,6 +5650,16 @@ Digital Signature Verified - ATSA AI Engine v2.0
 
                     {activeTab === 'sdf' && results && (
                       <div className="space-y-6">
+                        {!hasDomainValues(domainBasis(results, 'sdf')) && (
+                          <UnassessedPanel
+                            domain="DNA fragmentation (SDF)"
+                            reason="The Sperm Chromatin Dispersion assay is not part of this tracking run. DFI, halo size, and fragmented-cell counts are not reported. The simulator below is educational only and does not produce a patient result."
+                            theme={theme}
+                          />
+                        )}
+
+                        {hasDomainValues(domainBasis(results, 'sdf')) && (
+                          <>
                         <div className="p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-[32px]">
                           <div className="flex items-center gap-4 mb-6">
                             <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center">
@@ -5556,6 +5738,8 @@ Digital Signature Verified - ATSA AI Engine v2.0
                             </div>
                           </div>
                         </section>
+                          </>
+                        )}
 
                         <section className={cn(
                           "p-4 border rounded-2xl space-y-4",
@@ -5563,13 +5747,13 @@ Digital Signature Verified - ATSA AI Engine v2.0
                         )}>
                           <div className="flex items-center justify-between">
                             <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Advanced SCD Halos Assay Simulator</h4>
-                            <span className="text-[8px] px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-full font-mono uppercase font-black">Interactive Sandbox</span>
+                            <span className="text-[8px] px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-full font-mono uppercase font-black">Educational simulation — not a measurement</span>
                           </div>
                           <p className={cn(
                             "text-[9px] leading-relaxed",
                             theme === 'dark' ? "text-white/50" : "text-slate-600"
                           )}>
-                            Simulate the acid denaturation and nuclear extraction steps of the Sperm Chromatin Dispersion (SCD) test. Observe how buffer protocols influence halo loop diameter and final diagnostic sensitivity.
+                            Explore the acid denaturation and nuclear extraction steps of the Sperm Chromatin Dispersion (SCD) test. This sandbox is educational only: its sliders do not measure the specimen and cannot create a patient result.
                           </p>
 
                           <div className="grid grid-cols-2 gap-4">
@@ -5769,11 +5953,16 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                 ))}
                               </div>
 
-                              {/* Model Infrastructure Metadata */}
+                              {/* Model infrastructure reference. These are illustrative
+                                  architecture figures, not benchmark results measured by
+                                  this application. */}
                               {videoFilters.aiModel !== 'none' && (
                                 <div className="grid grid-cols-2 gap-3 pt-3 border-t border-purple-500/10">
+                                  <p className="col-span-2 text-[8px] leading-relaxed text-purple-300/60">
+                                    Illustrative reference figures for this model family. They are not benchmark results measured on this device, and selecting a model runs a simulation of its output.
+                                  </p>
                                   <div className="space-y-0.5">
-                                    <span className="text-[8px] uppercase tracking-widest text-white/30 font-semiboldBlock">Latency / Inference</span>
+                                    <span className="text-[8px] uppercase tracking-widest text-white/30 font-semiboldBlock">Reference Latency</span>
                                     <p className="text-[11px] font-mono font-bold text-purple-400">
                                       {videoFilters.aiModel === 'yolov8' && "1.8 - 2.4 ms"}
                                       {videoFilters.aiModel === 'ssd' && "4.5 - 6.2 ms"}
@@ -5791,7 +5980,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                     </p>
                                   </div>
                                   <div className="space-y-0.5 mt-2">
-                                    <span className="text-[8px] uppercase tracking-widest text-white/30 font-semiboldBlock">Mean Precision (mAP)</span>
+                                    <span className="text-[8px] uppercase tracking-widest text-white/30 font-semiboldBlock">Reference Precision (mAP)</span>
                                     <p className="text-[11px] font-mono font-semibold text-emerald-400">
                                       {videoFilters.aiModel === 'yolov8' && "96.4%"}
                                       {videoFilters.aiModel === 'ssd' && "91.8%"}
@@ -6446,7 +6635,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                       </span>
                                       <span className="text-[10px] tracking-wide text-slate-300 font-sans">
-                                        🔬 <strong className="text-white">{results.species} Specimen</strong> ({results.patientId}) Loaded &middot; Ready for Clinical Certification
+                                        🔬 <strong className="text-white">{results.species} Specimen</strong> ({results.patientId}) Loaded &middot; {getProvenance(results).source === 'measured' ? 'Measured run ready for export' : 'Demonstration data — not a clinical measurement'}
                                       </span>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-1.5">
@@ -6510,13 +6699,45 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                       ))}
                                     </div>
                                     <p className="text-[6.5px] font-mono font-bold text-black/40">SYS_UID: {results.patientId}-{new Date(results.timestamp).getTime().toString().substring(8)}</p>
-                                    <span className="text-[8px] font-mono mt-1 font-bold bg-black text-white px-1.5 py-0.5 rounded leading-none">CLINIC_COPY</span>
+                                    <span className="text-[8px] font-mono mt-1 font-bold bg-black text-white px-1.5 py-0.5 rounded leading-none">
+                                      {getProvenance(results).source === 'measured' ? 'CLINIC_COPY' : 'DEMO_COPY'}
+                                    </span>
                                   </div>
                                 </div>
 
+                                {/* Provenance strip: printed into every exported report */}
+                                {(() => {
+                                  const provenance = getProvenance(results);
+                                  const measured = provenance.source === 'measured';
+                                  return (
+                                    <div className={cn(
+                                      "mb-3 p-3 rounded-xl border space-y-1 font-sans",
+                                      measured ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-300"
+                                    )}>
+                                      <div className="flex flex-wrap items-center gap-2 text-[9px] font-black uppercase tracking-wider">
+                                        <span className={cn(
+                                          "px-2 py-0.5 rounded-full border",
+                                          measured ? "bg-emerald-100 border-emerald-300 text-emerald-800" : "bg-amber-100 border-amber-400 text-amber-900"
+                                        )}>
+                                          {provenance.label}
+                                        </span>
+                                        <span className={measured ? "text-emerald-900" : "text-amber-900"}>
+                                          {measured ? 'Measured analysis' : 'NOT A MEASUREMENT'}
+                                        </span>
+                                      </div>
+                                      <p className={cn("text-[8.5px] leading-relaxed font-semibold", measured ? "text-emerald-900/80" : "text-amber-950/80")}>
+                                        {provenance.detail}
+                                      </p>
+                                      <p className={cn("text-[8px] leading-relaxed", measured ? "text-emerald-900/60" : "text-amber-950/60")}>
+                                        Research and educational use only. Not a validated diagnostic device and not for clinical decision-making.
+                                      </p>
+                                    </div>
+                                  );
+                                })()}
+
                                 {/* Report Status Indicator bar */}
                                 <div className={cn(
-                                  "mb-6 p-3 rounded-xl border flex items-center justify-between text-xs font-bold leading-none uppercase tracking-wider",
+                                  "mb-6 p-3 rounded-xl border flex flex-wrap items-center justify-between gap-2 text-xs font-bold leading-none uppercase tracking-wider",
                                   results.summary.interpretation?.status === 'normal' 
                                     ? "bg-emerald-50 border-emerald-200 text-emerald-800" 
                                     : results.summary.interpretation?.status === 'borderline' 
@@ -6529,9 +6750,11 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                       results.summary.interpretation?.status === 'normal' ? "bg-emerald-500" :
                                       results.summary.interpretation?.status === 'borderline' ? "bg-amber-500" : "bg-red-500"
                                     )} />
-                                    <span>DIAGNOSTIC STATUS: {results.summary.interpretation?.status || 'NOT READY'}</span>
+                                    <span>{getProvenance(results).source === 'measured' ? 'INTERPRETATION STATUS' : 'DEMONSTRATION STATUS'}: {results.summary.interpretation?.status || 'NOT INTERPRETED'}</span>
                                   </div>
-                                  <span className="text-[9px] font-mono opacity-60">Verified {new Date(results.timestamp).toLocaleDateString()}</span>
+                                  <span className="text-[9px] font-mono opacity-60">
+                                    {getProvenance(results).source === 'measured' ? 'Generated' : 'Synthetic run generated'} {new Date(results.timestamp).toLocaleDateString()}
+                                  </span>
                                 </div>
 
                                 {/* Demographics and Collection Metadata block */}
@@ -6582,9 +6805,17 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                   <section className="space-y-3 mb-6 relative">
                                     <div className="flex items-center justify-between border-b border-black/15 pb-1">
                                       <h3 className="text-[9.5px] font-black text-black/80 uppercase tracking-wider">I. Motility & Advanced Kinematics</h3>
-                                      <span className="text-[7px] font-bold text-emerald-600 font-mono">Reference Normals Included</span>
+                                      <span className="text-[7px] font-bold text-emerald-600 font-mono">Basis: {domainBasis(results, 'kinematics')}</span>
                                     </div>
-                                    
+
+                                    {!hasDomainValues(domainBasis(results, 'kinematics')) && (
+                                      <p className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[9px] font-bold text-amber-900">
+                                        Not assessed. No trajectory kinematics were measured for this run, so motility and velocity values are omitted rather than estimated.
+                                      </p>
+                                    )}
+
+                                    {hasDomainValues(domainBasis(results, 'kinematics')) && (
+                                    <>
                                     <div className="grid grid-cols-3 gap-2">
                                       {[
                                         { label: 'Total Motility', val: `${(results.summary?.motility?.total ?? 0).toFixed(1)}%`, ref: `> ${results.settings?.profile?.minTotalMotility ?? 60}%`, pass: (results.summary?.motility?.total ?? 0) >= (results.settings?.profile?.minTotalMotility ?? 60) },
@@ -6620,6 +6851,8 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                         </div>
                                       ))}
                                     </div>
+                                    </>
+                                    )}
                                   </section>
                                 )}
 
@@ -6628,9 +6861,17 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                   <section className="space-y-3 mb-6">
                                     <div className="flex items-center justify-between border-b border-black/15 pb-1">
                                       <h3 className="text-[9.5px] font-black text-black/80 uppercase tracking-wider">II. Morphology & Indices</h3>
-                                      <span className="text-[7px] font-semibold text-black/40 font-mono">Visual morphometry verification</span>
+                                      <span className="text-[7px] font-semibold text-black/40 font-mono">Basis: {domainBasis(results, 'morphology')}</span>
                                     </div>
 
+                                    {!hasDomainValues(domainBasis(results, 'morphology')) && (
+                                      <p className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[9px] font-bold text-amber-900">
+                                        Not assessed. Morphology, morphometry, and defect indices require a dedicated stained-image assessment that this run did not perform. No morphology value is reported.
+                                      </p>
+                                    )}
+
+                                    {hasDomainValues(domainBasis(results, 'morphology')) && (
+                                    <>
                                     <div className="grid grid-cols-3 gap-2">
                                       <div className="p-3 bg-slate-50 border border-black/5 rounded-xl text-center">
                                         <p className="text-[7.5px] font-bold text-black/50 uppercase leading-none mb-1">Normal Cells</p>
@@ -6685,6 +6926,8 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                         ))}
                                       </div>
                                     </div>
+                                    </>
+                                    )}
                                   </section>
                                 )}
 
@@ -6693,7 +6936,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                   <section className="space-y-3 mb-6">
                                     <div className="flex items-center justify-between border-b border-black/15 pb-1">
                                       <h3 className="text-[9.5px] font-black text-black/80 uppercase tracking-wider">III. Concentration, DNA Fragmentation & Vitality</h3>
-                                      <span className="text-[7px] font-semibold text-black/40 font-mono">Cytometric viability measures</span>
+                                      <span className="text-[7px] font-semibold text-black/40 font-mono">Unassessed values are omitted</span>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3 text-[9px] font-medium text-left">
@@ -6701,15 +6944,27 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                         <div className="space-y-1">
                                           <div className="flex justify-between border-b border-black/[0.04] pb-1">
                                             <span className="text-black/70">Sperm Concentration:</span>
-                                            <span className="font-mono font-black text-black">{(results.summary?.concentration ?? 0).toFixed(1)} Millions/mL</span>
+                                            <span className="font-mono font-black text-black">
+                                              {hasDomainValues(domainBasis(results, 'concentration'))
+                                                ? `${(results.summary?.concentration ?? 0).toFixed(1)} Millions/mL`
+                                                : 'Not assessed'}
+                                            </span>
                                           </div>
                                           <div className="flex justify-between border-b border-black/[0.04] pb-1">
                                             <span className="text-black/70">Vitality (Percent Live):</span>
-                                            <span className="font-mono font-black text-black">{results.summary.vitality.live.toFixed(1)}%</span>
+                                            <span className="font-mono font-black text-black">
+                                              {hasDomainValues(domainBasis(results, 'vitality'))
+                                                ? `${results.summary.vitality.live.toFixed(1)}%`
+                                                : 'Not assessed'}
+                                            </span>
                                           </div>
                                           <div className="flex justify-between">
                                             <span className="text-black/70">Leukocytes Count:</span>
-                                            <span className="font-mono font-black text-black">{(results.summary?.leukocytes ?? 0.1).toFixed(1)} M/mL</span>
+                                            <span className="font-mono font-black text-black">
+                                              {hasDomainValues(domainBasis(results, 'leukocytes'))
+                                                ? `${(results.summary?.leukocytes ?? 0).toFixed(1)} M/mL`
+                                                : 'Not assessed'}
+                                            </span>
                                           </div>
                                         </div>
                                       )}
@@ -6718,15 +6973,21 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                         <div className="space-y-1 border-l border-black/10 pl-4">
                                           <div className="flex justify-between border-b border-black/[0.04] pb-1">
                                             <span className="text-black/70">Halos (DFI Ratio):</span>
-                                            <span className="font-mono font-black text-red-600">{(results.summary?.sdf?.dfi ?? 0).toFixed(1)}% DFI</span>
+                                            <span className="font-mono font-black text-red-600">
+                                              {hasDomainValues(domainBasis(results, 'sdf')) ? `${(results.summary?.sdf?.dfi ?? 0).toFixed(1)}% DFI` : 'Not assessed'}
+                                            </span>
                                           </div>
                                           <div className="flex justify-between border-b border-black/[0.04] pb-1">
                                             <span className="text-black/70">Fragmented Count:</span>
-                                            <span className="font-mono font-black text-black">{results.summary?.sdf?.fragmentedCount ?? 0} cells</span>
+                                            <span className="font-mono font-black text-black">
+                                              {hasDomainValues(domainBasis(results, 'sdf')) ? `${results.summary?.sdf?.fragmentedCount ?? 0} cells` : 'Not assessed'}
+                                            </span>
                                           </div>
                                           <div className="flex justify-between">
                                             <span className="text-black/70">Total SDF Sample size:</span>
-                                            <span className="font-mono font-black text-black">{results.summary?.sdf?.totalCount ?? results.summary?.totalCount ?? 0} cells</span>
+                                            <span className="font-mono font-black text-black">
+                                              {hasDomainValues(domainBasis(results, 'sdf')) ? `${results.summary?.sdf?.totalCount ?? 0} cells` : 'Not assessed'}
+                                            </span>
                                           </div>
                                         </div>
                                       )}
@@ -6811,18 +7072,29 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                     <div className="w-16 h-16 rounded-full border-2 border-emerald-600/30 border-dashed p-1 flex items-center justify-center relative select-none animate-spin-slow">
                                       <div className="absolute inset-2 rounded-full bg-emerald-500/5" />
                                       <span className="text-[6.5px] text-emerald-700/60 font-black tracking-tighter uppercase block text-center leading-none">
-                                        ATSA DVM<br />
-                                        APPROVED<br />
-                                        v2.0 SEAL
+                                        {getProvenance(results).source === 'measured' ? (
+                                          <>
+                                            ATSA DVM<br />
+                                            APPROVED<br />
+                                            v2.0 SEAL
+                                          </>
+                                        ) : (
+                                          <>
+                                            DEMO<br />
+                                            NOT<br />
+                                            CERTIFIED
+                                          </>
+                                        )}
                                       </span>
                                     </div>
 
                                     <div className="text-right leading-tight font-sans">
                                       <div className="text-[7px] font-bold text-black/40 uppercase flex items-center justify-end gap-1 font-mono">
-                                        <ShieldCheck className="w-2.5 h-2.5 text-emerald-600 inline" /> Digital Integrity Verified
+                                        <ShieldCheck className="w-2.5 h-2.5 text-emerald-600 inline" />
+                                        {getProvenance(results).source === 'measured' ? 'Measured run' : 'Demonstration output'}
                                       </div>
                                       <div className="text-[6.5px] text-black/30 uppercase mt-0.5 font-bold font-mono">
-                                        SHA-256 SECURED CRYPTO_ID: {new Date(results.timestamp).getTime().toString(16).toUpperCase()}
+                                        Run ID: {new Date(results.timestamp).getTime().toString(16).toUpperCase()}
                                       </div>
                                     </div>
                                   </div>
@@ -6838,10 +7110,10 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                 <button 
                                   onClick={() => setShowPDFDossier(true)}
                                   className="p-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl font-bold text-[10px] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20"
-                                  title="Open Multi-Page ISO 15189 / WHO 6th Clinical Dossier generator"
+                                  title="Open the multi-page report dossier generator"
                                 >
                                   <Award className="w-3.5 h-3.5" />
-                                  Clinical Dossier
+                                  Report Dossier
                                 </button>
 
                                 {/* 1. Native Print Dialogue */}
@@ -6913,14 +7185,17 @@ Digital Signature Verified - ATSA AI Engine v2.0
                                 {/* 6. Persistent DB storage */}
                                 <button 
                                   onClick={saveToHistory}
-                                  disabled={isSaving}
+                                  disabled={isSaving || !canSaveToPatientRecord(results)}
+                                  title={canSaveToPatientRecord(results) ? 'Save this measured run to patient history' : 'Only measured runs can be saved. Simulated, reference, and AI-estimated results are excluded.'}
                                   className={cn(
-                                    "px-6 py-3 rounded-xl font-bold text-[10px] shadow-lg transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer",
-                                    isSaving ? (theme === 'dark' ? "bg-white/5 text-white/40" : "bg-black/5 text-black/40") : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20"
+                                    "px-6 py-3 rounded-xl font-bold text-[10px] shadow-lg transition-all flex items-center justify-center gap-2 shrink-0",
+                                    isSaving || !canSaveToPatientRecord(results)
+                                      ? (theme === 'dark' ? "bg-white/5 text-white/30 cursor-not-allowed" : "bg-black/5 text-black/30 cursor-not-allowed")
+                                      : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20 cursor-pointer"
                                   )}
                                 >
                                   {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-                                  {isSaving ? "Saving..." : "Save to Cloud"}
+                                  {isSaving ? "Saving..." : canSaveToPatientRecord(results) ? "Save to Cloud" : "Measured data only"}
                                 </button>
                               </div>
                             </div>
@@ -6948,7 +7223,7 @@ Digital Signature Verified - ATSA AI Engine v2.0
                             <div className="max-w-md space-y-2">
                               <h3 className="text-lg font-black uppercase tracking-tight">No Active Specimen Loaded</h3>
                               <p className="text-xs opacity-60 leading-relaxed">
-                                Load a validated reference specimen dataset to preview and export certified clinical dossiers according to ISO 15189 and WHO standards.
+                                Load a reference or demonstration specimen to preview the report layout. Bundled reference datasets are supplied recordings and are never treated as measurements of a registered patient.
                               </p>
                             </div>
                             <div className="flex flex-wrap items-center justify-center gap-2 pt-2 max-w-lg">
@@ -7632,21 +7907,31 @@ Digital Signature Verified - ATSA AI Engine v2.0
           onFieldsChange={setMultiFOVFields}
           onApplyComposite={(composite) => {
             if (results) {
+              const domains = getProvenance(results).domains;
               setResults({
                 ...results,
                 multiFov: composite,
                 summary: {
                   ...results.summary,
-                  concentration: composite.meanConcentration,
-                  motility: {
-                    ...results.summary.motility,
-                    total: composite.meanTotalMotility,
-                    progressive: composite.meanProgressiveMotility
-                  },
-                  morphology: {
-                    ...results.summary.morphology,
-                    normal: composite.meanNormalMorphology
-                  }
+                  concentration:
+                    domains.concentration !== 'not_assessed'
+                      ? composite.meanConcentration
+                      : results.summary.concentration,
+                  motility:
+                    domains.kinematics !== 'not_assessed'
+                      ? {
+                          ...results.summary.motility,
+                          total: composite.meanTotalMotility,
+                          progressive: composite.meanProgressiveMotility
+                        }
+                      : results.summary.motility,
+                  morphology:
+                    domains.morphology !== 'not_assessed'
+                      ? {
+                          ...results.summary.morphology,
+                          normal: composite.meanNormalMorphology
+                        }
+                      : results.summary.morphology
                 }
               });
             }

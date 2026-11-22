@@ -1,3 +1,26 @@
+export type MeasurementBasis = 'measured' | 'estimated' | 'simulated' | 'reference' | 'not_assessed';
+
+export type AnalysisSource = 'measured' | 'estimated' | 'simulated' | 'reference' | 'ai_estimated' | 'unknown';
+
+export interface DomainAssessment {
+  kinematics: MeasurementBasis;
+  concentration: MeasurementBasis;
+  morphometry: MeasurementBasis;
+  morphology: MeasurementBasis;
+  vitality: MeasurementBasis;
+  sdf: MeasurementBasis;
+  leukocytes: MeasurementBasis;
+}
+
+export interface AnalysisProvenance {
+  source: AnalysisSource;
+  label: string;
+  detail: string;
+  /** Only a measured run may be written to a patient record. */
+  recordEligible: boolean;
+  domains: DomainAssessment;
+}
+
 export interface SpermData {
   id: string;
   path: { x: number; y: number; z?: number; t: number }[];
@@ -25,16 +48,16 @@ export interface SpermData {
   };
   
   morphology: {
-    head: 'normal' | 'large' | 'small' | 'amorphous' | 'pyriform' | 'tapered' | 'round' | 'vacuolated' | 'double';
-    vacuoles: 'present' | 'absent';
-    acrosome: 'normal' | 'abnormal' | 'detached';
-    midpiece: 'normal' | 'thick' | 'bent' | 'asymmetric' | 'cytoplasmic_droplet';
-    tail: 'normal' | 'short' | 'coiled' | 'multiple' | 'bent' | 'broken';
-    droplet: 'none' | 'proximal' | 'distal';
-    krugerStrict: 'strict_normal' | 'borderline' | 'abnormal';
+    head: 'normal' | 'large' | 'small' | 'amorphous' | 'pyriform' | 'tapered' | 'round' | 'vacuolated' | 'double' | 'not_assessed';
+    vacuoles: 'present' | 'absent' | 'not_assessed';
+    acrosome: 'normal' | 'abnormal' | 'detached' | 'not_assessed';
+    midpiece: 'normal' | 'thick' | 'bent' | 'asymmetric' | 'cytoplasmic_droplet' | 'not_assessed';
+    tail: 'normal' | 'short' | 'coiled' | 'multiple' | 'bent' | 'broken' | 'not_assessed';
+    droplet: 'none' | 'proximal' | 'distal' | 'not_assessed';
+    krugerStrict: 'strict_normal' | 'borderline' | 'abnormal' | 'not_assessed';
   };
   
-  vitality: 'live' | 'dead';
+  vitality: 'live' | 'dead' | 'not_assessed';
   
   classification: 'progressive' | 'non-progressive' | 'immotile';
   isHyperactivated: boolean;
@@ -45,6 +68,7 @@ export interface SpermData {
     fragmented: boolean;
     haloSized: number; // µm
     dfi: number; // DNA Fragmentation Index (0-100)
+    assessed?: boolean;
   };
 }
 
@@ -121,6 +145,11 @@ export interface AnalysisResult {
   whoEdition?: '5th' | '6th';
   macro?: MacroEvaluation;
   multiFov?: MultiFOVComposite;
+  /**
+   * Describes how each reported domain was obtained. Legacy records without
+   * provenance must be treated as unverified, not as measured patient data.
+   */
+  provenance?: AnalysisProvenance;
   settings: {
     fps: number;
     micronsPerPixel: number;
@@ -128,6 +157,8 @@ export interface AnalysisResult {
     chamberDepth?: number;
     chamberPreset?: string;
     whoStandard?: '5th' | '6th';
+    frameWidth?: number;
+    frameHeight?: number;
   };
   summary: {
     totalCount: number;
