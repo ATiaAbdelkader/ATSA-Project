@@ -167,6 +167,7 @@ const ResultProvenanceBanner: React.FC<{
 }> = ({ result, theme }) => {
   const provenance = getProvenance(result);
   const missing = describeMissingDomains(result, [
+    'kinematics',
     'concentration',
     'morphometry',
     'morphology',

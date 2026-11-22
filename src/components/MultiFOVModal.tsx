@@ -451,6 +451,42 @@ export const MultiFOVModal: React.FC<MultiFOVModalProps> = ({
                           </span>
                         </label>
 
+                        <label className="text-right">
+                          <span className={cn("text-[8px] uppercase font-bold block", isDark ? "text-white/30" : "text-slate-400")}>Normal Morph.</span>
+                          <span className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.1}
+                              value={f.normalMorphology}
+                              onChange={(e) => updateField(idx, { normalMorphology: numberFrom(e.target.value) })}
+                              className={cn(
+                                "w-16 px-1 py-0.5 rounded border text-right text-sm font-mono font-bold focus:outline-none",
+                                isDark ? "bg-black/40 border-white/10 text-white focus:border-emerald-500" : "bg-white border-slate-200 text-slate-900 focus:border-emerald-500"
+                              )}
+                              aria-label={`Field ${f.fieldIndex} normal morphology percent`}
+                            />
+                            <span className="text-[9px] opacity-60">%</span>
+                          </span>
+                        </label>
+
+                        <label className="text-right">
+                          <span className={cn("text-[8px] uppercase font-bold block", isDark ? "text-white/30" : "text-slate-400")}>Cells Counted</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={f.spermCount}
+                            onChange={(e) => updateField(idx, { spermCount: Math.round(numberFrom(e.target.value)) })}
+                            className={cn(
+                              "w-16 px-1 py-0.5 rounded border text-right text-sm font-mono font-bold focus:outline-none",
+                              isDark ? "bg-black/40 border-white/10 text-white focus:border-emerald-500" : "bg-white border-slate-200 text-slate-900 focus:border-emerald-500"
+                            )}
+                            aria-label={`Field ${f.fieldIndex} cells counted`}
+                          />
+                        </label>
+
                         <button
                           type="button"
                           onClick={() => handleDeleteField(idx)}
