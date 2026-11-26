@@ -1021,7 +1021,7 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
             setUploadProgress(Math.min(99, Math.round(progress)));
           },
           (error) => {
-            console.warn("Firebase Storage upload error/cancelled: ", error.message);
+            console.warn("Firebase Storage upload error/cancelled: ", (error as any)?.message);
             if (!isResolved) {
               isResolved = true;
               clearTimeout(timeoutId);
