@@ -1047,21 +1047,6 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
         );
       });
 
-      // 2. Convert file to base64 for Gemini
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const base64 = await base64Promise;
-      const base64Data = base64.split(',')[1];
-
-      // 3. Call Gemini for AI Analysis
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is not configured. Please add it to your environment variables.");
-      }
       const isVideo = file.type.startsWith('video/');
 
       if (isVideo) {
@@ -1132,6 +1117,22 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
         } catch (videoCVError) {
           console.warn("Optical video tracing encountered an issue, falling back to Vision AI:", videoCVError);
         }
+      }
+
+      // 2. Convert the file to base64 for the Gemini fallback path
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const base64 = await base64Promise;
+      const base64Data = base64.split(',')[1];
+
+      // 3. Fall back to Gemini Vision AI only when local tracing is unavailable
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("GEMINI_API_KEY is not configured. Please add it to your environment variables.");
       }
 
       const prompt = isVideo 

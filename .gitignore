@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# local microscopy test clips (originals and derived H.264 copies)
+Semen Video/
