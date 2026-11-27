@@ -1106,6 +1106,10 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
             path: s.path
           }));
 
+          // The report must describe this run, not whatever dataset was loaded before it.
+          setClinicianRemarks(
+            `Phase-contrast CASA optical recording of the uploaded footage. Calibrated at ${tracingRes.micronsPerPixel} μm/pixel, ${tracingRes.fps} FPS frame rate. Video demonstrates ${tracingRes.summary.motility.progressive.toFixed(1)}% progressive motility and ${tracingRes.summary.concentration.toFixed(1)} M/ml concentration.`
+          );
           setActiveTab('live');
           setIsAnalyzing(true);
           setActiveRealSampleKey(null);
@@ -1366,6 +1370,9 @@ export const CASAEngine: React.FC<CASAEngineProps> = ({ onBack, theme, patientDa
         type: 'info'
       });
 
+      setClinicianRemarks(
+        `Vision AI estimate from the uploaded ${isVideo ? 'video' : 'image'} (not a volumetric measurement). Estimated ${conc.toFixed(1)} M/ml concentration${isVideo ? ` and ${prog.toFixed(1)}% progressive motility` : ', motility not assessed'}.`
+      );
       // Auto-switch to live screen and trigger animation tracks immediately
       setActiveTab('live');
       setIsAnalyzing(true);
